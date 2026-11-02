@@ -190,8 +190,10 @@ body{font-family:'Prompt',system-ui,sans-serif;background:var(--bg);color:var(--
       <div class="toggle">สั่นเมื่อถึงตาคุณพูด <div class="sw" id="swVib"></div></div>
     </div>
     <div class="field">
-      <label>Model</label>
-      <input id="model" placeholder="gemini-2.5-flash">
+      <label>Model <span id="testRes"></span></label>
+      <input id="model" placeholder="auto">
+      <small>ใส่ auto = เลือกโมเดลฟรีที่เร็วที่สุดให้อัตโนมัติ</small>
+      <button class="q" id="testBtn" type="button" style="margin-top:10px;width:100%">🔌 ทดสอบการเชื่อมต่อ</button>
     </div>
     <div class="field">
       <label>คำสั่งผู้ช่วย (ขั้นสูง)</label>
@@ -232,12 +234,13 @@ const store = {
   set(k,v){ try{ localStorage.setItem('kvc_'+k,v) }catch(e){} }
 };
 let cfg = {
-  key: store.get('key',''), model: store.get('model','gemini-2.5-flash'), lang: store.get('lang','th-TH'),
+  key: store.get('key',''), model: store.get('model','auto'), lang: store.get('lang','th-TH'),
   rate: +store.get('rate','1'), sil: +store.get('sil','0.8'), voice: store.get('voice',''),
   persona: store.get('persona', DEFAULT_PERSONA),
   confirm: store.get('confirm','1')==='1', wake: store.get('wake','1')==='1', vib: store.get('vib','1')==='1'
 };
 if(/คาลิล|Khalil|ไปต่อไหมครับ/.test(cfg.persona)){ cfg.persona = DEFAULT_PERSONA; store.set('persona',DEFAULT_PERSONA) }
+if(/^gemini-(1\.|2\.)/.test(cfg.model)){ cfg.model='auto'; store.set('model','auto') }
 if(cfg.sil>=1.4){ cfg.sil=0.8; store.set('sil','0.8') }
 let history = []; try{ history = JSON.parse(store.get('history','[]')) }catch(e){}
 
@@ -269,7 +272,7 @@ function renderQuick(){
   const q=$('quick'); q.innerHTML='';
   (QUICK[L()]||QUICK.en).forEach(s=>{ const b=document.createElement('button'); b.className='q'; b.textContent=s; b.onclick=()=>handleUser(s); q.appendChild(b) });
 }
-function renderChips(){ $('modelChip').textContent=cfg.model.replace('gemini-','gemini '); $('langChip').textContent={th:'ไทย',en:'English',fr:'Français',ar:'عربي'}[L()] }
+function renderChips(){ $('modelChip').textContent=(cfg.model==='auto'?(liveModel||'auto'):cfg.model).replace('gemini-','gemini '); $('langChip').textContent={th:'ไทย',en:'English',fr:'Français',ar:'عربي'}[L()] }
 function net(){ const on=navigator.onLine; $('netDot').className='dot '+(on?'on':'off'); $('netTxt').textContent=on?'online':'offline' }
 function tick(){ const s=Math.floor((Date.now()-startTime)/1000); $('timer').textContent=String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0') }
 function buzz(p){ if(cfg.vib && navigator.vibrate) try{ navigator.vibrate(p) }catch(e){} }
@@ -390,17 +393,44 @@ function sqPlay(){
 }
 
 /* ================= AI (Gemini, streaming) ================= */
+const API='https://generativelanguage.googleapis.com/v1beta/';
+let liveModel=null;
+// Picks the best free, fast text model your key can use (newest Flash-Lite first, then Flash).
+async function resolveModel(force){
+  if(cfg.model && cfg.model!=='auto') return cfg.model;
+  if(liveModel && !force) return liveModel;
+  const r=await fetch(API+'models?pageSize=200&key='+encodeURIComponent(cfg.key));
+  const j=await r.json().catch(()=>({}));
+  if(!r.ok) throw new Error(j.error?.message||('HTTP '+r.status));
+  const ok=(j.models||[]).filter(m=>(m.supportedGenerationMethods||[]).includes('generateContent'))
+    .map(m=>m.name.replace('models/',''))
+    .filter(n=>/^gemini-\d+(\.\d+)?-flash(-lite)?(-latest)?$/.test(n));
+  const ver=n=>parseFloat((n.match(/gemini-(\d+(\.\d+)?)/)||[])[1]||0);
+  ok.sort((a,b)=>{ const la=/lite/.test(a), lb=/lite/.test(b); if(la!==lb) return la?-1:1; return ver(b)-ver(a) });
+  if(!ok.length) throw new Error('ไม่พบโมเดล Gemini ที่ใช้ได้กับคีย์นี้');
+  liveModel=ok[0]; renderChips(); return liveModel;
+}
+async function geminiStream(model, body){
+  return fetch(API+`models/${encodeURIComponent(model)}:streamGenerateContent?alt=sse&key=${encodeURIComponent(cfg.key)}`,
+    {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+}
 async function askAIStream(userText, onDelta){
   history.push({role:'user',parts:[{text:userText}],t:timeStr()});
-  const gen={temperature:.7,maxOutputTokens:300};
-  if(/2\.5/.test(cfg.model)) gen.thinkingConfig={thinkingBudget:0};   // no "thinking" = much faster replies
+  const gen={temperature:.7,maxOutputTokens:400};
   const body={
     systemInstruction:{parts:[{text: cfg.persona + (cfg.confirm?CONFIRM_RULE:'') + `\n- เวลาปัจจุบัน: ${new Date().toLocaleString('th-TH',{timeZone:'Asia/Bangkok'})}`}]},
     contents: history.slice(-20).map(m=>({role:m.role,parts:m.parts})),
     generationConfig:gen
   };
-  const url=`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(cfg.model)}:streamGenerateContent?alt=sse&key=${encodeURIComponent(cfg.key)}`;
-  const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  let model, r;
+  try{
+    model=await resolveModel();
+    // ask for the least "thinking" possible = fastest reply; fall back if the model rejects it
+    const think = /^gemini-2\.5/.test(model) ? {thinkingBudget:0} : {thinkingLevel:'minimal'};
+    r=await geminiStream(model,{...body,generationConfig:{...gen,thinkingConfig:think}});
+    if(r.status===400) r=await geminiStream(model,body);
+    if(r.status===404 && cfg.model==='auto'){ model=await resolveModel(true); r=await geminiStream(model,body) }
+  }catch(e){ history.pop(); throw e }
   if(!r.ok){ history.pop(); let m='HTTP '+r.status; try{ m=(await r.json()).error?.message||m }catch(e){} throw new Error(m) }
   const reader=r.body.getReader(), dec=new TextDecoder(); let buf='', full='';
   while(true){
@@ -440,7 +470,7 @@ async function handleUser(text){
     showTyping(false);
     if(inCall){ sqPush(pending); await sqFinish() }
   }catch(e){
-    showTyping(false); addMsg('⚠️ '+e.message,'ai');
+    showTyping(false); addMsg('⚠️ '+e.message,'ai'); toast('Gemini: '+e.message.slice(0,80));
     if(inCall){ sqReset(); sqPush(T('err')); await sqFinish() }
   }
   busy=false;
@@ -523,7 +553,7 @@ function openSheet(){
 function closeSheet(){ $('sheetWrap').classList.remove('open') }
 $('settingsBtn').onclick=openSheet; $('sheetBg').onclick=()=>{ cfg.lang=store.get('lang','th-TH'); closeSheet() };
 $('saveBtn').onclick=()=>{
-  cfg.key=$('apiKey').value.trim(); cfg.model=$('model').value.trim()||'gemini-2.5-flash';
+  cfg.key=$('apiKey').value.trim(); cfg.model=$('model').value.trim()||'auto'; liveModel=null;
   cfg.rate=+$('rate').value; cfg.sil=+$('sil').value; cfg.voice=$('voiceSel').value;
   cfg.persona=$('persona').value.trim()||DEFAULT_PERSONA;
   cfg.confirm=$('swConfirm').classList.contains('on'); cfg.wake=$('swWake').classList.contains('on'); cfg.vib=$('swVib').classList.contains('on');
@@ -531,7 +561,18 @@ $('saveBtn').onclick=()=>{
   Object.entries(save).forEach(([k,v])=>store.set(k,v));
   closeSheet(); renderChips(); renderQuick(); if(!inCall) setMode('idle',T('ready'),T('readySub')); toast('บันทึกแล้ว ✓');
 };
-$('resetBtn').onclick=()=>{ $('persona').value=DEFAULT_PERSONA; $('rate').value=1; $('rate').oninput(); $('sil').value=0.8; $('sil').oninput(); $('model').value='gemini-2.5-flash'; $('voiceSel').value='' };
+$('resetBtn').onclick=()=>{ $('persona').value=DEFAULT_PERSONA; $('rate').value=1; $('rate').oninput(); $('sil').value=0.8; $('sil').oninput(); $('model').value='auto'; $('voiceSel').value='' };
+
+$('testBtn').onclick=async()=>{
+  const old={key:cfg.key,model:cfg.model}; cfg.key=$('apiKey').value.trim(); cfg.model=$('model').value.trim()||'auto'; liveModel=null;
+  $('testRes').textContent='กำลังทดสอบ…';
+  try{
+    const m=await resolveModel(true);
+    const r=await geminiStream(m,{contents:[{role:'user',parts:[{text:'ตอบว่า OK'}]}],generationConfig:{maxOutputTokens:20}});
+    if(!r.ok){ let e='HTTP '+r.status; try{ e=(await r.json()).error?.message||e }catch(_){} throw new Error(e) }
+    $('testRes').textContent='✅ ใช้ได้: '+m; toast('เชื่อมต่อสำเร็จ ✓ '+m);
+  }catch(e){ $('testRes').textContent='❌'; toast('❌ '+e.message.slice(0,90)); cfg.key=old.key; cfg.model=old.model }
+};
 
 /* ================= init ================= */
 if('speechSynthesis' in window){ speechSynthesis.onvoiceschanged=loadVoices; loadVoices() }
