@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b1020">
+<title>K.LINKO Voice Call</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;600&display=swap" rel="stylesheet">
+<style>
+  :root{--bg:#0b1020;--card:#151b33;--text:#eef1ff;--muted:#8b93b8;--green:#22c55e;--red:#ef4444;--accent:#7c5cff}
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{font-family:'Prompt',system-ui,sans-serif;background:radial-gradient(circle at 50% 0%,#1d2550 0%,var(--bg) 60%);color:var(--text);
+       display:flex;flex-direction:column;align-items:center;padding:env(safe-area-inset-top) 16px env(safe-area-inset-bottom)}
+  header{width:100%;max-width:480px;display:flex;justify-content:space-between;align-items:center;padding:16px 0}
+  header h1{font-size:18px;font-weight:600}
+  .icon-btn{background:var(--card);border:0;color:var(--text);width:42px;height:42px;border-radius:50%;font-size:20px;cursor:pointer}
+  main{flex:1;width:100%;max-width:480px;display:flex;flex-direction:column;align-items:center;gap:18px}
+  .avatar-wrap{position:relative;margin-top:20px;width:170px;height:170px;display:grid;place-items:center}
+  .ring{position:absolute;inset:0;border-radius:50%;border:2px solid var(--accent);opacity:0}
+  .listening .ring{animation:pulse 1.6s infinite}
+  .listening .ring:nth-child(2){animation-delay:.5s}
+  .speaking .ring{border-color:var(--green);animation:pulse 1s infinite}
+  @keyframes pulse{0%{transform:scale(.8);opacity:.9}100%{transform:scale(1.35);opacity:0}}
+  .avatar{width:130px;height:130px;border-radius:50%;background:linear-gradient(135deg,var(--accent),#22d3ee);display:grid;place-items:center;font-size:54px;box-shadow:0 10px 40px #7c5cff55}
+  #status{font-size:16px;color:var(--muted);min-height:24px;text-align:center}
+  #timer{font-size:14px;color:var(--muted)}
+  #log{width:100%;flex:1;min-height:160px;max-height:38vh;overflow-y:auto;background:#0f1530aa;border-radius:16px;padding:12px;display:flex;flex-direction:column;gap:8px}
+  .msg{padding:8px 12px;border-radius:14px;max-width:85%;font-size:15px;line-height:1.45;white-space:pre-wrap}
+  .me{align-self:flex-end;background:var(--accent)}
+  .ai{align-self:flex-start;background:var(--card)}
+  .interim{opacity:.6;font-style:italic}
+  .controls{display:flex;gap:28px;padding:18px 0 26px}
+  .call-btn{width:76px;height:76px;border-radius:50%;border:0;font-size:32px;color:#fff;cursor:pointer;box-shadow:0 8px 24px #0006}
+  .start{background:var(--green)} .end{background:var(--red)} .mute{background:var(--card)}
+  .hidden{display:none!important}
+  dialog{margin:auto;border:0;border-radius:18px;background:var(--card);color:var(--text);padding:20px;width:min(92vw,440px)}
+  dialog::backdrop{background:#000a}
+  dialog h2{font-size:18px;margin-bottom:12px}
+  label{display:block;font-size:13px;color:var(--muted);margin:12px 0 4px}
+  input,select,textarea{width:100%;background:#0b1020;color:var(--text);border:1px solid #2a3360;border-radius:10px;padding:10px;font-family:inherit;font-size:14px}
+  textarea{min-height:90px;resize:vertical}
+  .row{display:flex;gap:10px;margin-top:16px}
+  .row button{flex:1;padding:12px;border:0;border-radius:10px;font-family:inherit;font-size:15px;cursor:pointer}
+  .primary{background:var(--accent);color:#fff} .ghost{background:#0b1020;color:var(--text)}
+  small a{color:#9fb0ff}
+  #textRow{width:100%;display:flex;gap:8px}
+  #textRow input{flex:1}
+  #textRow button{border:0;border-radius:10px;background:var(--accent);color:#fff;padding:0 16px;font-size:18px}
+</style>
+</head>
+<body>
+<header>
+  <h1>📞 K.LINKO Voice Call</h1>
+  <button class="icon-btn" id="settingsBtn" aria-label="Settings">⚙️</button>
+</header>
+
+<main>
+  <div class="avatar-wrap" id="avatarWrap">
+    <div class="ring"></div><div class="ring"></div>
+    <div class="avatar">🤖</div>
+  </div>
+  <div id="status">กดปุ่มสีเขียวเพื่อเริ่มโทร</div>
+  <div id="timer"></div>
+  <div id="log"></div>
+  <form id="textRow" class="hidden">
+    <input id="textInput" placeholder="พิมพ์แทนการพูด…" autocomplete="off">
+    <button type="submit">➤</button>
+  </form>
+  <div class="controls">
+    <button class="call-btn start" id="startBtn" aria-label="Start call">📞</button>
+    <button class="call-btn mute hidden" id="muteBtn" aria-label="Mute">🎙️</button>
+    <button class="call-btn end hidden" id="endBtn" aria-label="End call">✖</button>
+  </div>
+</main>
+
+<dialog id="settings">
+  <h2>⚙️ ตั้งค่า / Settings</h2>
+  <label>Gemini API key (ฟรี)</label>
+  <input id="apiKey" type="password" placeholder="AIza...">
+  <small>รับคีย์ฟรีที่ <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a> — เก็บไว้ในเครื่องนี้เท่านั้น</small>
+  <label>Model</label>
+  <input id="model" placeholder="gemini-2.5-flash">
+  <label>ภาษา / Language</label>
+  <select id="lang">
+    <option value="th-TH">ไทย (Thai)</option>
+    <option value="en-US">English</option>
+    <option value="ar-TN">العربية (Arabic)</option>
+    <option value="fr-FR">Français</option>
+  </select>
+  <label>ความเร็วเสียง / Voice speed</label>
+  <input id="rate" type="range" min="0.7" max="1.4" step="0.05">
+  <label>คำสั่งผู้ช่วย / Assistant instructions</label>
+  <textarea id="persona"></textarea>
+  <div class="row">
+    <button class="ghost" id="clearBtn" type="button">ล้างประวัติ</button>
+    <button class="primary" id="saveBtn" type="button">บันทึก</button>
+  </div>
+</dialog>
+
+<script>
+const DEFAULT_PERSONA = `คุณคือผู้ช่วยเสียงส่วนตัวของคุณคาลิล (Khalil) ชาวตูนิเซียที่อาศัยอยู่ในประเทศไทย เจ้าของธุรกิจ Solar Rooftop, BS VYNE และเพจ K. LINKO X
+กติกา:
+- คุยเหมือนโทรศัพท์: ตอบสั้น 1-3 ประโยค เป็นธรรมชาติ ไม่ใช้ markdown ไม่ใช้สัญลักษณ์ ไม่ใช้อีโมจิ
+- พูดภาษาเดียวกับที่คุณคาลิลพูด (ค่าเริ่มต้นภาษาไทย ลงท้ายด้วย ครับ)
+- เมื่อช่วยวางแผนงาน ให้แบ่งเป็นขั้นตอน และก่อนเริ่มแต่ละขั้นตอนต้องอธิบายสั้นๆ แล้วถามว่า "ไปต่อไหมครับ" รอให้เขาตอบตกลงก่อนเสมอ
+- ถ้าไม่แน่ใจ ให้ถามกลับหนึ่งคำถาม`;
+
+const $ = id => document.getElementById(id);
+const store = {
+  get(k, d){ try{ const v = localStorage.getItem('kvc_'+k); return v===null ? d : v }catch(e){ return d } },
+  set(k, v){ try{ localStorage.setItem('kvc_'+k, v) }catch(e){} }
+};
+
+let cfg = {
+  key: store.get('key',''),
+  model: store.get('model','gemini-2.5-flash'),
+  lang: store.get('lang','th-TH'),
+  rate: parseFloat(store.get('rate','1')),
+  persona: store.get('persona', DEFAULT_PERSONA)
+};
+let history = [];
+try { history = JSON.parse(store.get('history','[]')) } catch(e){ history = [] }
+
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+let rec = null, inCall = false, muted = false, busy = false, speaking = false;
+let startTime = 0, timerInt = null, interimEl = null, finalText = '', silenceTimer = null;
+
+/* ---------- UI helpers ---------- */
+function setStatus(t, mode){
+  $('status').textContent = t;
+  $('avatarWrap').className = 'avatar-wrap ' + (mode||'');
+}
+function addMsg(text, who){
+  const d = document.createElement('div');
+  d.className = 'msg ' + who; d.textContent = text;
+  $('log').appendChild(d); $('log').scrollTop = 1e9;
+  return d;
+}
+function renderHistory(){
+  $('log').innerHTML = '';
+  history.slice(-20).forEach(m => addMsg(m.parts[0].text, m.role==='user'?'me':'ai'));
+}
+function tick(){
+  const s = Math.floor((Date.now()-startTime)/1000);
+  $('timer').textContent = String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0');
+}
+
+/* ---------- Speech output ---------- */
+function pickVoice(){
+  const vs = speechSynthesis.getVoices();
+  const base = cfg.lang.split('-')[0];
+  return vs.find(v=>v.lang===cfg.lang) || vs.find(v=>v.lang && v.lang.startsWith(base)) || null;
+}
+function speak(text){
+  return new Promise(res=>{
+    if(!('speechSynthesis' in window)){ res(); return }
+    speechSynthesis.cancel();
+    const clean = text.replace(/[*_#`>\[\]]/g,'');
+    // split long text into chunks (some engines cut off long Thai text)
+    const chunks = clean.match(/[^.!?。\n]{1,180}[.!?。\n]?/g) || [clean];
+    let i = 0;
+    speaking = true; setStatus('กำลังพูด…','speaking');
+    const next = () => {
+      if(i >= chunks.length || !inCall){ speaking=false; res(); return }
+      const u = new SpeechSynthesisUtterance(chunks[i++].trim());
+      u.lang = cfg.lang; u.rate = cfg.rate;
+      const v = pickVoice(); if(v) u.voice = v;
+      u.onend = next; u.onerror = next;
+      speechSynthesis.speak(u);
+    };
+    next();
+  });
+}
+
+/* ---------- AI brain (Gemini) ---------- */
+async function askAI(userText){
+  history.push({role:'user', parts:[{text:userText}]});
+  const body = {
+    systemInstruction: {parts:[{text: cfg.persona}]},
+    contents: history.slice(-30),
+    generationConfig: {temperature:0.7, maxOutputTokens:400}
+  };
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(cfg.model)}:generateContent?key=${encodeURIComponent(cfg.key)}`;
+  const r = await fetch(url, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
+  const j = await r.json();
+  if(!r.ok){ history.pop(); throw new Error(j.error?.message || ('HTTP '+r.status)) }
+  const text = (j.candidates?.[0]?.content?.parts||[]).map(p=>p.text||'').join('').trim() || '…';
+  history.push({role:'model', parts:[{text}]});
+  store.set('history', JSON.stringify(history.slice(-40)));
+  return text;
+}
+
+async function handleUser(text){
+  text = text.trim(); if(!text || busy) return;
+  busy = true; stopListening();
+  addMsg(text,'me');
+  setStatus('กำลังคิด…','');
+  try{
+    const reply = await askAI(text);
+    addMsg(reply,'ai');
+    await speak(reply);
+  }catch(e){
+    addMsg('⚠️ '+e.message,'ai');
+    await speak(cfg.lang.startsWith('th') ? 'ขอโทษครับ มีปัญหาในการเชื่อมต่อ' : 'Sorry, there was a connection problem.');
+  }
+  busy = false;
+  if(inCall) startListening();
+}
+
+/* ---------- Speech input ---------- */
+function startListening(){
+  if(!inCall || muted || busy || speaking || !SR) { if(inCall && !muted && !busy) setStatus(SR?'':'พิมพ์ข้อความด้านล่าง',''); return }
+  try{
+    rec = new SR();
+    rec.lang = cfg.lang; rec.interimResults = true; rec.continuous = true; rec.maxAlternatives = 1;
+    finalText = '';
+    rec.onresult = e => {
+      let interim = '';
+      for(let i=e.resultIndex;i<e.results.length;i++){
+        const t = e.results[i][0].transcript;
+        if(e.results[i].isFinal) finalText += t + ' '; else interim += t;
+      }
+      const show = (finalText + interim).trim();
+      if(show){
+        if(!interimEl){ interimEl = addMsg('', 'me interim') }
+        interimEl.textContent = show; $('log').scrollTop = 1e9;
+      }
+      clearTimeout(silenceTimer);
+      // send after 1.4s of silence
+      silenceTimer = setTimeout(()=>{
+        const t = (finalText + interim).trim();
+        if(t){ if(interimEl){interimEl.remove(); interimEl=null} handleUser(t) }
+      }, 1400);
+    };
+    rec.onerror = e => {
+      if(e.error==='not-allowed' || e.error==='service-not-allowed'){
+        setStatus('ไม่ได้รับอนุญาตใช้ไมค์ — ใช้การพิมพ์แทน',''); $('textRow').classList.remove('hidden');
+      }
+    };
+    rec.onend = () => { rec = null; if(inCall && !busy && !speaking && !muted) setTimeout(startListening, 250) };
+    rec.start();
+    setStatus('กำลังฟัง… พูดได้เลยครับ','listening');
+  }catch(e){ /* already started */ }
+}
+function stopListening(){
+  clearTimeout(silenceTimer);
+  if(rec){ rec.onend = null; try{ rec.abort() }catch(e){} rec = null }
+  if(interimEl){ interimEl.remove(); interimEl = null }
+}
+
+/* ---------- Call control ---------- */
+async function startCall(){
+  if(!cfg.key){ openSettings(); return }
+  inCall = true; muted = false;
+  $('startBtn').classList.add('hidden'); $('endBtn').classList.remove('hidden'); $('muteBtn').classList.remove('hidden');
+  if(!SR) $('textRow').classList.remove('hidden');
+  startTime = Date.now(); tick(); timerInt = setInterval(tick, 1000);
+  // unlock audio on iOS/Android with a user gesture
+  try{ speechSynthesis.speak(new SpeechSynthesisUtterance('')) }catch(e){}
+  const hello = cfg.lang.startsWith('th') ? 'สวัสดีครับคุณคาลิล วันนี้อยากให้ช่วยอะไรครับ'
+              : cfg.lang.startsWith('fr') ? 'Bonjour Khalil, comment puis-je vous aider ?'
+              : cfg.lang.startsWith('ar') ? 'مرحبا خليل، كيف يمكنني مساعدتك؟'
+              : 'Hi Khalil, what can I help you with today?';
+  addMsg(hello,'ai');
+  await speak(hello);
+  startListening();
+}
+function endCall(){
+  inCall = false; busy = false; stopListening();
+  try{ speechSynthesis.cancel() }catch(e){}
+  clearInterval(timerInt);
+  $('startBtn').classList.remove('hidden'); $('endBtn').classList.add('hidden'); $('muteBtn').classList.add('hidden');
+  setStatus('วางสายแล้ว — กดปุ่มสีเขียวเพื่อโทรอีกครั้ง','');
+}
+function toggleMute(){
+  muted = !muted;
+  $('muteBtn').textContent = muted ? '🔇' : '🎙️';
+  if(muted){ stopListening(); setStatus('ปิดไมค์อยู่','') } else startListening();
+}
+
+/* ---------- Settings ---------- */
+function openSettings(){
+  $('apiKey').value = cfg.key; $('model').value = cfg.model; $('lang').value = cfg.lang;
+  $('rate').value = cfg.rate; $('persona').value = cfg.persona;
+  $('settings').showModal();
+}
+$('saveBtn').onclick = () => {
+  cfg.key = $('apiKey').value.trim(); cfg.model = $('model').value.trim() || 'gemini-2.5-flash';
+  cfg.lang = $('lang').value; cfg.rate = parseFloat($('rate').value) || 1;
+  cfg.persona = $('persona').value.trim() || DEFAULT_PERSONA;
+  Object.entries({key:cfg.key, model:cfg.model, lang:cfg.lang, rate:cfg.rate, persona:cfg.persona}).forEach(([k,v])=>store.set(k,v));
+  $('settings').close();
+};
+$('clearBtn').onclick = () => { history = []; store.set('history','[]'); renderHistory() };
+
+$('settingsBtn').onclick = openSettings;
+$('startBtn').onclick = startCall;
+$('endBtn').onclick = endCall;
+$('muteBtn').onclick = toggleMute;
+$('textRow').onsubmit = e => { e.preventDefault(); const v = $('textInput').value; $('textInput').value=''; handleUser(v) };
+if('speechSynthesis' in window) speechSynthesis.onvoiceschanged = () => {};
+renderHistory();
+if(!cfg.key) setStatus('กด ⚙️ ใส่ Gemini API key ฟรีก่อนครับ','');
+</script>
+</body>
+</html>
