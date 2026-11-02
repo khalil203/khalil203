@@ -100,10 +100,10 @@
 </dialog>
 
 <script>
-const DEFAULT_PERSONA = `คุณคือผู้ช่วยเสียงส่วนตัวของคุณคาลิล (Khalil) ชาวตูนิเซียที่อาศัยอยู่ในประเทศไทย เจ้าของธุรกิจ Solar Rooftop, BS VYNE และเพจ K. LINKO X
+const DEFAULT_PERSONA = `คุณคือผู้ช่วยเสียงส่วนตัวของคุณลิงโก้ (Linko) ชาวตูนิเซียที่อาศัยอยู่ในประเทศไทย ให้เรียกเขาว่า "คุณลิงโก้" หรือ "Linko" เสมอ เจ้าของธุรกิจ Solar Rooftop, BS VYNE และเพจ K. LINKO X
 กติกา:
 - คุยเหมือนโทรศัพท์: ตอบสั้น 1-3 ประโยค เป็นธรรมชาติ ไม่ใช้ markdown ไม่ใช้สัญลักษณ์ ไม่ใช้อีโมจิ
-- พูดภาษาเดียวกับที่คุณคาลิลพูด (ค่าเริ่มต้นภาษาไทย ลงท้ายด้วย ครับ)
+- พูดภาษาเดียวกับที่คุณลิงโก้พูด (ค่าเริ่มต้นภาษาไทย ลงท้ายด้วย ครับ)
 - เมื่อช่วยวางแผนงาน ให้แบ่งเป็นขั้นตอน และก่อนเริ่มแต่ละขั้นตอนต้องอธิบายสั้นๆ แล้วถามว่า "ไปต่อไหมครับ" รอให้เขาตอบตกลงก่อนเสมอ
 - ถ้าไม่แน่ใจ ให้ถามกลับหนึ่งคำถาม`;
 
@@ -120,6 +120,7 @@ let cfg = {
   rate: parseFloat(store.get('rate','1')),
   persona: store.get('persona', DEFAULT_PERSONA)
 };
+if(/คาลิล|Khalil/.test(cfg.persona)){ cfg.persona = DEFAULT_PERSONA; store.set('persona', DEFAULT_PERSONA) }
 let history = [];
 try { history = JSON.parse(store.get('history','[]')) } catch(e){ history = [] }
 
@@ -259,10 +260,10 @@ async function startCall(){
   startTime = Date.now(); tick(); timerInt = setInterval(tick, 1000);
   // unlock audio on iOS/Android with a user gesture
   try{ speechSynthesis.speak(new SpeechSynthesisUtterance('')) }catch(e){}
-  const hello = cfg.lang.startsWith('th') ? 'สวัสดีครับคุณคาลิล วันนี้อยากให้ช่วยอะไรครับ'
-              : cfg.lang.startsWith('fr') ? 'Bonjour Khalil, comment puis-je vous aider ?'
-              : cfg.lang.startsWith('ar') ? 'مرحبا خليل، كيف يمكنني مساعدتك؟'
-              : 'Hi Khalil, what can I help you with today?';
+  const hello = cfg.lang.startsWith('th') ? 'สวัสดีครับคุณลิงโก้ วันนี้อยากให้ช่วยอะไรครับ'
+              : cfg.lang.startsWith('fr') ? 'Bonjour Linko, comment puis-je vous aider ?'
+              : cfg.lang.startsWith('ar') ? 'مرحبا لينكو، كيف يمكنني مساعدتك؟'
+              : 'Hi Linko, what can I help you with today?';
   addMsg(hello,'ai');
   await speak(hello);
   startListening();
