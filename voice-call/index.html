@@ -182,7 +182,7 @@ body{font-family:'Prompt',system-ui,sans-serif;background:var(--bg);color:var(--
     </div>
     <div class="field">
       <label>รอเงียบก่อนส่ง <span id="silVal"></span></label>
-      <input id="sil" type="range" min="0.8" max="3" step="0.1">
+      <input id="sil" type="range" min="0.4" max="2.5" step="0.1">
     </div>
     <div class="field">
       <div class="toggle">ขอยืนยันก่อนทุกขั้นตอน <div class="sw" id="swConfirm"></div></div>
@@ -233,11 +233,12 @@ const store = {
 };
 let cfg = {
   key: store.get('key',''), model: store.get('model','gemini-2.5-flash'), lang: store.get('lang','th-TH'),
-  rate: +store.get('rate','1'), sil: +store.get('sil','1.4'), voice: store.get('voice',''),
+  rate: +store.get('rate','1'), sil: +store.get('sil','0.8'), voice: store.get('voice',''),
   persona: store.get('persona', DEFAULT_PERSONA),
   confirm: store.get('confirm','1')==='1', wake: store.get('wake','1')==='1', vib: store.get('vib','1')==='1'
 };
 if(/คาลิล|Khalil|ไปต่อไหมครับ/.test(cfg.persona)){ cfg.persona = DEFAULT_PERSONA; store.set('persona',DEFAULT_PERSONA) }
+if(cfg.sil>=1.4){ cfg.sil=0.8; store.set('sil','0.8') }
 let history = []; try{ history = JSON.parse(store.get('history','[]')) }catch(e){}
 
 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -366,39 +367,84 @@ function interrupt(){
   mode='interrupted'; buzz(20);
 }
 
-/* ================= AI (Gemini) ================= */
-async function askAI(userText){
+/* ================= streaming speech queue ================= */
+// Speaks sentences one after another while the AI is still writing the rest.
+const sq={items:[],playing:false,done:false,resolve:null};
+function sqReset(){ sq.items=[]; sq.playing=false; sq.done=false; sq.resolve=null }
+function sqPush(s){ s=s.replace(/[*_#`>\[\]]/g,'').trim(); if(!s) return; sq.items.push(s); sqPlay() }
+function sqFinish(){ sq.done=true; return new Promise(r=>{ sq.resolve=r; sqCheck() }) }
+function sqCheck(){ if(sq.done && !sq.playing && !sq.items.length && sq.resolve){ const r=sq.resolve; sq.resolve=null; r() } }
+function sqPlay(){
+  if(sq.playing) return;
+  if(!sq.items.length || !inCall || !speakerOn || mode==='interrupted' || !('speechSynthesis' in window)){
+    if(mode==='interrupted' || !speakerOn || !inCall) sq.items=[];
+    sqCheck(); return;
+  }
+  sq.playing=true;
+  if(mode!=='speaking') setMode('speaking',T('speak'),T('speakSub'));
+  const u=new SpeechSynthesisUtterance(sq.items.shift()); u.lang=cfg.lang; u.rate=cfg.rate;
+  const v=pickVoice(); if(v) u.voice=v;
+  u.onboundary=()=>{ energy=Math.min(1,energy+.35) };
+  u.onend=u.onerror=()=>{ sq.playing=false; sqPlay() };
+  speechSynthesis.speak(u);
+}
+
+/* ================= AI (Gemini, streaming) ================= */
+async function askAIStream(userText, onDelta){
   history.push({role:'user',parts:[{text:userText}],t:timeStr()});
+  const gen={temperature:.7,maxOutputTokens:300};
+  if(/2\.5/.test(cfg.model)) gen.thinkingConfig={thinkingBudget:0};   // no "thinking" = much faster replies
   const body={
     systemInstruction:{parts:[{text: cfg.persona + (cfg.confirm?CONFIRM_RULE:'') + `\n- เวลาปัจจุบัน: ${new Date().toLocaleString('th-TH',{timeZone:'Asia/Bangkok'})}`}]},
-    contents: history.slice(-30).map(m=>({role:m.role,parts:m.parts})),
-    generationConfig:{temperature:.7,maxOutputTokens:500}
+    contents: history.slice(-20).map(m=>({role:m.role,parts:m.parts})),
+    generationConfig:gen
   };
-  const url=`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(cfg.model)}:generateContent?key=${encodeURIComponent(cfg.key)}`;
+  const url=`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(cfg.model)}:streamGenerateContent?alt=sse&key=${encodeURIComponent(cfg.key)}`;
   const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
-  const j=await r.json();
-  if(!r.ok){ history.pop(); throw new Error(j.error?.message||('HTTP '+r.status)) }
-  const text=(j.candidates?.[0]?.content?.parts||[]).map(p=>p.text||'').join('').trim()||'…';
-  history.push({role:'model',parts:[{text}],t:timeStr()});
+  if(!r.ok){ history.pop(); let m='HTTP '+r.status; try{ m=(await r.json()).error?.message||m }catch(e){} throw new Error(m) }
+  const reader=r.body.getReader(), dec=new TextDecoder(); let buf='', full='';
+  while(true){
+    const {value,done}=await reader.read(); if(done) break;
+    buf+=dec.decode(value,{stream:true});
+    let i; while((i=buf.indexOf('\n'))>=0){
+      const line=buf.slice(0,i).trim(); buf=buf.slice(i+1);
+      if(!line.startsWith('data:')) continue;
+      try{ const j=JSON.parse(line.slice(5)); const d=(j.candidates?.[0]?.content?.parts||[]).map(p=>p.text||'').join(''); if(d){ full+=d; onDelta(d) } }catch(e){}
+    }
+  }
+  full=full.trim()||'…';
+  history.push({role:'model',parts:[{text:full}],t:timeStr()});
   store.set('history',JSON.stringify(history.slice(-40)));
-  return text;
+  return full;
 }
 async function handleUser(text){
   text=(text||'').trim(); if(!text || busy) return;
   if(!cfg.key){ openSheet(); toast('ใส่ Gemini API key ก่อนครับ'); return }
-  busy=true; stopListening(); interrupt();
+  busy=true; stopListening(); interrupt(); sqReset();
   addMsg(text,'me');
   setMode('thinking',T('think'),T('thinkSub')); showTyping(true);
+  let bubble=null, pending='';
   try{
-    const reply=await askAI(text);
-    showTyping(false); addMsg(reply,'ai');
-    if(inCall) await speak(reply);
+    await askAIStream(text, d=>{
+      if(!bubble){ showTyping(false); bubble=addMsg('','ai') }
+      if(!bubble._t){ bubble._t=document.createTextNode(''); bubble.prepend(bubble._t) } bubble._t.nodeValue+=d;
+      $('log').scrollTop=1e9;
+      if(!inCall) return;
+      pending+=d;
+      // cut a sentence as soon as one is ready: punctuation, new line, or a Thai pause (space) after ~25 chars
+      let m;
+      while((m=pending.match(/^([\s\S]*?[.!?。\n])\s*/)) || (m=pending.match(/^([\s\S]{25,}?)\s+/))){
+        sqPush(m[1]); pending=pending.slice(m[0].length);
+      }
+    });
+    showTyping(false);
+    if(inCall){ sqPush(pending); await sqFinish() }
   }catch(e){
     showTyping(false); addMsg('⚠️ '+e.message,'ai');
-    if(inCall) await speak(T('err'));
+    if(inCall){ sqReset(); sqPush(T('err')); await sqFinish() }
   }
   busy=false;
-  if(inCall) startListening(); else setMode('idle',T('ready'),T('readySub'));
+  if(inCall){ mode='listening'; startListening() } else setMode('idle',T('ready'),T('readySub'));
 }
 
 /* ================= speech input ================= */
@@ -415,10 +461,12 @@ function startListening(){
       const show=(finalText+interim).trim();
       if(show){ if(!interimEl) interimEl=addMsg('','me interim'); interimEl.textContent=show; $('log').scrollTop=1e9 }
       clearTimeout(silenceTimer);
-      silenceTimer=setTimeout(()=>{ const t=(finalText+interim).trim(); if(t){ if(interimEl){interimEl.remove();interimEl=null} handleUser(t) } }, cfg.sil*1000);
+      // final words with nothing pending = send almost immediately; otherwise wait the silence time
+      const wait = interim ? cfg.sil*1000 : Math.min(350, cfg.sil*1000);
+      silenceTimer=setTimeout(()=>{ const t=(finalText+interim).trim(); if(t){ if(interimEl){interimEl.remove();interimEl=null} handleUser(t) } }, wait);
     };
     rec.onerror=e=>{ if(e.error==='not-allowed'||e.error==='service-not-allowed'){ toast('ไม่ได้รับอนุญาตใช้ไมค์'); $('textRow').classList.remove('hidden') } };
-    rec.onend=()=>{ rec=null; if(inCall && !busy && !muted && mode==='listening') setTimeout(startListening,200) };
+    rec.onend=()=>{ rec=null; if(inCall && !busy && !muted && mode==='listening') setTimeout(startListening,50) };
     rec.start(); buzz(15);
     setMode('listening',T('listen'),T('listenSub'));
   }catch(e){}
@@ -483,7 +531,7 @@ $('saveBtn').onclick=()=>{
   Object.entries(save).forEach(([k,v])=>store.set(k,v));
   closeSheet(); renderChips(); renderQuick(); if(!inCall) setMode('idle',T('ready'),T('readySub')); toast('บันทึกแล้ว ✓');
 };
-$('resetBtn').onclick=()=>{ $('persona').value=DEFAULT_PERSONA; $('rate').value=1; $('rate').oninput(); $('sil').value=1.4; $('sil').oninput(); $('model').value='gemini-2.5-flash'; $('voiceSel').value='' };
+$('resetBtn').onclick=()=>{ $('persona').value=DEFAULT_PERSONA; $('rate').value=1; $('rate').oninput(); $('sil').value=0.8; $('sil').oninput(); $('model').value='gemini-2.5-flash'; $('voiceSel').value='' };
 
 /* ================= init ================= */
 if('speechSynthesis' in window){ speechSynthesis.onvoiceschanged=loadVoices; loadVoices() }
