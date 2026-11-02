@@ -160,6 +160,7 @@ body{font-family:'Prompt',system-ui,sans-serif;background:var(--bg);color:var(--
     <div class="field"><label>การเตือน</label><div class="list" id="remList"></div></div>
 
     <h3>🛠 ขั้นสูง</h3>
+    <div class="field"><label>โหมดฟังเสียง</label><select id="stt"><option value="accurate">แม่นยำ (แนะนำสำหรับภาษาไทย)</option><option value="fast">เร็วที่สุด</option></select></div>
     <div class="field"><label>โมเดลแชท</label><input id="model" placeholder="auto"><small>auto = เลือกโมเดลฟรีที่ดีที่สุดให้เอง</small></div>
     <div class="field"><label>เมืองเริ่มต้นสำหรับสภาพอากาศ</label><input id="city" placeholder="Bangkok"></div>
     <div class="field"><label>บุคลิก / คำสั่ง Jarvis</label><textarea id="persona"></textarea></div>
@@ -192,7 +193,7 @@ const $=id=>document.getElementById(id);
 const store={get(k,d){try{const v=localStorage.getItem('jv_'+k);return v===null?d:v}catch(e){return d}},set(k,v){try{localStorage.setItem('jv_'+k,v)}catch(e){}},
   getJ(k,d){try{return JSON.parse(this.get(k,''))??d}catch(e){return d}},setJ(k,v){this.set(k,JSON.stringify(v))}};
 let cfg={key:store.get('key',''),model:store.get('model','auto'),lang:store.get('lang','th-TH'),rate:+store.get('rate','1.05'),sil:+store.get('sil','0.7'),
-  sens:+store.get('sens','5'),voice:store.get('voice',''),persona:store.get('persona',DEFAULT_PERSONA),hooks:store.get('hooks',''),city:store.get('city','Bangkok'),
+  sens:+store.get('sens','5'),stt:store.get('stt','accurate'),voice:store.get('voice',''),persona:store.get('persona',DEFAULT_PERSONA),hooks:store.get('hooks',''),city:store.get('city','Bangkok'),
   confirm:store.get('confirm','1')==='1',barge:store.get('barge','0')==='1',wake:store.get('wake','1')==='1',vib:store.get('vib','1')==='1'};
 let history=store.getJ('history',[]), memory=store.getJ('memory',[]), todos=store.getJ('todos',[]), reminders=store.getJ('reminders',[]);
 
@@ -335,19 +336,34 @@ function finishUtterance(){
     const blob=new Blob(chunks,{type:r.mimeType||'audio/webm'});
     try{
       const text=await transcribe(blob);
-      if(!text||isHallucination(text,dur)){startListening();return}
+      if(!text||isHallucination(text,dur)){if(text)toast('🎧 ได้ยิน: '+text);startListening();return}
       handleUser(text);
     }catch(e){addMsg('⚠️ '+e.message,'ai');toast(e.message.slice(0,90));startListening()}
   };
   try{r.stop()}catch(e){}
 }
 function isHallucination(t,dur){t=t.trim();return !t||(dur<1200&&/^(thank you|thanks for watching|you|bye|ขอบคุณ(ที่รับชม|ครับ|ค่ะ)*|ซับไตเติ้ล.*|\.+)[\s.!]*$/i.test(t))}
-async function transcribe(blob){
+const STT_PROMPT={th:'สวัสดีครับจาร์วิส ผมชื่อลิงโก้ ช่วยดูงานโซลาร์รูฟท็อป ส่งไลน์ลูกค้า และทำคอนเทนต์ติ๊กต็อกหน่อยครับ',
+  en:'Hi Jarvis, this is Linko. Solar Rooftop, BS VYNE, TikTok, Make.',fr:'Bonjour Jarvis, c\'est Linko.',ar:'مرحبا جارفيس، أنا لينكو.'};
+async function whisper(blob,model){
   const ext=(blob.type.match(/mp4|ogg|webm/)||['webm'])[0];const fd=new FormData();
-  fd.append('file',blob,'speech.'+(ext==='mp4'?'m4a':ext));fd.append('model','whisper-large-v3-turbo');fd.append('language',L());
-  fd.append('response_format','json');fd.append('temperature','0');fd.append('prompt','Linko, Jarvis, Solar Rooftop, BS VYNE, TikTok, Make');
+  fd.append('file',blob,'speech.'+(ext==='mp4'?'m4a':ext));fd.append('model',model);fd.append('language',L());
+  fd.append('response_format','json');fd.append('temperature','0');fd.append('prompt',STT_PROMPT[L()]||STT_PROMPT.en);
   const r=await fetch(GROQ+'audio/transcriptions',{method:'POST',headers:{Authorization:'Bearer '+cfg.key},body:fd});
-  const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.error?.message||('Whisper HTTP '+r.status));return (j.text||'').trim();
+  const j=await r.json().catch(()=>({}));if(!r.ok){const e=new Error(j.error?.message||('Whisper HTTP '+r.status));e.status=r.status;throw e}
+  return (j.text||'').trim();
+}
+const SCRIPT={th:/[฀-๿]/,ar:/[؀-ۿ]/};
+async function transcribe(blob){
+  // Thai: accurate model first (better Thai), turbo as backup. Other languages: turbo (fastest).
+  const models=cfg.stt==='fast'?['whisper-large-v3-turbo','whisper-large-v3']:['whisper-large-v3','whisper-large-v3-turbo'];
+  let text='',lastErr=null;
+  for(const m of models){
+    try{text=await whisper(blob,m)}catch(e){lastErr=e;continue}
+    const sc=SCRIPT[L()];
+    if(!sc||!text||sc.test(text))return text;   // got the right script (e.g. Thai letters) → done
+  }
+  if(lastErr&&!text)throw lastErr;return text;
 }
 
 /* ===================================================== TOOLS (what Jarvis can do) */
@@ -531,18 +547,18 @@ function renderLists(){
   mk('remList',reminders,r=>new Date(r.at).toLocaleString('th-TH',{dateStyle:'short',timeStyle:'short'})+' · '+r.text,i=>{reminders.splice(i,1);store.setJ('reminders',reminders)});
 }
 function openSheet(){
-  $('apiKey').value=cfg.key;$('model').value=cfg.model;$('persona').value=cfg.persona;$('hooks').value=cfg.hooks;$('city').value=cfg.city;
+  $('apiKey').value=cfg.key;$('model').value=cfg.model;$('stt').value=cfg.stt;$('persona').value=cfg.persona;$('hooks').value=cfg.hooks;$('city').value=cfg.city;
   $('rate').value=cfg.rate;$('rate').oninput();$('sil').value=cfg.sil;$('sil').oninput();$('sens').value=cfg.sens;$('sens').oninput();
   [...$('langSeg').children].forEach(x=>x.classList.toggle('sel',x.dataset.v===cfg.lang));
   setSw('swConfirm',cfg.confirm);setSw('swBarge',cfg.barge);setSw('swWake',cfg.wake);setSw('swVib',cfg.vib);loadVoices();renderLists();$('sheetWrap').classList.add('open');
 }
 $('settingsBtn').onclick=openSheet;$('sheetBg').onclick=()=>{cfg.lang=store.get('lang','th-TH');$('sheetWrap').classList.remove('open')};
 $('saveBtn').onclick=()=>{
-  Object.assign(cfg,{key:$('apiKey').value.trim(),model:$('model').value.trim()||'auto',rate:+$('rate').value,sil:+$('sil').value,sens:+$('sens').value,voice:$('voiceSel').value,
+  Object.assign(cfg,{key:$('apiKey').value.trim(),model:$('model').value.trim()||'auto',stt:$('stt').value,rate:+$('rate').value,sil:+$('sil').value,sens:+$('sens').value,voice:$('voiceSel').value,
     persona:$('persona').value.trim()||DEFAULT_PERSONA,hooks:$('hooks').value.trim(),city:$('city').value.trim()||'Bangkok',
     confirm:$('swConfirm').classList.contains('on'),barge:$('swBarge').classList.contains('on'),wake:$('swWake').classList.contains('on'),vib:$('swVib').classList.contains('on')});
   liveModel=null;
-  for(const k of['key','model','lang','rate','sil','sens','voice','persona','hooks','city'])store.set(k,cfg[k]);
+  for(const k of['key','model','stt','lang','rate','sil','sens','voice','persona','hooks','city'])store.set(k,cfg[k]);
   for(const k of['confirm','barge','wake','vib'])store.set(k,cfg[k]?'1':'0');
   $('sheetWrap').classList.remove('open');renderChips();renderQuick();if(!inCall)setMode('idle',T('ready'),T('readySub'));toast('บันทึกแล้ว ✓');
 };
