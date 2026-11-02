@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="th">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
@@ -91,7 +91,7 @@ body{font-family:'Prompt',system-ui,sans-serif;background:var(--bg);color:var(--
 <div id="toast"></div>
 <div class="app">
   <div class="top">
-    <div class="brand"><div class="logo">J</div><div><h1>JARVIS</h1><small>ผู้ช่วยส่วนตัวของคุณลิงโก้</small></div></div>
+    <div class="brand"><div class="logo">J</div><div><h1>JARVIS</h1><small>Linko's personal AI assistant</small></div></div>
     <button class="ibtn" id="settingsBtn" aria-label="Settings">⚙️</button>
   </div>
   <div class="chips-row">
@@ -103,14 +103,14 @@ body{font-family:'Prompt',system-ui,sans-serif;background:var(--bg);color:var(--
   </div>
   <div class="stage">
     <canvas id="orb"></canvas>
-    <div class="state"><b id="stateTitle">พร้อม</b><span id="stateSub"></span></div>
+    <div class="state"><b id="stateTitle">Ready</b><span id="stateSub"></span></div>
   </div>
   <div class="panel">
-    <div class="panel-h"><span>💬 บทสนทนา</span><button id="copyAll">คัดลอกทั้งหมด</button></div>
+    <div class="panel-h"><span>💬 Conversation</span><button id="copyAll">Copy all</button></div>
     <div id="log"></div>
   </div>
   <div class="quick" id="quick"></div>
-  <form id="textRow" class="hidden"><input id="textInput" placeholder="พิมพ์คำสั่ง…" autocomplete="off"><button type="submit">➤</button></form>
+  <form id="textRow" class="hidden"><input id="textInput" placeholder="Type a command…" autocomplete="off"><button type="submit">➤</button></form>
   <div class="controls">
     <button class="cbtn" id="kbBtn" aria-label="Keyboard">⌨️</button>
     <button class="cbtn hidden" id="muteBtn" aria-label="Mute">🎙️</button>
@@ -124,77 +124,79 @@ body{font-family:'Prompt',system-ui,sans-serif;background:var(--bg);color:var(--
   <div class="sheet-bg" id="sheetBg"></div>
   <div class="sheet">
     <div class="grab"></div>
-    <h2>⚙️ ตั้งค่า Jarvis</h2>
+    <h2>⚙️ Jarvis settings</h2>
     <div class="field">
-      <label>Groq API key <span>ฟรี</span></label>
+      <label>Groq API key <span>free</span></label>
       <input id="apiKey" type="password" placeholder="gsk_...">
-      <small>สมัครฟรีที่ <a href="https://console.groq.com/keys" target="_blank" rel="noopener">console.groq.com/keys</a> → Create API Key · เก็บในเครื่องนี้เท่านั้น</small>
-      <button class="q" id="testBtn" type="button" style="margin-top:10px;width:100%">🔌 ทดสอบการเชื่อมต่อ <span id="testRes"></span></button>
+      <small>Get one free at <a href="https://console.groq.com/keys" target="_blank" rel="noopener">console.groq.com/keys</a> → Create API Key · stored only on this device</small>
+      <button class="q" id="testBtn" type="button" style="margin-top:10px;width:100%">🔌 Test connection <span id="testRes"></span></button>
     </div>
-    <div class="field"><label>ภาษา</label>
-      <div class="seg" id="langSeg"><button data-v="th-TH">ไทย</button><button data-v="en-US">EN</button><button data-v="fr-FR">FR</button><button data-v="ar-TN">عربي</button></div>
+    <div class="field"><label>Language</label>
+      <div class="seg" id="langSeg"><button data-v="th-TH">TH</button><button data-v="en-US">EN</button><button data-v="fr-FR">FR</button><button data-v="ar-TN">عربي</button></div>
     </div>
-    <div class="field"><label>เสียงพูด <span id="voiceCount"></span></label><select id="voiceSel"></select></div>
-    <div class="field"><label>ความเร็วเสียง <span id="rateVal"></span></label><input id="rate" type="range" min="0.7" max="1.6" step="0.05"></div>
-    <div class="field"><label>รอเงียบก่อนส่ง <span id="silVal"></span></label><input id="sil" type="range" min="0.3" max="2" step="0.1"></div>
-    <div class="field"><label>ความไวไมค์ <span id="sensVal"></span></label><input id="sens" type="range" min="1" max="10" step="1">
-      <small>ถ้ามีเสียงรบกวนรอบตัวแล้วมันส่งเอง → ลดลง · ถ้าพูดแล้วมันไม่ได้ยิน → เพิ่มขึ้น</small></div>
+    <div class="field"><label>Voice <span id="voiceCount"></span></label><select id="voiceSel"></select></div>
+    <div class="field"><label>Speaking speed <span id="rateVal"></span></label><input id="rate" type="range" min="0.7" max="1.6" step="0.05"></div>
+    <div class="field"><label>Silence before sending <span id="silVal"></span></label><input id="sil" type="range" min="0.3" max="2" step="0.1"></div>
+    <div class="field"><label>Mic sensitivity <span id="sensVal"></span></label><input id="sens" type="range" min="1" max="10" step="1">
+      <small>If it sends by itself because of background noise → lower it · if it doesn't hear you → raise it</small></div>
     <div class="field">
-      <div class="toggle">ขอยืนยันก่อนทุกขั้นตอน <div class="sw" id="swConfirm"></div></div>
-      <div class="toggle">พูดแทรกได้ขณะ Jarvis พูด (ใช้หูฟังจะดีกว่า) <div class="sw" id="swBarge"></div></div>
-      <div class="toggle">เปิดหน้าจอค้างไว้ <div class="sw" id="swWake"></div></div>
-      <div class="toggle">สั่นเมื่อถึงตาคุณพูด <div class="sw" id="swVib"></div></div>
+      <div class="toggle">Ask before every step <div class="sw" id="swConfirm"></div></div>
+      <div class="toggle">Let me interrupt while Jarvis talks (best with earphones) <div class="sw" id="swBarge"></div></div>
+      <div class="toggle">Keep screen on <div class="sw" id="swWake"></div></div>
+      <div class="toggle">Vibrate when it's my turn <div class="sw" id="swVib"></div></div>
     </div>
 
     <h3>🔗 Make.com Automations</h3>
     <div class="field">
-      <label>หนึ่งบรรทัดต่อหนึ่งงาน: ชื่อ | webhook URL | อธิบายว่าทำอะไร</label>
-      <textarea id="hooks" placeholder="ส่งไลน์ลูกค้า | https://hook.eu2.make.com/xxxx | ส่งข้อความ LINE OA ถึงลูกค้า ต้องมี ชื่อลูกค้า และ ข้อความ
-บันทึกลูกค้าใหม่ | https://hook.eu2.make.com/yyyy | เพิ่มลูกค้าโซลาร์ใหม่ลง CRM ต้องมี ชื่อ เบอร์ ที่อยู่"></textarea>
-      <small>ใน Make: สร้าง Scenario → โมดูลแรก Webhooks › Custom webhook → คัดลอก URL มาวาง · Jarvis จะส่งข้อมูลเป็น JSON</small>
+      <label>One per line: name | webhook URL | what it does</label>
+      <textarea id="hooks" placeholder="Send LINE to customer | https://hook.eu2.make.com/xxxx | Sends a LINE OA message to a customer, needs customer name and message
+Add new customer | https://hook.eu2.make.com/yyyy | Adds a new solar customer to the CRM, needs name, phone, address"></textarea>
+      <small>In Make: create a Scenario → first module Webhooks › Custom webhook → copy the URL here · Jarvis sends the data as JSON</small>
     </div>
 
-    <h3>🧠 ความจำ & งาน</h3>
-    <div class="field"><label>สิ่งที่ Jarvis จำไว้</label><div class="list" id="memList"></div></div>
-    <div class="field"><label>รายการที่ต้องทำ</label><div class="list" id="todoList"></div></div>
-    <div class="field"><label>การเตือน</label><div class="list" id="remList"></div></div>
+    <h3>🧠 Memory & tasks</h3>
+    <div class="field"><label>What Jarvis remembers</label><div class="list" id="memList"></div></div>
+    <div class="field"><label>To-do list</label><div class="list" id="todoList"></div></div>
+    <div class="field"><label>Reminders</label><div class="list" id="remList"></div></div>
 
-    <h3>🛠 ขั้นสูง</h3>
-    <div class="field"><label>โหมดฟังเสียง</label><select id="stt"><option value="accurate">แม่นยำ (แนะนำสำหรับภาษาไทย)</option><option value="fast">เร็วที่สุด</option></select></div>
-    <div class="field"><label>โมเดลแชท</label><input id="model" placeholder="auto"><small>auto = เลือกโมเดลฟรีที่ดีที่สุดให้เอง</small></div>
-    <div class="field"><label>เมืองเริ่มต้นสำหรับสภาพอากาศ</label><input id="city" placeholder="Bangkok"></div>
-    <div class="field"><label>บุคลิก / คำสั่ง Jarvis</label><textarea id="persona"></textarea></div>
-    <div class="actions"><button class="ghost" id="resetBtn" type="button">คืนค่า</button><button class="primary" id="saveBtn" type="button">บันทึก</button></div>
+    <h3>🛠 Advanced</h3>
+    <div class="field"><label>Listening mode</label><select id="stt"><option value="accurate">Accurate</option><option value="fast">Fastest (recommended for English)</option></select></div>
+    <div class="field"><label>Chat model</label><input id="model" placeholder="auto"><small>auto = picks the best free model for you</small></div>
+    <div class="field"><label>Default weather city</label><input id="city" placeholder="Bangkok"></div>
+    <div class="field"><label>Jarvis personality / instructions</label><textarea id="persona"></textarea></div>
+    <div class="actions"><button class="ghost" id="resetBtn" type="button">Reset</button><button class="primary" id="saveBtn" type="button">Save</button></div>
   </div>
 </div>
 
 <script>
 /* ===================================================== CONFIG */
 const GROQ='https://api.groq.com/openai/v1/';
-const DEFAULT_PERSONA=`คุณคือ "จาร์วิส" (Jarvis) ผู้ช่วย AI ส่วนตัวของคุณลิงโก้ (Linko) ชาวตูนิเซียที่อาศัยอยู่ในประเทศไทย เจ้าของธุรกิจ Solar Rooftop (ติดตั้งโซลาร์), BS VYNE (เอเจนซี่การตลาด/ออกแบบ) และเพจ K. LINKO X / TikTok @k.linkox
-บุคลิก: ฉลาด สุภาพ กระชับ มั่นใจ แบบ Jarvis ในหนัง เรียกเขาว่า "คุณลิงโก้"
-กติกา:
-- นี่คือการคุยด้วยเสียง ตอบสั้น 1-3 ประโยค เป็นธรรมชาติ ห้ามใช้ markdown สัญลักษณ์ หรืออีโมจิ
-- ตอบภาษาเดียวกับที่คุณลิงโก้พูด (ค่าเริ่มต้นภาษาไทย ลงท้าย ครับ)
-- ใช้เครื่องมือ (tools) เมื่อจำเป็น: สั่งงาน automation, เปิดแอปในมือถือ, จำข้อมูล, รายการที่ต้องทำ, ตั้งเตือน, สภาพอากาศ, ค้นเว็บ
-- ถ้าคุณลิงโก้บอกข้อมูลส่วนตัวที่ควรจำ (ชื่อคน เบอร์ ความชอบ) ให้ใช้ remember
-- ถ้าข้อมูลไม่พอสำหรับงาน ให้ถามกลับหนึ่งคำถาม`;
-const CONFIRM_RULE=`\n- ก่อนสั่ง automation หรือทำงานหลายขั้นตอน ให้อธิบายสั้นๆ แล้วถาม "ไปต่อไหมครับ" รอคำตอบตกลงก่อนเสมอ`;
+const DEFAULT_PERSONA=`You are JARVIS, the personal AI assistant of Linko, a Tunisian living in Thailand. He runs Solar Rooftop (solar installation), BS VYNE (marketing & design agency) and the Facebook page K. LINKO X / TikTok @k.linkox.
+Personality: smart, calm, polite, confident and a little witty, like Jarvis in the movies. Call him "Linko" (occasionally "sir").
+Rules:
+- This is a voice conversation: answer in 1-3 short, natural sentences. No markdown, no symbols, no emoji.
+- Speak English unless Linko clearly speaks another language.
+- Use your tools when useful: run automations, open apps on the phone, remember facts, to-do list, reminders, weather, web search.
+- When Linko shares something worth keeping (names, numbers, preferences), use remember.
+- If you need more information for a task, ask one short question.`;
+const CONFIRM_RULE=`
+- Before running an automation or a multi-step task, explain it briefly and ask "Shall I proceed?" Always wait for his OK.`;
 const QUICK={th:['วันนี้มีอะไรต้องทำบ้าง','อากาศวันนี้เป็นยังไง','ช่วยคิดคอนเทนต์ TikTok','จำไว้ว่า…','เตือนฉันใน 10 นาที','ข่าวโซลาร์ล่าสุด'],
   en:['What is on my to-do list?','Weather today?','TikTok content ideas','Remind me in 10 minutes','Latest solar news'],
   fr:['Ma liste de tâches ?','Météo aujourd\'hui ?','Idées TikTok','Rappelle-moi dans 10 minutes'],
   ar:['ما هي مهامي اليوم؟','كيف الطقس اليوم؟','أفكار تيك توك','ذكرني بعد 10 دقائق']};
 const GREET={th:'สวัสดีครับคุณลิงโก้ จาร์วิสพร้อมแล้วครับ',en:'Good to see you, Linko. Jarvis is online.',fr:'Bonjour Linko, Jarvis est prêt.',ar:'مرحبا لينكو، جارفيس جاهز.'};
 const UI={th:{ready:'พร้อม',readySub:'แตะปุ่มสีฟ้าเพื่อคุยกับ Jarvis',listen:'กำลังฟัง…',listenSub:'พูดได้เลยครับ',hear:'ได้ยินแล้ว…',hearSub:'พูดต่อได้เลย',stt:'กำลังแปลงเสียง…',think:'กำลังคิด…',speak:'กำลังพูด',speakSub:'แตะลูกบอลเพื่อขัดจังหวะ',muted:'ปิดไมค์อยู่',ended:'จบการสนทนา',needKey:'ต้องใส่ Groq key',needKeySub:'แตะ ⚙️ (สมัครฟรี)',err:'ขอโทษครับ เชื่อมต่อไม่ได้',mic:'ใช้ไมค์ไม่ได้ ใช้การพิมพ์แทน'},
-  en:{ready:'Ready',readySub:'Tap the blue button to talk',listen:'Listening…',listenSub:'Go ahead',hear:'Hearing you…',hearSub:'',stt:'Transcribing…',think:'Thinking…',speak:'Speaking',speakSub:'Tap the orb to interrupt',muted:'Muted',ended:'Session ended',needKey:'Groq key needed',needKeySub:'Tap ⚙️ (free)',err:'Sorry, connection problem.',mic:'Microphone unavailable, use typing'}};
+  en:{ready:'Ready',readySub:'Tap the mic to talk to Jarvis',listen:'Listening…',listenSub:'Go ahead',hear:'Hearing you…',hearSub:'',stt:'Transcribing…',think:'Thinking…',speak:'Speaking',speakSub:'Tap the orb to interrupt',muted:'Muted',ended:'Session ended',needKey:'Groq key needed',needKeySub:'Tap ⚙️ (free)',err:'Sorry, connection problem.',mic:'Microphone unavailable, use typing'}};
 const L=()=>cfg.lang.split('-')[0];
-const T=k=>(UI[L()]||UI.en)[k]??UI.en[k];
+const T=k=>UI.en[k];   // interface always in English
 const $=id=>document.getElementById(id);
 const store={get(k,d){try{const v=localStorage.getItem('jv_'+k);return v===null?d:v}catch(e){return d}},set(k,v){try{localStorage.setItem('jv_'+k,v)}catch(e){}},
   getJ(k,d){try{return JSON.parse(this.get(k,''))??d}catch(e){return d}},setJ(k,v){this.set(k,JSON.stringify(v))}};
-let cfg={key:store.get('key',''),model:store.get('model','auto'),lang:store.get('lang','th-TH'),rate:+store.get('rate','1.05'),sil:+store.get('sil','0.7'),
-  sens:+store.get('sens','5'),stt:store.get('stt','accurate'),voice:store.get('voice',''),persona:store.get('persona',DEFAULT_PERSONA),hooks:store.get('hooks',''),city:store.get('city','Bangkok'),
+let cfg={key:store.get('key',''),model:store.get('model','auto'),lang:store.get('lang','en-US'),rate:+store.get('rate','1.05'),sil:+store.get('sil','0.7'),
+  sens:+store.get('sens','5'),stt:store.get('stt','fast'),voice:store.get('voice',''),persona:store.get('persona',DEFAULT_PERSONA),hooks:store.get('hooks',''),city:store.get('city','Bangkok'),
   confirm:store.get('confirm','1')==='1',barge:store.get('barge','0')==='1',wake:store.get('wake','1')==='1',vib:store.get('vib','1')==='1'};
+if(store.get('en_v','')!=='1'){cfg.lang='en-US';cfg.persona=DEFAULT_PERSONA;cfg.stt='fast';store.set('lang','en-US');store.set('persona',DEFAULT_PERSONA);store.set('stt','fast');store.set('history','[]');store.set('en_v','1')}
 let history=store.getJ('history',[]), memory=store.getJ('memory',[]), todos=store.getJ('todos',[]), reminders=store.getJ('reminders',[]);
 
 let inCall=false,muted=false,busy=false,speakerOn=true,mode='idle',energy=0,micLevel=0;
@@ -211,7 +213,7 @@ function addMsg(text,who,time){
   $('log').appendChild(d);$('log').scrollTop=1e9;return d;
 }
 function addCard(title,url,label){
-  const d=addMsg(title,'ai card');const a=document.createElement('a');a.href=url;a.textContent=label||'เปิด';
+  const d=addMsg(title,'ai card');const a=document.createElement('a');a.href=url;a.textContent=label||'Open';
   if(/^https?:/.test(url)){a.target='_blank';a.rel='noopener'} d.appendChild(a);$('log').scrollTop=1e9;
   try{ if(!/^https?:/.test(url)) location.href=url; else window.open(url,'_blank') }catch(e){}
 }
@@ -221,13 +223,13 @@ function showTyping(on){
 }
 function renderHistory(){
   $('log').innerHTML='';
-  if(!history.length){$('log').innerHTML='<div class="empty">🤖 สวัสดีครับคุณลิงโก้ ผมคือ Jarvis<br>แตะ 🎙️ เพื่อคุยด้วยเสียง · ⌨️ เพื่อพิมพ์<br>สั่งได้ทั้งเตือน จำ ค้นเว็บ อากาศ<br>เปิดแอป และสั่งงาน Make.com</div>';return}
+  if(!history.length){$('log').innerHTML='<div class="empty">🤖 Hello Linko, I\'m Jarvis.<br>Tap 🎙️ to talk · ⌨️ to type<br>Reminders, memory, web search, weather,<br>open apps and run your Make.com automations</div>';return}
   history.slice(-24).forEach(m=>addMsg(m.content,m.role==='user'?'me':'ai',m.t||''));
 }
 function renderQuick(){const q=$('quick');q.innerHTML='';(QUICK[L()]||QUICK.en).forEach(s=>{const b=document.createElement('button');b.className='q';b.textContent=s;
   b.onclick=()=>{ if(s.endsWith('…')){ $('textRow').classList.remove('hidden'); $('textInput').value=s.replace('…',' '); $('textInput').focus() } else handleUser(s) };q.appendChild(b)})}
 function renderChips(){$('modelChip').textContent=(cfg.model==='auto'?(liveModel||'auto'):cfg.model).split('/').pop();
-  $('langChip').textContent={th:'ไทย',en:'EN',fr:'FR',ar:'عربي'}[L()];$('hookChip').textContent=parseHooks().length+' automations'}
+  $('langChip').textContent={th:'TH',en:'EN',fr:'FR',ar:'AR'}[L()];$('hookChip').textContent=parseHooks().length+' automations'}
 function net(){const on=navigator.onLine;$('netDot').className='dot '+(on?'on':'off');$('netTxt').textContent=on?'online':'offline'}
 function tick(){const s=Math.floor((Date.now()-startTime)/1000);$('timer').textContent=String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0')}
 function buzz(p){if(cfg.vib&&navigator.vibrate)try{navigator.vibrate(p)}catch(e){}}
@@ -268,7 +270,7 @@ function buzz(p){if(cfg.vib&&navigator.vibrate)try{navigator.vibrate(p)}catch(e)
 /* ===================================================== SPEECH OUT (queue) */
 let voices=[];
 function loadVoices(){voices=('speechSynthesis' in window)?speechSynthesis.getVoices():[];const list=voices.filter(v=>v.lang&&v.lang.toLowerCase().startsWith(L()));
-  $('voiceSel').innerHTML='<option value="">อัตโนมัติ</option>'+list.map(v=>`<option value="${v.name}">${v.name}</option>`).join('');$('voiceSel').value=cfg.voice;$('voiceCount').textContent=list.length+' เสียง'}
+  $('voiceSel').innerHTML='<option value="">Automatic</option>'+list.map(v=>`<option value="${v.name}">${v.name}</option>`).join('');$('voiceSel').value=cfg.voice;$('voiceCount').textContent=list.length+' voices'}
 const pickVoice=()=>voices.find(v=>v.name===cfg.voice)||voices.find(v=>v.lang===cfg.lang)||voices.find(v=>v.lang&&v.lang.toLowerCase().startsWith(L()))||null;
 function splitSentences(t){t=t.replace(/[*_#`>\[\]]/g,'');const out=[];let m;
   while((m=t.match(/^([\s\S]*?[.!?。\n])\s*/))||(m=t.match(/^([\s\S]{30,}?)\s+/))){out.push(m[1].trim());t=t.slice(m[0].length)}if(t.trim())out.push(t.trim());return out.filter(Boolean)}
@@ -336,7 +338,7 @@ function finishUtterance(){
     const blob=new Blob(chunks,{type:r.mimeType||'audio/webm'});
     try{
       const text=await transcribe(blob);
-      if(!text||isHallucination(text,dur)){if(text)toast('🎧 ได้ยิน: '+text);startListening();return}
+      if(!text||isHallucination(text,dur)){if(text)toast('🎧 Heard: '+text);startListening();return}
       handleUser(text);
     }catch(e){addMsg('⚠️ '+e.message,'ai');toast(e.message.slice(0,90));startListening()}
   };
@@ -394,12 +396,12 @@ async function runTool(name,a){
   }
   case 'open_on_phone':{
     const t=a.target||'',tx=a.text||'',num=t.replace(/[^\d+]/g,'');
-    const map={call:['tel:'+num,'📞 โทร '+t],sms:[`sms:${num}${tx?'?body='+enc(tx):''}`,'💬 ส่ง SMS ถึง '+t],line:[tx?'https://line.me/R/msg/text/?'+enc(tx):'https://line.me/R/','🟢 เปิด LINE'],
-      whatsapp:[`https://wa.me/${num.replace('+','')}${tx?'?text='+enc(tx):''}`,'🟢 WhatsApp '+t],maps:['https://www.google.com/maps/search/?api=1&query='+enc(t),'🗺️ แผนที่: '+t],
+    const map={call:['tel:'+num,'📞 Call '+t],sms:[`sms:${num}${tx?'?body='+enc(tx):''}`,'💬 SMS to '+t],line:[tx?'https://line.me/R/msg/text/?'+enc(tx):'https://line.me/R/','🟢 Open LINE'],
+      whatsapp:[`https://wa.me/${num.replace('+','')}${tx?'?text='+enc(tx):''}`,'🟢 WhatsApp '+t],maps:['https://www.google.com/maps/search/?api=1&query='+enc(t),'🗺️ Map: '+t],
       youtube:['https://www.youtube.com/results?search_query='+enc(t),'▶️ YouTube: '+t],google:['https://www.google.com/search?q='+enc(t),'🔎 Google: '+t],
       facebook:['https://www.facebook.com/'+(/^https?:/.test(t)?'':enc(t)),'📘 Facebook'],tiktok:['https://www.tiktok.com/'+(t.startsWith('@')?t:'search?q='+enc(t)),'🎵 TikTok'],
-      email:[`mailto:${t}${tx?'?body='+enc(tx):''}`,'✉️ อีเมลถึง '+t],url:[/^https?:/.test(t)?t:'https://'+t,'🌐 '+t]};
-    const [url,label]=map[a.action]||map.url;addCard(label,url,'แตะเพื่อเปิด');return'shown an open button to Linko for: '+label;
+      email:[`mailto:${t}${tx?'?body='+enc(tx):''}`,'✉️ Email '+t],url:[/^https?:/.test(t)?t:'https://'+t,'🌐 '+t]};
+    const [url,label]=map[a.action]||map.url;addCard(label,url,'Tap to open');return'shown an open button to Linko for: '+label;
   }
   case 'remember':memory.push(a.fact);store.setJ('memory',memory.slice(-80));return'remembered';
   case 'forget':{const n=memory.length;memory=memory.filter(m=>!m.toLowerCase().includes((a.keyword||'').toLowerCase()));store.setJ('memory',memory);return'forgot '+(n-memory.length)+' item(s)'}
@@ -428,13 +430,13 @@ async function runTool(name,a){
   }}
   return'unknown tool';
 }
-const toolLabel={run_automation:'⚙️ สั่งงาน Make',open_on_phone:'📱 เปิดในมือถือ',remember:'🧠 จำไว้',forget:'🧹 ลบความจำ',todo:'✅ รายการงาน',set_reminder:'⏰ ตั้งเตือน',get_weather:'🌤️ ดูอากาศ',web_search:'🔎 ค้นเว็บ'};
+const toolLabel={run_automation:'⚙️ Running Make automation',open_on_phone:'📱 Opening on phone',remember:'🧠 Remembered',forget:'🧹 Forgot',todo:'✅ To-do list',set_reminder:'⏰ Reminder set',get_weather:'🌤️ Checking weather',web_search:'🔎 Searching the web'};
 
 /* reminders */
 function scheduleReminder(r){const ms=r.at-Date.now();setTimeout(()=>fireReminder(r),Math.max(0,ms))}
 async function fireReminder(r){
   reminders=reminders.filter(x=>x!==r&&!(x.at===r.at&&x.text===r.text));store.setJ('reminders',reminders);
-  buzz([200,100,200,100,200]);toast('⏰ '+r.text);addMsg('⏰ เตือน: '+r.text,'ai');
+  buzz([200,100,200,100,200]);toast('⏰ '+r.text);addMsg('⏰ Reminder: '+r.text,'ai');
   try{if(Notification.permission==='granted')new Notification('Jarvis ⏰',{body:r.text})}catch(e){}
   if(busy)return;stopRecorder();await speak((L()==='th'?'คุณลิงโก้ครับ เตือนความจำ: ':'Reminder: ')+r.text);
   if(inCall&&!busy)startListening();else if(!inCall)setMode('idle',T('ready'),T('readySub'));
@@ -448,13 +450,13 @@ async function resolveModel(force){
   if(!r.ok)throw new Error(j.error?.message||('Groq HTTP '+r.status));
   const ids=(j.data||[]).filter(m=>m.active!==false).map(m=>m.id);
   liveModel=PREF.find(p=>ids.includes(p))||ids.find(i=>!/whisper|tts|guard|compound|playai|orpheus|prompt/i.test(i));
-  if(!liveModel)throw new Error('ไม่พบโมเดลแชทใน Groq');renderChips();return liveModel;
+  if(!liveModel)throw new Error('No chat model found on Groq');renderChips();return liveModel;
 }
 function systemPrompt(){
-  const now=new Date().toLocaleString('th-TH',{timeZone:'Asia/Bangkok',dateStyle:'full',timeStyle:'short'});
-  let s=cfg.persona+(cfg.confirm?CONFIRM_RULE:'')+`\n- เวลาตอนนี้ (กรุงเทพ): ${now}`;
-  if(memory.length)s+=`\n\nสิ่งที่จำไว้เกี่ยวกับคุณลิงโก้:\n- `+memory.slice(-40).join('\n- ');
-  const open=todos.filter(t=>!t.done);if(open.length)s+=`\n\nรายการที่ต้องทำ: `+open.map(t=>t.text).join(' / ');
+  const now=new Date().toLocaleString('en-GB',{timeZone:'Asia/Bangkok',dateStyle:'full',timeStyle:'short'});
+  let s=cfg.persona+(cfg.confirm?CONFIRM_RULE:'')+`\n- Current time (Bangkok): ${now}`;
+  if(memory.length)s+=`\n\nThings you remember about Linko:\n- `+memory.slice(-40).join('\n- ');
+  const open=todos.filter(t=>!t.done);if(open.length)s+=`\n\nOpen to-dos: `+open.map(t=>t.text).join(' / ');
   return s;
 }
 async function chat(messages,model,useTools){
@@ -497,7 +499,7 @@ async function think(userText){
 }
 async function handleUser(text){
   text=(text||'').trim();if(!text||busy)return;
-  if(!cfg.key){openSheet();toast('ใส่ Groq API key ก่อนครับ (ฟรี)');return}
+  if(!cfg.key){openSheet();toast('Add your free Groq API key first');return}
   busy=true;stopRecorder();interrupt();addMsg(text,'me');setMode('thinking',T('think'),'');showTyping(true);
   try{const reply=await think(text);showTyping(false);addMsg(reply,'ai');await speak(reply)}
   catch(e){showTyping(false);addMsg('⚠️ '+e.message,'ai');toast('Groq: '+e.message.slice(0,90));if(inCall)await speak(T('err'))}
@@ -525,10 +527,10 @@ $('callBtn').onclick=()=>inCall?endCall():startCall();
 $('muteBtn').onclick=()=>{muted=!muted;$('muteBtn').textContent=muted?'🔇':'🎙️';$('muteBtn').classList.toggle('active',muted);if(muted){stopRecorder();setMode('idle',T('muted'),'')}else startListening()};
 $('spkBtn').onclick=()=>{speakerOn=!speakerOn;$('spkBtn').textContent=speakerOn?'🔊':'🔈';$('spkBtn').classList.toggle('active',!speakerOn);if(!speakerOn)interrupt()};
 $('kbBtn').onclick=()=>{$('textRow').classList.toggle('hidden');if(!$('textRow').classList.contains('hidden'))$('textInput').focus()};
-$('newBtn').onclick=()=>{history=[];store.setJ('history',[]);renderHistory();toast('เริ่มบทสนทนาใหม่')};
+$('newBtn').onclick=()=>{history=[];store.setJ('history',[]);renderHistory();toast('New conversation')};
 $('orb').onclick=()=>{if(mode==='speaking')interrupt();else if(!inCall)startCall()};
 $('textRow').onsubmit=e=>{e.preventDefault();const v=$('textInput').value;$('textInput').value='';handleUser(v)};
-$('copyAll').onclick=async()=>{try{await navigator.clipboard.writeText(history.map(m=>(m.role==='user'?'Linko: ':'Jarvis: ')+m.content).join('\n'));toast('คัดลอกแล้ว')}catch(e){toast('คัดลอกไม่ได้')}};
+$('copyAll').onclick=async()=>{try{await navigator.clipboard.writeText(history.map(m=>(m.role==='user'?'Linko: ':'Jarvis: ')+m.content).join('\n'));toast('Copied')}catch(e){toast('Could not copy')}};
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&inCall)requestWake()});
 addEventListener('online',net);addEventListener('offline',net);
 
@@ -537,10 +539,10 @@ const setSw=(id,on)=>$(id).classList.toggle('on',on);
 ['swConfirm','swBarge','swWake','swVib'].forEach(id=>$(id).onclick=()=>$(id).classList.toggle('on'));
 $('langSeg').onclick=e=>{const b=e.target.closest('button');if(!b)return;[...$('langSeg').children].forEach(x=>x.classList.toggle('sel',x===b));cfg.lang=b.dataset.v;loadVoices()};
 $('rate').oninput=()=>$('rateVal').textContent=(+$('rate').value).toFixed(2)+'x';
-$('sil').oninput=()=>$('silVal').textContent=(+$('sil').value).toFixed(1)+' วิ';
+$('sil').oninput=()=>$('silVal').textContent=(+$('sil').value).toFixed(1)+' s';
 $('sens').oninput=()=>$('sensVal').textContent=$('sens').value+'/10';
 function renderLists(){
-  const mk=(el,items,label,del)=>{$(el).innerHTML=items.length?'':'<small style="color:var(--muted)">— ว่าง —</small>';
+  const mk=(el,items,label,del)=>{$(el).innerHTML=items.length?'':'<small style="color:var(--muted)">— empty —</small>';
     items.forEach((it,i)=>{const d=document.createElement('div');d.className='li';d.innerHTML='<span></span><button>✕</button>';d.firstChild.textContent=label(it);d.lastChild.onclick=()=>{del(i);renderLists()};$(el).appendChild(d)})};
   mk('memList',memory,m=>m,i=>{memory.splice(i,1);store.setJ('memory',memory)});
   mk('todoList',todos,t=>(t.done?'✔ ':'☐ ')+t.text,i=>{todos.splice(i,1);store.setJ('todos',todos)});
@@ -552,7 +554,7 @@ function openSheet(){
   [...$('langSeg').children].forEach(x=>x.classList.toggle('sel',x.dataset.v===cfg.lang));
   setSw('swConfirm',cfg.confirm);setSw('swBarge',cfg.barge);setSw('swWake',cfg.wake);setSw('swVib',cfg.vib);loadVoices();renderLists();$('sheetWrap').classList.add('open');
 }
-$('settingsBtn').onclick=openSheet;$('sheetBg').onclick=()=>{cfg.lang=store.get('lang','th-TH');$('sheetWrap').classList.remove('open')};
+$('settingsBtn').onclick=openSheet;$('sheetBg').onclick=()=>{cfg.lang=store.get('lang','en-US');$('sheetWrap').classList.remove('open')};
 $('saveBtn').onclick=()=>{
   Object.assign(cfg,{key:$('apiKey').value.trim(),model:$('model').value.trim()||'auto',stt:$('stt').value,rate:+$('rate').value,sil:+$('sil').value,sens:+$('sens').value,voice:$('voiceSel').value,
     persona:$('persona').value.trim()||DEFAULT_PERSONA,hooks:$('hooks').value.trim(),city:$('city').value.trim()||'Bangkok',
@@ -560,12 +562,12 @@ $('saveBtn').onclick=()=>{
   liveModel=null;
   for(const k of['key','model','stt','lang','rate','sil','sens','voice','persona','hooks','city'])store.set(k,cfg[k]);
   for(const k of['confirm','barge','wake','vib'])store.set(k,cfg[k]?'1':'0');
-  $('sheetWrap').classList.remove('open');renderChips();renderQuick();if(!inCall)setMode('idle',T('ready'),T('readySub'));toast('บันทึกแล้ว ✓');
+  $('sheetWrap').classList.remove('open');renderChips();renderQuick();if(!inCall)setMode('idle',T('ready'),T('readySub'));toast('Saved ✓');
 };
 $('resetBtn').onclick=()=>{$('persona').value=DEFAULT_PERSONA;$('model').value='auto';$('rate').value=1.05;$('rate').oninput();$('sil').value=.7;$('sil').oninput();$('sens').value=5;$('sens').oninput()};
 $('testBtn').onclick=async()=>{
   const old={key:cfg.key,model:cfg.model};cfg.key=$('apiKey').value.trim();cfg.model=$('model').value.trim()||'auto';liveModel=null;$('testRes').textContent='…';
-  try{const m=await resolveModel(true);await chat([{role:'user',content:'say OK'}],m,false);$('testRes').textContent='✅ '+m.split('/').pop();toast('เชื่อมต่อ Groq สำเร็จ ✓')}
+  try{const m=await resolveModel(true);await chat([{role:'user',content:'say OK'}],m,false);$('testRes').textContent='✅ '+m.split('/').pop();toast('Groq connected ✓')}
   catch(e){$('testRes').textContent='❌';toast('❌ '+e.message.slice(0,100));cfg.key=old.key;cfg.model=old.model}
 };
 
