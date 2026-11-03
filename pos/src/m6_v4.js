@@ -1,6 +1,6 @@
 /* ================= Shop POS v4 — promotions engine, data center, barcodes, personal use,
    activity log, branding, receipt image, cashier upgrades, auto-update ================= */
-const APP_VERSION = '4.3.2';
+const APP_VERSION = '4.3.3';
 Object.assign(TH, { 'Data center': 'ศูนย์ข้อมูล', 'Barcodes': 'บาร์โค้ด', 'Branches': 'สาขา' });
 PAGES.splice(PAGES.findIndex(p => p.id === 'settings'), 0,
   { id: 'barcodes', ic: '🏷', name: 'Barcodes', roles: ['owner', 'manager', 'stock'] },
@@ -973,9 +973,12 @@ VIEWS.settings = pg => {
 };
 
 /* ===================================================================== AUTO UPDATE (silent) */
-const canAutoReload = () => !(S.cart && S.cart.length) && !document.querySelector('.mbg') && !document.activeElement?.matches?.('input,textarea,select');
+const canAutoReload = () => { const a = document.activeElement; return !(S.cart && S.cart.length) && !document.querySelector('.mbg, .cmdk') && !(a?.matches?.('input,textarea,select') && a.value); };
 let UPD = null;
+const updTries = ver => +(sessionStorage.getItem('pos_upd_try_' + ver) || 0);
 async function applyUpdate(ver) {
+  if (updTries(ver) >= 2) { UPD = null; $('#updchip')?.remove(); return; }   // never loop: at most 2 reloads per new version
+  sessionStorage.setItem('pos_upd_try_' + ver, updTries(ver) + 1);
   try { const regs = await navigator.serviceWorker?.getRegistrations?.() || []; await Promise.all(regs.map(x => x.update().catch(() => {})));
     if (window.caches) for (const k of await caches.keys()) await caches.delete(k); } catch {}
   sessionStorage.setItem('pos_updated_to', ver); location.reload();
@@ -985,6 +988,7 @@ async function checkUpdate(manual) {
     const r = await fetch('version.json?t=' + Date.now(), { cache: 'no-store' }); if (!r.ok) return;
     const v = await r.json();
     if (v.version && v.version !== APP_VERSION) {
+      if (updTries(v.version) >= 2 && !manual) return;
       UPD = v.version;
       if (canAutoReload() || manual) return applyUpdate(v.version);
       if (!$('#updchip')) document.body.insertAdjacentHTML('beforeend', `<div id="updchip" class="updchip">✨ เวอร์ชันใหม่ ${esc(v.version)} — จะอัปเดตเองหลังจบบิลนี้</div>`);
@@ -995,7 +999,7 @@ setInterval(() => { if (UPD && canAutoReload()) applyUpdate(UPD); }, 4000);
 setTimeout(() => checkUpdate(), 2500); setInterval(() => checkUpdate(), 5 * 60 * 1000);
 document.addEventListener('visibilitychange', () => { if (!document.hidden) checkUpdate(); });
 window.addEventListener('online', () => checkUpdate());
-{ const u = sessionStorage.getItem('pos_updated_to'); if (u) { sessionStorage.removeItem('pos_updated_to'); setTimeout(() => toast(`อัปเดตเป็นเวอร์ชัน ${u} แล้ว ✨`, 'ok'), 1500); } }
+{ const u = sessionStorage.getItem('pos_updated_to'); if (u) { sessionStorage.removeItem('pos_updated_to'); if (u === APP_VERSION) setTimeout(() => toast(`อัปเดตเป็นเวอร์ชัน ${u} แล้ว ✨`, 'ok'), 1500); } }
 
 /* ===================================================================== NATIVE APP (Android Capacitor / desktop) */
 const isNativeApp = () => !!window.Capacitor?.isNativePlatform?.();
