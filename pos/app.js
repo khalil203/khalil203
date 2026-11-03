@@ -177,6 +177,10 @@ function renderAuth() {
   $('#lng').onclick = () => { LANG = LANG === 'th' ? 'en' : 'th'; localStorage.setItem('pos_lang', LANG); renderAuth(); };
   $('#gbtn').onclick = async () => {
     $('#gbtn').disabled = true;
+    try {
+      const st = await (await fetch(window.POS_CONFIG.url + '/auth/v1/settings', { headers: { apikey: window.POS_CONFIG.key } })).json();
+      if (!st.external?.google) { $('#gbtn').disabled = false; return toast(LANG === 'th' ? 'ยังไม่ได้เปิด Google Login ใน Supabase' : 'Google login is not enabled in Supabase yet', 'bad'); }
+    } catch (e) { /* offline check failed: try anyway */ }
     const { error } = await sb.auth.signInWithOAuth({ provider: 'google',
       options: { redirectTo: location.origin + location.pathname, queryParams: { prompt: 'select_account' } } });
     if (error) { $('#gbtn').disabled = false; fail(/not enabled|unsupported provider/i.test(error.message)
