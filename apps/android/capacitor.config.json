@@ -5,10 +5,30 @@
   "server": {
     "url": "https://khalil203.github.io/khalil203/pos/",
     "cleartext": false,
-    "allowNavigation": ["khalil203.github.io", "*.supabase.co"]
+    "allowNavigation": [
+      "khalil203.github.io",
+      "*.supabase.co"
+    ],
+    "errorPath": "offline.html"
   },
   "android": {
     "backgroundColor": "#f3f4fa",
     "appendUserAgent": "ShopPOSApp"
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 1500,
+      "launchAutoHide": true,
+      "backgroundColor": "#ffffff",
+      "showSpinner": false
+    },
+    "Keyboard": {
+      "resize": "body"
+    },
+    "StatusBar": {
+      "backgroundColor": "#ffffff",
+      "style": "LIGHT",
+      "overlaysWebView": false
+    }
   }
 }

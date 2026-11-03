@@ -64,10 +64,32 @@ jobs:
           for d in android/app/src/main/res/mipmap-*dpi; do
             cp icon.png "$d/ic_launcher.png"; cp icon.png "$d/ic_launcher_round.png"; cp icon.png "$d/ic_launcher_foreground.png"
           done
+      - name: Version
+        run: |
+          G=android/app/build.gradle
+          sed -i -E "s/versionCode [0-9]+/versionCode $((100 + ${{ github.run_number }}))/; s/versionName \"[^\"]*\"/versionName \"$(node -p "require('./package.json').version")\"/" $G
+          grep -E "versionCode|versionName" $G
       - run: npx cap sync android
-      - run: chmod +x gradlew && ./gradlew assembleDebug --no-daemon
+      - name: Build APK (release-signed when the signing secrets exist, otherwise debug)
         working-directory: apps/android/android
-      - run: cp android/app/build/outputs/apk/debug/app-debug.apk YanisaShop.apk
+        env:
+          KS_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
+          KS_PASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KS_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+        run: |
+          chmod +x gradlew
+          if [ -n "$KS_B64" ]; then
+            ./gradlew assembleRelease --no-daemon
+            echo "$KS_B64" | base64 -d > ks.jks
+            BT=$(ls -d $ANDROID_HOME/build-tools/* | sort -V | tail -1)
+            $BT/zipalign -p -f 4 app/build/outputs/apk/release/app-release-unsigned.apk aligned.apk
+            $BT/apksigner sign --ks ks.jks --ks-pass env:KS_PASS --key-pass env:KS_PASS --ks-key-alias "${KS_ALIAS:-yanisa}" --out ../YanisaShop.apk aligned.apk
+            $BT/apksigner verify --print-certs ../YanisaShop.apk | head -3
+            rm -f ks.jks
+          else
+            ./gradlew assembleDebug --no-daemon
+            cp app/build/outputs/apk/debug/app-debug.apk ../YanisaShop.apk
+          fi
       - uses: actions/upload-artifact@v4
         with:
           name: android

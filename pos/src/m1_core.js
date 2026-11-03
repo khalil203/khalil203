@@ -52,7 +52,9 @@ const PAY = {
 };
 const payName = m => (PAY[m] || ['', m, m])[LANG === 'th' ? 1 : 2];
 const payIcon = m => (PAY[m] || ['💰'])[0];
-const shopMethods = () => ['cash', 'promptpay'];   // checkout offers only: เงินสด / สแกนจ่าย
+const PAY_CHOICES = ['cash', 'promptpay', 'transfer', 'credit_card', 'debit_card'];
+const shopMethods = () => { const a = Array.isArray(S.shop?.checkout_methods) ? S.shop.checkout_methods.filter(k => PAY_CHOICES.includes(k)) : [];
+  return a.length ? a : ['cash', 'promptpay']; };   // set in ตั้งค่า → ช่องทางชำระเงิน (default: เงินสด / สแกนจ่าย)
 const uid = () => (crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2));
 
 /* ---------------- online / offline + sale queue ---------------- */
@@ -139,7 +141,7 @@ payDialog = function () {
   const m = modal(`ชำระเงิน ${baht(c.total)}`, `
     <div id="payTop"></div><div id="pbody"></div>
     <div class="row" style="margin-top:10px;justify-content:space-between">
-      <button class="btn sm" id="splitBtn">🔀 เงินสด + สแกน</button>
+      <button class="btn sm" id="splitBtn">🔀 แบ่งจ่ายหลายช่องทาง</button>
       <label class="row"><input type="checkbox" id="autoPrint" ${localStorage.getItem('pos_autoprint') === '1' ? 'checked' : ''}> 🖨️ พิมพ์ใบเสร็จอัตโนมัติ</label></div>
     ${fullTax ? `<details id="taxBox" style="margin-top:10px"><summary class="b" style="cursor:pointer">🧾 ออกใบกำกับภาษีเต็มรูป (ระบุข้อมูลผู้ซื้อ)</summary>
       <div class="grid2" style="margin-top:10px"><div class="fg"><label class="f">ชื่อผู้ซื้อ / บริษัท</label><input class="in" id="txName" value="${esc(S.customer?.name || '')}"></div>
@@ -206,7 +208,7 @@ payDialog = function () {
     $$('[data-v]', m).forEach(cb => cb.onchange = () => { lines[+cb.dataset.v].verified = cb.checked; });
     const ref = $('#refIn', m); if (ref) ref.oninput = () => { lines[0].ref = ref.value; };
   };
-  $('#splitBtn', m).onclick = () => { split = !split; if (split && lines.length === 1) { lines[0].amount = c.total; } if (!split) lines = [{ ...lines[0], amount: c.total }]; $('#splitBtn', m).textContent = split ? '↩ ชำระช่องทางเดียว' : '🔀 เงินสด + สแกน'; draw(); };
+  $('#splitBtn', m).onclick = () => { split = !split; if (split && lines.length === 1) { lines[0].amount = c.total; } if (!split) lines = [{ ...lines[0], amount: c.total }]; $('#splitBtn', m).textContent = split ? '↩ ชำระช่องทางเดียว' : '🔀 แบ่งจ่ายหลายช่องทาง'; draw(); };
   draw();
 
   $('#cfm', m).onclick = async () => {

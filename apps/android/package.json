@@ -1,13 +1,17 @@
 {
   "name": "shop-pos-android",
-  "version": "4.0.0",
+  "version": "4.2.0",
   "private": true,
-  "description": "Shop POS Android app (Capacitor) — opens the live POS so it is always up to date",
+  "description": "Shop POS Android app (Capacitor) \u2014 opens the live POS so it is always up to date",
   "dependencies": {
     "@capacitor/android": "^6.2.0",
     "@capacitor/core": "^6.2.0",
     "@capacitor/filesystem": "^6.0.2",
-    "@capacitor/share": "^6.0.3"
+    "@capacitor/share": "^6.0.3",
+    "@capacitor/app": "^6.0.2",
+    "@capacitor/status-bar": "^6.0.2",
+    "@capacitor/splash-screen": "^6.0.3",
+    "@capacitor/keyboard": "^6.0.3"
   },
   "devDependencies": {
     "@capacitor/cli": "^6.2.0"

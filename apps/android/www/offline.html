@@ -1,0 +1,12 @@
+<!DOCTYPE html>
+<html lang="th" translate="no" class="notranslate"><head><meta charset="utf-8"><meta name="google" content="notranslate"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Yanisa Shop</title></head>
+<body style="font-family:sans-serif;display:grid;place-items:center;min-height:100vh;margin:0;background:#f3f4fa;text-align:center;color:#0f1222">
+<div style="padding:24px"><img src="icon.png" alt="" style="width:120px;height:120px"><h2 style="margin:12px 0 4px">Yanisa Shop</h2>
+<p style="color:#6b7285">ยังเชื่อมต่ออินเทอร์เน็ตไม่ได้<br>ตรวจสอบ Wi-Fi / เน็ตมือถือ แล้วลองใหม่</p>
+<button id="r" style="padding:14px 26px;border-radius:14px;border:0;background:#1d4ed8;color:#fff;font-size:17px">ลองอีกครั้ง</button>
+<p id="s" style="color:#6b7285;font-size:13px"></p></div>
+<script>
+const URL='https://khalil203.github.io/khalil203/pos/';
+const go=()=>{document.getElementById('s').textContent='กำลังเชื่อมต่อ…';location.href=URL;};
+document.getElementById('r').onclick=go; addEventListener('online',go); setInterval(()=>{if(navigator.onLine)go();},15000);
+</script></body></html>

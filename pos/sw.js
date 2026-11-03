@@ -1,5 +1,5 @@
 // Shop POS service worker: app shell cached, always tries network first so updates arrive immediately.
-const CACHE = 'shop-pos-v18';
+const CACHE = 'shop-pos-v19';
 const SHELL = ['./', 'index.html', 'style.css', 'app.js', 'config.js', 'display.html', 'manifest.json', 'icon.svg', 'icon-192.png', 'icon-512.png', 'modules.js'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL))); self.skipWaiting(); });
 self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k))))); self.clients.claim(); });

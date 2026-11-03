@@ -29,7 +29,7 @@ VIEWS.reports = pg => {
     $$('[data-s]', $('#rbody')).forEach(th => th.onclick = () => { sortD = sortK === th.dataset.s ? -sortD : -1; sortK = th.dataset.s; show(); });
     cur._rows = rows;
   };
-  const run = async () => { $('#rbody').innerHTML = '<div class="skel"><i></i><i></i></div>'; try { sortK = null; cur = await REPORT_FN[rep](A, B); show(); } catch (e) { fail(e); $('#rbody').innerHTML = ''; } };
+  const run = async () => { if (!$('#rbody')) return; $('#rbody').innerHTML = '<div class="skel"><i></i><i></i></div>'; try { sortK = null; cur = await REPORT_FN[rep](A, B); if ($('#rbody')) show(); } catch (e) { if ($('#rbody')) { fail(e); $('#rbody').innerHTML = ''; } } };
   $('#rq').oninput = show;
   const fname = () => `report_${rep}_${ymd(A)}_${ymd(B)}`;
   $('#rcsv').onclick = () => cur && download(fname() + '.csv', toCSV(cur._rows.map(r => Object.fromEntries(cur.cols.map(([k, l]) => [l, r[k]]))), cur.cols.map(c => c[1])));
