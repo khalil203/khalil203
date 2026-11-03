@@ -1423,7 +1423,7 @@ const _goC = go;
 go = function (page) { _goC(page); $('.top')?.classList.toggle('posmode', S.page === 'pos'); };
 /* ================= Shop POS v4 — promotions engine, data center, barcodes, personal use,
    activity log, branding, receipt image, cashier upgrades, auto-update ================= */
-const APP_VERSION = '4.7.0';
+const APP_VERSION = '4.7.1';
 Object.assign(TH, { 'Data center': 'ศูนย์ข้อมูล', 'Barcodes': 'บาร์โค้ด', 'Branches': 'สาขา' });
 PAGES.splice(PAGES.findIndex(p => p.id === 'settings'), 0,
   { id: 'barcodes', ic: '🏷', name: 'Barcodes', roles: ['owner', 'manager', 'stock'] },
@@ -3820,36 +3820,74 @@ VIEWS.settings = pg => {
   };
 };
 
-/* ---------- header: branch / shop switcher ---------- */
+/* ---------- header: branch / shop switcher (v4.7.1 — keeps the page title, rich switcher sheet) ---------- */
+const brLogo = s => esc(s?.logo_url || 'logo-round.png');
+const brSub = s => esc(s.branch_name || branchLine(s));
 const _renderShell47 = renderShell;
 renderShell = function () {
   _renderShell47();
-  const br = $('.branch'); if (!br || !S.shop) return;
-  const nb = document.createElement('button'); nb.type = 'button'; nb.className = 'branch brsw'; nb.id = 'brsw'; nb.title = 'สลับสาขา / โปรไฟล์ร้าน';
-  nb.innerHTML = `<img src="${esc(S.shop.logo_url || 'logo-round.png')}" alt=""><span>${esc(S.shop.name)}<small>${esc(S.shop.branch_name || branchLine(S.shop))} · ${ROLE_NAME(S.role)}</small></span><i>▾</i>`;
-  br.replaceWith(nb);
-  nb.onclick = e => { e.stopPropagation(); branchMenu(nb); };
+  if (!S.shop) return;
+  // wide screens: compact pill in the top bar (hidden on smaller screens so the page title always stays visible)
+  const br = $('.branch');
+  if (br) br.outerHTML = `<button type="button" class="brsw" id="brsw" data-brsw title="สลับสาขา (Alt+B)"><img src="${brLogo(S.shop)}" alt=""><span><b>${esc(S.shop.name)}</b><small>${brSub(S.shop)} · ${ROLE_NAME(S.role)}</small></span><i>▾</i></button>`;
+  // phones/tablets: the shop-name line under the page title becomes the switcher
+  const sm = $('.top .tt small.mob');
+  if (sm) sm.outerHTML = `<button type="button" class="ttsw mob" data-brsw><span>${esc(S.shop.name)}</span>${S.shops.length > 1 ? `<em>${S.shops.length} สาขา</em>` : ''}<i>▾</i></button>`;
+  // desktop sidebar: shop name block
+  const lg = $('.side .logo'); if (lg) { lg.setAttribute('data-brsw', ''); lg.classList.add('brside'); lg.title = 'สลับสาขา / โปรไฟล์ร้าน'; if (!$('.brcaret', lg)) lg.insertAdjacentHTML('beforeend', '<i class="brcaret">▾</i>'); }
+  const sb2 = $('#shopBtn'); if (sb2) sb2.setAttribute('data-brsw', '');
+  $$('[data-brsw]').forEach(el => el.onclick = e => { e.preventDefault(); e.stopPropagation(); branchSwitcher(); });
 };
-function branchMenu(anchor) {
-  if ($('#brmenu')) return $('#brmenu').remove();
-  const r = anchor.getBoundingClientRect();
-  document.body.insertAdjacentHTML('beforeend', `<div class="brmenu" id="brmenu" style="top:${r.bottom + 6}px;left:${Math.max(8, Math.min(r.left, innerWidth - 300))}px">
-    <div class="brh">สลับสาขา / โปรไฟล์ร้าน</div>
-    ${S.shops.map(s => `<button type="button" data-bs="${s.id}" class="${s.id === S.shop.id ? 'on' : ''}"><img src="${esc(s.logo_url || 'logo-round.png')}" alt=""><span><b>${esc(s.name)}</b><small>${esc(s.branch_name || branchLine(s))} · ${ROLE_NAME(s._role)}</small></span>${s.id === S.shop.id ? '<em>✓ ใช้งานอยู่</em>' : ''}</button>`).join('')}
-    ${pageOK(PAGES.find(p => p.id === 'branches') || {}) ? '<button type="button" data-bs="_manage" class="brm"><span>🏬</span><span><b>จัดการสาขา</b><small>เพิ่มสาขา / ดูยอดทุกสาขา</small></span></button>' : ''}</div>`);
-  const mn = $('#brmenu');
-  const off = ev => { if (!mn.contains(ev.target)) { mn.remove(); document.removeEventListener('click', off, true); } };
-  setTimeout(() => document.addEventListener('click', off, true), 0);
-  $$('[data-bs]', mn).forEach(b => b.onclick = async () => {
-    mn.remove(); document.removeEventListener('click', off, true);
-    const id = b.dataset.bs;
-    if (id === '_manage') return go('branches');
-    if (id === S.shop.id) return;
-    if (S.cart?.length && !(await confirmBox('มีสินค้าในตะกร้า — สลับสาขาแล้วตะกร้าจะถูกล้าง ดำเนินการต่อ?'))) return;
-    localStorage.setItem('pos_shop', id); S.cart = []; sfx('ok');
-    toast('กำลังสลับไป ' + (S.shops.find(s => s.id === id)?.name || ''), 'ok');
-    boot();
-  });
+window.addEventListener('keydown', e => { if (e.altKey && e.key.toLowerCase() === 'b' && S.shop && !$('.mbg')) { e.preventDefault(); branchSwitcher(); } });
+function branchMenu() { branchSwitcher(); }
+
+const recentShops = () => { try { return JSON.parse(localStorage.getItem('pos_shop_recent') || '[]'); } catch { return []; } };
+function branchSwitcher() {
+  if ($('.mbg.brsheet')) return;
+  const cur = S.shop, rec = recentShops();
+  const others = S.shops.filter(s => s.id !== cur.id).sort((a, b) => ((rec.indexOf(a.id) + 1 || 99) - (rec.indexOf(b.id) + 1 || 99)) || a.name.localeCompare(b.name, 'th'));
+  const card = (s, isCur) => `<div class="brc ${isCur ? 'cur' : ''}" data-sid="${s.id}" data-k="${esc((s.name + ' ' + (s.branch_name || '') + ' ' + (s.branch_code || '') + ' ' + (s.address || '')).toLowerCase())}">
+      <img src="${brLogo(s)}" alt=""><div class="brc-b"><b>${esc(s.name)}</b><small>${brSub(s)}${s.branch_code ? ' · รหัส ' + esc(s.branch_code) : ''}</small>
+      <div class="brc-m"><span class="chip">${ROLE_NAME(s._role)}</span>${s.phone ? `<span>☎ ${esc(s.phone)}</span>` : ''}</div>
+      <div class="brc-s" data-st="${s.id}"><span class="muted">กำลังโหลดยอดวันนี้…</span></div></div>
+      ${isCur ? '<span class="brc-on">✓ ใช้งานอยู่</span>' : `<button type="button" class="btn p sm" data-go="${s.id}">สลับ →</button>`}</div>`;
+  const m = modal('🏬 สาขา / โปรไฟล์ร้าน', `
+    <div class="brsec">ร้านที่ใช้งานอยู่</div>${card(cur, true)}
+    ${others.length ? `<div class="brsec">สลับไปสาขาอื่น <small class="muted">(${others.length})</small></div>
+      ${others.length > 3 ? '<input class="in" id="brq" placeholder="🔍 ค้นหาสาขา ชื่อ รหัส หรือที่อยู่…" style="margin-bottom:8px">' : ''}
+      <div class="brlist">${others.map(s => card(s, false)).join('')}</div>`
+      : `<div class="brempty">มีร้านเดียวในบัญชีนี้${can('owner') ? ' — เพิ่มสาขาใหม่ได้ที่ปุ่มด้านล่าง' : ''}</div>`}
+    ${S.cart?.length ? `<p class="chip warn" style="margin-top:10px">🛒 มีสินค้าในตะกร้า ${S.cart.length} รายการ — ขายให้เสร็จหรือพักบิลก่อนสลับสาขา</p>` : ''}`,
+    { sheet: innerWidth < 700, foot: `${pageOK(PAGES.find(p => p.id === 'branches') || {}) ? '<button type="button" class="btn" id="brman">📊 ทุกสาขา</button>' : ''}${can('owner') ? '<button type="button" class="btn" id="bradd">＋ เพิ่มสาขา</button>' : ''}<span style="flex:1"></span><button type="button" class="btn" data-x2>ปิด</button>` });
+  m.classList.add('brsheet');
+  $('[data-x2]', m).onclick = () => m.close();
+  if ($('#brman', m)) $('#brman', m).onclick = () => { m.close(); go('branches'); };
+  if ($('#bradd', m)) $('#bradd', m).onclick = () => { m.close(); go('branches'); setTimeout(() => $('#nb')?.click(), 600); };
+  if ($('#brq', m)) $('#brq', m).oninput = e => { const v = e.target.value.trim().toLowerCase(); $$('.brlist .brc', m).forEach(c => c.classList.toggle('hidden', !!v && !c.dataset.k.includes(v))); };
+  $$('[data-go]', m).forEach(b => b.onclick = () => { m.close(); switchShop(b.dataset.go); });
+  $$('.brlist .brc', m).forEach(c => c.ondblclick = () => { m.close(); switchShop(c.dataset.sid); });
+  // today's numbers per branch (only what this account is allowed to see)
+  (async () => {
+    const d0 = new Date(); d0.setHours(0, 0, 0, 0);
+    let rows = [];
+    try { rows = await q(sb.from('sales').select('shop_id,total,status').in('shop_id', S.shops.map(s => s.id)).gte('created_at', d0.toISOString()).limit(5000)); } catch { rows = null; }
+    S.shops.forEach(s => {
+      const el = $(`[data-st="${s.id}"]`, m); if (!el) return;
+      if (!rows) { el.innerHTML = ''; return; }
+      const mine = rows.filter(r => r.shop_id === s.id && r.status !== 'void');
+      el.innerHTML = `<span>วันนี้ <b>${baht(mine.reduce((a, r) => a + num(r.total), 0))}</b></span><span>${mine.length} บิล</span>`;
+    });
+  })();
+}
+async function switchShop(id) {
+  const to = S.shops.find(s => s.id === id); if (!to || id === S.shop.id) return;
+  if (S.cart?.length && !(await confirmBox(`มีสินค้าในตะกร้า ${S.cart.length} รายการ — สลับไป “${to.name}” แล้วตะกร้าจะถูกล้าง ดำเนินการต่อ?`))) return;
+  const rec = [id, ...recentShops().filter(x => x !== id)].slice(0, 10); localStorage.setItem('pos_shop_recent', JSON.stringify(rec));
+  document.body.insertAdjacentHTML('beforeend', `<div class="brswitching"><div><img src="${brLogo(to)}" alt=""><b>กำลังสลับไป</b><span>${esc(to.name)}</span><small>${brSub(to)}</small><i></i></div></div>`);
+  sfx('ok'); localStorage.setItem('pos_shop', id); S.cart = []; S.customer = null;
+  const page = S.page;
+  try { await boot(); if (page && PAGES.find(p => p.id === page && pageOK(p))) go(page); toast('✓ ใช้งาน ' + to.name, 'ok'); }
+  finally { setTimeout(() => $('.brswitching')?.remove(), 350); }
 }
 
 /* ---------- sound settings: every event, tone choice, custom sound files, voice ---------- */

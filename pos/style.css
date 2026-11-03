@@ -725,20 +725,33 @@ code{font-family:ui-monospace,monospace;font-size:13px;background:var(--bg);padd
 .cqr-pv{width:150px;height:150px;border:1px dashed var(--line);border-radius:14px;display:grid;place-items:center;background:#fff;overflow:hidden}
 .cqr-pv img{width:100%;height:100%;object-fit:contain}
 .rcpt .rqr img,.rcpt .rqr svg{display:block;margin:4px auto}
-button.brsw{border:1px solid var(--line);background:var(--card,#fff);border-radius:999px;padding:4px 12px 4px 4px;cursor:pointer;font:inherit;max-width:260px}
-button.brsw:hover{border-color:var(--brand)}
+button.brsw{display:flex;align-items:center;gap:8px;border:1px solid var(--line);background:var(--card,#fff);border-radius:999px;padding:4px 12px 4px 4px;cursor:pointer;font:inherit;color:inherit;max-width:280px;min-width:0;transition:border-color .15s,box-shadow .15s}
+button.brsw:hover{border-color:var(--brand);box-shadow:0 0 0 3px color-mix(in srgb,var(--brand) 15%,transparent)}
 button.brsw img{width:30px;height:30px;border-radius:50%;object-fit:cover;flex:none}
-button.brsw span{overflow:hidden;text-align:left}button.brsw span,button.brsw small{white-space:nowrap;text-overflow:ellipsis;overflow:hidden}
-button.brsw i{font-style:normal;color:var(--muted);font-size:11px}
-@media (max-width:1180px){button.brsw{display:flex!important;max-width:170px}}
-@media (max-width:700px){button.brsw{display:flex!important;max-width:118px;padding:3px 8px 3px 3px;gap:5px}button.brsw img{width:26px;height:26px}button.brsw small{display:none}button.brsw span{font-size:12px}}
-.brmenu{position:fixed;z-index:9999;width:290px;max-width:calc(100vw - 16px);background:var(--card,#fff);border:1px solid var(--line);border-radius:16px;box-shadow:0 18px 50px rgba(0,0,0,.18);padding:6px;}
-.brmenu .brh{font-size:12px;color:var(--muted);padding:6px 10px}
-.brmenu button{display:flex;align-items:center;gap:10px;width:100%;border:0;background:none;padding:8px 10px;border-radius:12px;cursor:pointer;text-align:left;font:inherit;color:inherit}
-.brmenu button:hover{background:var(--soft,#f3f4f6)}.brmenu button.on{background:color-mix(in srgb,var(--brand) 10%,transparent)}
-.brmenu button img{width:34px;height:34px;border-radius:50%;object-fit:cover}.brmenu button span:not(:first-child),.brmenu button>span:nth-child(2){display:flex;flex-direction:column;flex:1;min-width:0}
-.brmenu small{color:var(--muted)}.brmenu em{font-style:normal;font-size:11px;color:var(--ok,#16a34a);white-space:nowrap}
-.brmenu .brm{border-top:1px solid var(--line);border-radius:0 0 12px 12px;margin-top:4px}.brmenu .brm>span:first-child{width:34px;text-align:center;font-size:20px}
+button.brsw span{display:flex;flex-direction:column;min-width:0;text-align:left;line-height:1.2}
+button.brsw b,button.brsw small{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}button.brsw small{color:var(--muted);font-size:11px}
+button.brsw i,.ttsw i,.brcaret{font-style:normal;color:var(--muted);font-size:11px}
+.ttsw{display:none;align-items:center;gap:6px;border:0;background:color-mix(in srgb,var(--brand) 9%,transparent);color:var(--brand);border-radius:999px;padding:2px 10px;margin-top:2px;font:inherit;font-size:12px;font-weight:600;cursor:pointer;max-width:100%}
+.ttsw span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}.ttsw em{font-style:normal;font-weight:400;opacity:.75;white-space:nowrap}
+@media (max-width:860px){.ttsw.mob{display:inline-flex}}
+.side .logo.brside{cursor:pointer;border-radius:14px;transition:background .15s;position:relative}.side .logo.brside:hover{background:rgba(255,255,255,.08)}
+.side .logo .brcaret{margin-left:auto;color:inherit;opacity:.6}#app.mini .side .logo .brcaret{display:none}
+.top .iconbtn.mob[data-brsw]{cursor:pointer}
+.brsheet .brsec{font-size:12px;font-weight:700;color:var(--muted);margin:12px 2px 6px;text-transform:uppercase;letter-spacing:.02em}.brsheet .brsec:first-child{margin-top:0}
+.brc{display:flex;align-items:center;gap:12px;padding:12px;border:1px solid var(--line);border-radius:16px;margin-bottom:8px;background:var(--card,#fff);transition:border-color .15s,transform .15s}
+.brlist .brc:hover{border-color:var(--brand);transform:translateY(-1px)}
+.brc.cur{border:2px solid var(--brand);background:color-mix(in srgb,var(--brand) 6%,var(--card,#fff))}
+.brc>img{width:52px;height:52px;border-radius:50%;object-fit:cover;flex:none;box-shadow:0 2px 8px rgba(0,0,0,.12)}
+.brc-b{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}.brc-b b{font-size:15px}.brc-b small{color:var(--muted)}
+.brc-m,.brc-s{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;font-size:12px;color:var(--muted)}.brc-m .chip{font-size:11px;padding:1px 8px}
+.brc-s b{color:var(--ink);font-size:13px}
+.brc-on{color:var(--ok,#16a34a);font-weight:700;font-size:12px;white-space:nowrap}
+.brempty{padding:16px;text-align:center;color:var(--muted);border:1px dashed var(--line);border-radius:14px}
+.brswitching{position:fixed;inset:0;z-index:10000;display:grid;place-items:center;background:color-mix(in srgb,var(--bg,#f6f7fb) 82%,transparent);backdrop-filter:blur(6px)}
+.brswitching>div{display:flex;flex-direction:column;align-items:center;gap:4px;text-align:center}.brswitching img{width:84px;height:84px;border-radius:50%;object-fit:cover;box-shadow:0 8px 30px rgba(0,0,0,.18);margin-bottom:8px;animation:brpulse 1s ease-in-out infinite}
+.brswitching span{font-size:20px;font-weight:800}.brswitching small{color:var(--muted)}
+.brswitching i{width:120px;height:4px;border-radius:4px;margin-top:10px;background:linear-gradient(90deg,var(--brand) 40%,var(--line) 0) 0/200% 100%;animation:brbar 1s linear infinite}
+@keyframes brpulse{50%{transform:scale(1.06)}}@keyframes brbar{to{background-position:-200% 0}}
 .snd-top{display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center}
 .snd-vol{display:flex;align-items:center;gap:8px;flex:1;min-width:220px}.snd-vol input{flex:1}
 .snd-list{display:flex;flex-direction:column;gap:6px}
@@ -746,3 +759,5 @@ button.brsw i{font-style:normal;color:var(--muted);font-size:11px}
 .snd-row .in{padding:6px 8px}.snd-n{gap:6px}
 .snd-voice{display:grid;grid-template-columns:1fr 1fr;gap:6px 14px;margin-bottom:8px}
 @media (max-width:700px){.snd-row{grid-template-columns:1fr 64px auto auto;gap:6px}.snd-row .snd-n{grid-column:1/-1}.snd-row [data-vol]{width:64px}.snd-row .btn{width:auto;justify-self:end}.snd-voice{grid-template-columns:1fr}}
+button.brsw{display:none}.top.posmode button.brsw{display:flex}@media (max-width:1180px){.top.posmode button.brsw{display:none}}
+@media (min-width:861px){.top .tt{min-width:150px}.top .tt h1{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}}
