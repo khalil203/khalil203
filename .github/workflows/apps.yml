@@ -105,6 +105,24 @@ jobs:
           path: out
           merge-multiple: true
       - run: ls -la out
+      - name: Remove old releases, old download files and old build artifacts
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: |
+          KEEP="YanisaShop.apk YanisaShop-Setup.exe YanisaShop-Portable.exe YanisaShop-mac.dmg"
+          # other releases (keep only app-latest)
+          for t in $(gh release list -R "$REPO" --limit 100 --json tagName -q '.[].tagName'); do
+            [ "$t" = "app-latest" ] || gh release delete "$t" -R "$REPO" --yes --cleanup-tag || true
+          done
+          # files in app-latest that are not current
+          for a in $(gh release view app-latest -R "$REPO" --json assets -q '.assets[].name' 2>/dev/null); do
+            case " $KEEP " in *" $a "*) ;; *) echo "delete $a"; gh release delete-asset app-latest "$a" -R "$REPO" --yes || true ;; esac
+          done
+          # build artifacts from older runs
+          for id in $(gh api "repos/$REPO/actions/artifacts?per_page=100" -q ".artifacts[] | select(.workflow_run.id != ${{ github.run_id }}) | .id"); do
+            gh api -X DELETE "repos/$REPO/actions/artifacts/$id" || true
+          done
       - uses: softprops/action-gh-release@v2
         with:
           tag_name: app-latest
