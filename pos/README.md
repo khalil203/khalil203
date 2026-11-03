@@ -46,3 +46,23 @@ Permissions are enforced in the database (Row Level Security), not just hidden i
 
 ## Free-tier notes
 Supabase free: 500 MB database, 50,000 monthly users. A free project **pauses after 7 days with no activity** — daily shop use keeps it awake; if it pauses, press *Restore* in the Supabase dashboard.
+
+## v3 — Enterprise Thai POS upgrade
+- **Dashboard (แดชบอร์ด):** real-data KPIs — net sales after refunds, bills, items sold, gross profit (ex-VAT − cost), expenses, net profit, refunds, pending QR payments, per-payment totals, sales trend vs previous period, 12-month chart, payment mix, busy hours, best / slow sellers, low & out of stock. Filters: วันนี้ / เมื่อวาน / 7 วัน / 30 วัน / เดือนนี้ / เดือนก่อน / กำหนดเอง
+- **Checkout:** split payment, cash / transfer / PromptPay / QR / credit / debit / e-wallet / เงินเชื่อ (store credit with credit limit), PromptPay marked **รอตรวจสอบ** until the cashier confirms money arrived, duplicate-submit protection (idempotent `client_id`), multi-unit selling (e.g. แพ็ก 6), promo price, member discount %, customer note, clear-cart confirmation, recently-sold tab, full tax invoice at checkout
+- **Offline:** sales are queued on the device when the internet drops (cash/card/transfer only) and synced automatically; online/offline status chip
+- **Sales history:** filters, pending-payment confirmation, partial/full refunds with reasons + restock + credit note, void with reason, issue full tax invoice later, digital receipt (share to LINE)
+- **Receipts:** 58 / 80 mm / A4, logo, branch (สำนักงานใหญ่ / สาขา), ABB or full tax invoice with buyer tax ID, Thai amount in words (บาทถ้วน)
+- **Inventory:** receive (with expiry/lot), remove, damaged, expired, stock count sheet, branch transfer, min/max stock, expiry alerts, valuation, full movement history, optional negative-stock block
+- **Purchasing:** purchase orders → receive into stock (weighted average cost) → supplier payments & balances, printable PO
+- **Customers:** tax info, groups, levels, member discount, credit limit & outstanding balance, purchase history, debt payments
+- **Expenses:** Thai categories, payment method, receipt photo, approval (cashier entries need approval)
+- **Cash register:** cash in/out, cash refunds & expenses included in expected cash, X report, shift close with difference
+- **Staff:** roles เจ้าของร้าน / ผู้ดูแลระบบ / ผู้จัดการร้าน / พนักงานขาย / พนักงานสต็อก / พนักงานบัญชี, configurable permission matrix, **audit log**
+- **Reports (14):** sales, profit, products, categories, inventory, stock moves, purchases, expenses, customers, staff, payment methods, VAT (ภาษีขาย), shifts, refunds — sort, search, CSV, Excel, print/PDF
+- **Settings:** shop & logo, business type, VAT & branch, receipt size, payment methods, พ.ศ./ค.ศ., decimals, Thai digits, negative stock, points, hardware test (scanner, test print, customer display, Web Serial scale)
+
+### Honest limits
+- Automatic PromptPay confirmation needs a bank/payment-provider API (paid). Until then the cashier confirms.
+- Printing uses the browser print dialog (works with installed thermal-printer drivers; cash drawer opens via the printer driver). Raw ESC/POS over USB is not used.
+- Source of `modules.js` is in `src/` (concatenate `src/m*.js` → `modules.js`).

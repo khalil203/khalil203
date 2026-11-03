@@ -1,0 +1,1191 @@
+/* ============================================================
+   Shop POS v3 — modules (permissions, offline, payments, …)
+   Loaded after app.js; overrides / extends its views.
+   ============================================================ */
+'use strict';
+Object.assign(TH, {
+  'Dashboard': 'แดชบอร์ด', 'Purchasing': 'สั่งซื้อสินค้า', 'Audit log': 'บันทึกการใช้งาน', 'Members': 'ลูกค้า/สมาชิก',
+  'Sell': 'ขายสินค้า', 'Bills': 'ประวัติการขาย', 'Shifts': 'กะ/ลิ้นชักเงิน',
+});
+
+/* ---------------- permissions ---------------- */
+const PERMS = [
+  ['dashboard', 'ดูแดชบอร์ด'], ['sell', 'ขายสินค้า'], ['view_sales', 'ดูประวัติการขาย'], ['apply_discount', 'ให้ส่วนลด'],
+  ['cancel_sale', 'ยกเลิกบิล'], ['refund', 'คืนสินค้า / คืนเงิน'], ['edit_products', 'จัดการสินค้า'], ['edit_prices', 'แก้ไขราคา'],
+  ['view_profit', 'ดูต้นทุนและกำไร'], ['manage_inventory', 'จัดการสต็อก'], ['purchasing', 'สั่งซื้อ / ผู้จำหน่าย'], ['customers', 'จัดการลูกค้า'],
+  ['promotions', 'จัดการโปรโมชั่น'], ['expenses', 'ค่าใช้จ่าย'], ['view_reports', 'ดูรายงาน'], ['shifts', 'กะ / ลิ้นชักเงิน'],
+  ['cash_moves', 'นำเงินเข้า-ออกลิ้นชัก'], ['manage_staff', 'จัดการพนักงาน'], ['manage_settings', 'ตั้งค่าร้าน'], ['audit', 'ดูบันทึกการใช้งาน'],
+];
+const ALL_PERMS = PERMS.map(p => p[0]);
+const PERM_DEF = {
+  manager: ALL_PERMS.filter(x => x !== 'manage_staff'),
+  cashier: ['sell', 'view_sales', 'apply_discount', 'customers', 'shifts'],
+  stock: ['sell', 'edit_products', 'manage_inventory', 'purchasing'],
+  accountant: ['dashboard', 'view_sales', 'view_profit', 'view_reports', 'expenses', 'purchasing', 'customers', 'shifts', 'audit'],
+};
+function canDo(perm) {
+  if (!perm) return true;
+  if (S.role === 'owner' || S.role === 'admin') return true;
+  const custom = S.shop?.permissions?.[S.role];
+  return (Array.isArray(custom) ? custom : (PERM_DEF[S.role] || [])).includes(perm);
+}
+const PAGE_PERM = { dashboard: 'dashboard', pos: 'sell', sales: 'view_sales', products: 'edit_products', stock: 'manage_inventory', purchases: 'purchasing',
+  members: 'customers', promotions: 'promotions', suppliers: 'purchasing', expenses: 'expenses', reports: 'view_reports', shifts: 'shifts',
+  staff: 'manage_staff', audit: 'audit', settings: null };
+function pageOK(p) { return canDo(PAGE_PERM[p.id]); }
+const PAGE_DESC = {
+  dashboard: 'ภาพรวมธุรกิจจากข้อมูลจริง — ยอดขาย กำไร และสินค้า', sales: 'ค้นหาบิล พิมพ์ซ้ำ คืนสินค้า และยกเลิกบิล',
+  products: 'เพิ่มและแก้ไขสินค้า ราคา รูปภาพ และหน่วยนับ', stock: 'รับเข้า เบิกออก ตรวจนับ โอนสาขา และประวัติสต็อก',
+  purchases: 'ใบสั่งซื้อ การรับสินค้า และการชำระเงินผู้จำหน่าย', members: 'ข้อมูลลูกค้า แต้มสะสม เครดิต และประวัติการซื้อ',
+  promotions: 'ส่วนลดและโปรโมชั่นที่ใช้ตอนขาย', suppliers: 'ข้อมูลผู้จำหน่ายและยอดค้างชำระ', expenses: 'บันทึกและอนุมัติค่าใช้จ่ายของร้าน',
+  reports: 'รายงานธุรกิจ ส่งออก Excel / CSV และพิมพ์', shifts: 'เปิด-ปิดกะ นับเงินสด และนำเงินเข้า-ออก', staff: 'พนักงาน ตำแหน่ง และสิทธิ์การใช้งาน',
+  audit: 'บันทึกการกระทำสำคัญทั้งหมดในร้าน', settings: 'ข้อมูลร้าน ภาษี ใบเสร็จ การชำระเงิน และฮาร์ดแวร์',
+};
+
+/* ---------------- payment methods ---------------- */
+const PAY = {
+  cash: ['💵', 'เงินสด', 'Cash'], transfer: ['🏦', 'โอนเงิน', 'Bank transfer'], promptpay: ['📱', 'พร้อมเพย์', 'PromptPay'],
+  qr: ['🔳', 'QR Payment', 'QR payment'], credit_card: ['💳', 'บัตรเครดิต', 'Credit card'], debit_card: ['💳', 'บัตรเดบิต', 'Debit card'],
+  ewallet: ['👛', 'เงินอิเล็กทรอนิกส์', 'E-wallet'], store_credit: ['📒', 'เงินเชื่อ / ชำระภายหลัง', 'Store credit / pay later'],
+  card: ['💳', 'บัตร', 'Card'], mixed: ['🔀', 'หลายช่องทาง', 'Mixed'],
+};
+const payName = m => (PAY[m] || ['', m, m])[LANG === 'th' ? 1 : 2];
+const payIcon = m => (PAY[m] || ['💰'])[0];
+const shopMethods = () => (Array.isArray(S.shop.payment_methods) && S.shop.payment_methods.length ? S.shop.payment_methods : ['cash', 'promptpay', 'transfer']).filter(m => PAY[m]);
+const uid = () => (crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2));
+
+/* ---------------- online / offline + sale queue ---------------- */
+const OQ = 'pos_offline_sales';
+const oqGet = () => JSON.parse(localStorage.getItem(OQ) || '[]');
+const oqSet = a => { localStorage.setItem(OQ, JSON.stringify(a)); updateNet(); };
+const isNetErr = e => !navigator.onLine || /fetch|network|load failed|timeout|ECONN/i.test(e?.message || String(e));
+function updateNet() {
+  const el = $('#net'); if (!el) return;
+  const n = oqGet().filter(x => x.shop === S.shop?.id).length, on = navigator.onLine;
+  el.innerHTML = `<span class="netdot ${on ? '' : 'off'}"></span> ${on ? 'ออนไลน์' : 'ออฟไลน์'}${n ? ` · รอซิงก์ ${n}` : ''}`;
+  el.className = 'chip ' + (on ? (n ? 'warn' : 'ok') : 'bad');
+  el.title = n ? 'มีบิลที่บันทึกขณะออฟไลน์ รอส่งขึ้นระบบ' : '';
+}
+async function submitSale(payload) {
+  if (!navigator.onLine) return queueSale(payload);
+  try { return { sale: await q(sb.rpc('create_sale', { p_shop: S.shop.id, p: payload })), queued: false }; }
+  catch (e) { if (isNetErr(e)) return queueSale(payload); throw e; }
+}
+function queueSale(payload) {
+  if (payload.payments.some(p => ['promptpay', 'qr', 'store_credit'].includes(p.method)))
+    throw new Error('ออฟไลน์อยู่ — รับได้เฉพาะเงินสด/บัตร/โอน (ยืนยันพร้อมเพย์หรือเงินเชื่อไม่ได้ขณะออฟไลน์)');
+  const a = oqGet(); a.push({ shop: S.shop.id, payload, at: new Date().toISOString() }); oqSet(a);
+  return { queued: true, sale: { id: null, bill_no: 'OFF-' + payload.client_id.slice(0, 6).toUpperCase(), created_at: new Date().toISOString(),
+    cashier_name: S.user.user_metadata?.full_name || S.user.email, status: 'paid', pay_status: 'paid', ...payload } };
+}
+let syncing = false;
+async function syncQueue() {
+  if (syncing || !navigator.onLine || !S.shop) return; syncing = true;
+  try {
+    let a = oqGet(), done = 0;
+    for (const it of [...a]) {
+      try { await q(sb.rpc('create_sale', { p_shop: it.shop, p: it.payload })); a = a.filter(x => x.payload.client_id !== it.payload.client_id); oqSet(a); done++; }
+      catch (e) { if (isNetErr(e)) break; it.error = e.message; oqSet(a); }
+    }
+    if (done) { toast(`ซิงก์บิลออฟไลน์แล้ว ${done} บิล`, 'ok'); if (S.page === 'pos') loadPosStats().catch(() => {}); }
+  } finally { syncing = false; }
+}
+window.addEventListener('online', () => { updateNet(); toast('กลับมาออนไลน์แล้ว', 'ok'); syncQueue(); });
+window.addEventListener('offline', () => { updateNet(); toast('ออฟไลน์ — ยังขายเงินสดได้ ระบบจะซิงก์ให้อัตโนมัติ', 'bad'); });
+setInterval(syncQueue, 30000);
+
+/* ---------------- shell additions ---------------- */
+const _renderShell = renderShell;
+renderShell = function () {
+  _renderShell();
+  $('.top .tt')?.insertAdjacentHTML('beforeend', '<small class="pdesc" id="pdesc"></small>');
+  $('.top .tt')?.insertAdjacentHTML('afterend', '<span id="net" class="chip"></span>');
+  updateNet();
+};
+const _go = go;
+go = function (page) {
+  _go(page);
+  const el = $('#pdesc'); if (el) el.textContent = S.page === 'pos' ? '' : (PAGE_DESC[S.page] || '');
+};
+
+/* ---------------- cart additions: notes, confirm clear, units ---------------- */
+const _drawCart = drawCart;
+drawCart = function () {
+  _drawCart();
+  const el = $('#cart'); if (!el) return;
+  const ft = $('.ft', el);
+  if (ft && !$('#noteBtn', el)) ft.insertAdjacentHTML('afterbegin', `<div class="tline"><a href="#" id="noteBtn">📝 ${S.note ? esc(S.note) : 'หมายเหตุลูกค้า'}</a><span></span></div>`);
+  $('#noteBtn', el)?.addEventListener('click', e => { e.preventDefault();
+    formModal('หมายเหตุลูกค้า', [{ k: 'note', label: 'หมายเหตุ (พิมพ์บนใบเสร็จ)', type: 'textarea', full: true }], { note: S.note || '' }, async o => { S.note = o.note; drawCart(); }); });
+  const clr = $('#clrBtn', el);
+  if (clr) clr.onclick = async () => { if (await confirmBox('ต้องการล้างสินค้าทั้งหมดในตะกร้าหรือไม่?')) { S.note = ''; resetSale(); } };
+  if (!canDo('apply_discount')) { const d = $('#discBtn', el); if (d) { d.onclick = e => { e.preventDefault(); toast('ไม่มีสิทธิ์ให้ส่วนลด', 'bad'); }; } }
+};
+function unitPicker(p, qty = 1) {
+  const units = [{ unit: p.unit, factor: 1, price: num(p.promo_price) > 0 ? num(p.promo_price) : num(p.price) }, ...p.units];
+  const m = modal(p.name, `<p class="muted" style="margin-top:0">เลือกหน่วยขาย</p><div class="pills" style="flex-direction:column">${units.map((u, i) =>
+    `<button class="btn lg" data-u="${i}" style="justify-content:space-between;width:100%"><span>${esc(u.unit)}${u.factor > 1 ? ` <small class="muted">(${qtyf(u.factor)} ${esc(p.unit)})</small>` : ''}</span><b>${baht(u.price)}</b></button>`).join('')}</div>`, { sheet: true });
+  $$('[data-u]', m).forEach(b => b.onclick = () => { const u = units[+b.dataset.u]; m.close(); addToCart(p, qty, i0(u)); });
+  function i0(u) { return { unit: u.factor === 1 && u.unit === p.unit ? '' : u.unit, factor: num(u.factor) || 1, price: num(u.price) }; }
+}
+
+/* ---------------- payment (split, all Thai methods, pending QR, idempotent, offline) ---------------- */
+payDialog = function () {
+  const c = calc(), methods = shopMethods(), clientId = uid();
+  let lines = [{ method: methods[0] || 'cash', amount: c.total, ref: '' }], split = false, received = c.total, busy = false;
+  const fullTax = S.shop.vat_mode !== 'none';
+  const m = modal(`ชำระเงิน ${baht(c.total)}`, `
+    <div id="payTop"></div><div id="pbody"></div>
+    <div class="row" style="margin-top:10px;justify-content:space-between">
+      <button class="btn sm" id="splitBtn">🔀 แบ่งชำระหลายช่องทาง</button>
+      <label class="row"><input type="checkbox" id="autoPrint" ${localStorage.getItem('pos_autoprint') === '1' ? 'checked' : ''}> 🖨️ พิมพ์ใบเสร็จอัตโนมัติ</label></div>
+    ${fullTax ? `<details id="taxBox" style="margin-top:10px"><summary class="b" style="cursor:pointer">🧾 ออกใบกำกับภาษีเต็มรูป (ระบุข้อมูลผู้ซื้อ)</summary>
+      <div class="grid2" style="margin-top:10px"><div class="fg"><label class="f">ชื่อผู้ซื้อ / บริษัท</label><input class="in" id="txName" value="${esc(S.customer?.name || '')}"></div>
+      <div class="fg"><label class="f">เลขประจำตัวผู้เสียภาษี (13 หลัก)</label><input class="in" id="txId" inputmode="numeric" maxlength="13" value="${esc(S.customer?.tax_id || '')}"></div>
+      <div class="fg" style="grid-column:1/-1"><label class="f">ที่อยู่</label><input class="in" id="txAddr" value="${esc(S.customer?.address || '')}"></div>
+      <div class="fg"><label class="f">สาขา (สำนักงานใหญ่ / เลขสาขา)</label><input class="in" id="txBr" value="${esc(S.customer?.tax_branch || 'สำนักงานใหญ่')}"></div></div></details>` : ''}`,
+    { foot: `<button class="btn" data-c>ยกเลิก</button><button class="btn ok lg" id="cfm">✔ ยืนยันชำระเงิน</button>` });
+  $('[data-c]', m).onclick = m.close;
+  say('ยอดชำระ ' + bahtWords(c.total));
+  const pending = () => lines.some(l => ['promptpay', 'qr'].includes(l.method) && !l.verified);
+  const cashLine = () => lines.find(l => l.method === 'cash');
+  const nonCash = () => r2(lines.filter(l => l.method !== 'cash').reduce((a, l) => a + num(l.amount), 0));
+  const draw = () => {
+    const top = $('#payTop', m), pb = $('#pbody', m);
+    if (!split) {
+      const L = lines[0];
+      top.innerHTML = `<div class="paym" style="grid-template-columns:repeat(auto-fill,minmax(120px,1fr))">${methods.map(k => `<button data-m="${k}" class="${k === L.method ? 'on' : ''}">${payIcon(k)} ${payName(k)}</button>`).join('')}</div>`;
+      $$('[data-m]', top).forEach(b => b.onclick = () => { L.method = b.dataset.m; L.verified = false; draw(); });
+      pb.innerHTML = methodBody(L, c.total);
+    } else {
+      top.innerHTML = '';
+      const rest = r2(c.total - lines.reduce((a, l) => a + num(l.amount), 0));
+      pb.innerHTML = lines.map((L, i) => `<div class="split-row"><select class="in" data-sm="${i}">${methods.map(k => `<option value="${k}" ${k === L.method ? 'selected' : ''}>${payIcon(k)} ${payName(k)}</option>`).join('')}</select>
+          <input class="in" data-sa="${i}" type="number" step="any" inputmode="decimal" value="${L.amount}"><button class="btn sm bad" data-sx="${i}" ${lines.length < 2 ? 'disabled' : ''}>×</button></div>
+          ${['promptpay', 'qr'].includes(L.method) ? verifyBox(L, i) : ''}`).join('') +
+        `<button class="btn sm" id="addLine">➕ เพิ่มช่องทาง</button>
+        <div class="tline big" style="margin-top:10px"><span>${rest > 0 ? 'คงเหลือ' : rest < 0 ? 'เกิน' : 'ครบแล้ว'}</span><span style="color:${rest === 0 ? 'var(--ok)' : 'var(--bad)'}">${baht(Math.abs(rest))}</span></div>
+        ${cashLine() ? `<p class="muted">เงินสดที่ได้รับเกินจะคำนวณเป็นเงินทอน</p>` : ''}`;
+      $$('[data-sm]', pb).forEach(s => s.onchange = () => { lines[+s.dataset.sm].method = s.value; lines[+s.dataset.sm].verified = false; draw(); });
+      $$('[data-sa]', pb).forEach(s => s.onchange = () => { lines[+s.dataset.sa].amount = num(s.value); draw(); });
+      $$('[data-sx]', pb).forEach(b => b.onclick = () => { lines.splice(+b.dataset.sx, 1); draw(); });
+      $('#addLine', pb).onclick = () => { const used = lines.map(l => l.method); lines.push({ method: methods.find(k => !used.includes(k)) || 'cash', amount: Math.max(0, rest), ref: '' }); draw(); };
+    }
+    wireBody();
+  };
+  const verifyBox = (L, i) => `<label class="row" style="margin:-2px 0 10px;font-size:13px"><input type="checkbox" data-v="${i ?? 0}" ${L.verified ? 'checked' : ''}> ตรวจสอบแล้วว่าเงินเข้าบัญชีจริง (แอปธนาคาร/SMS)</label>`;
+  const methodBody = (L, total) => {
+    if (L.method === 'cash') {
+      const notes = [...new Set([total, Math.ceil(total / 20) * 20, Math.ceil(total / 100) * 100, Math.ceil(total / 500) * 500, Math.ceil(total / 1000) * 1000, 1000])].filter(v => v >= total).slice(0, 6);
+      return `<label class="f">รับเงินมา</label><input class="in" id="recv" type="number" step="any" inputmode="decimal" value="${received}" style="font-size:28px;font-weight:700">
+        <div class="quick">${notes.map(v => `<button class="btn" data-v2="${v}">${v === total ? 'พอดี' : baht(v)}</button>`).join('')}</div>
+        <div class="tline big"><span>เงินทอน</span><span id="chg">0.00</span></div>`;
+    }
+    if (L.method === 'promptpay' || L.method === 'qr') {
+      if (!S.shop.promptpay_id) return `<p class="chip warn">กรุณาตั้งค่าพร้อมเพย์ในหน้าตั้งค่าก่อน</p>${verifyBox(L)}`;
+      const payload = promptPayPayload(S.shop.promptpay_id, total);
+      bc?.postMessage({ type: 'qr', svg: qrSvg(payload), total });
+      return `<div class="qr">${qrSvg(payload)}<b style="font-size:22px">${baht(total)}</b><span class="muted">ให้ลูกค้าสแกนจ่ายด้วยแอปธนาคาร</span></div>
+        <div class="card" style="padding:10px;background:var(--warnsoft);box-shadow:none;font-size:13px">⚠️ การแสดง QR ไม่ได้แปลว่าชำระสำเร็จ — ตรวจสอบยอดเงินเข้าก่อนยืนยัน หากยังไม่ได้ตรวจสอบ บิลจะถูกบันทึกเป็น <b>“รอตรวจสอบ”</b></div>${verifyBox(L)}`;
+    }
+    if (L.method === 'store_credit') {
+      if (!S.customer) return `<p class="chip bad">การขายเงินเชื่อต้องเลือกลูกค้าก่อน</p>`;
+      const cu = S.customer; return `<div class="kv"><span>ลูกค้า</span><b>${esc(cu.name)}</b><span>ยอดค้างเดิม</span><b>${baht(cu.balance)}</b><span>วงเงินเครดิต</span><b>${num(cu.credit_limit) ? baht(cu.credit_limit) : 'ไม่จำกัด'}</b><span>ยอดค้างหลังขาย</span><b style="color:var(--bad)">${baht(num(cu.balance) + total)}</b></div>`;
+    }
+    return `<div class="fg"><label class="f">เลขอ้างอิง / 4 หลักท้ายบัตร (ถ้ามี)</label><input class="in" id="refIn" value="${esc(L.ref || '')}"></div>`;
+  };
+  const wireBody = () => {
+    const r = $('#recv', m);
+    if (r) {
+      const upd = () => { received = num(r.value); const ch = r2(received - c.total); $('#chg', m).textContent = money(ch); $('#chg', m).style.color = ch < 0 ? 'var(--bad)' : 'var(--ok)'; };
+      r.oninput = upd; upd(); setTimeout(() => r.select(), 50);
+      $$('[data-v2]', m).forEach(b => b.onclick = () => { r.value = b.dataset.v2; upd(); });
+      r.onkeydown = e => { if (e.key === 'Enter') $('#cfm', m).click(); };
+    }
+    $$('[data-v]', m).forEach(cb => cb.onchange = () => { lines[+cb.dataset.v].verified = cb.checked; });
+    const ref = $('#refIn', m); if (ref) ref.oninput = () => { lines[0].ref = ref.value; };
+  };
+  $('#splitBtn', m).onclick = () => { split = !split; if (split && lines.length === 1) { lines[0].amount = c.total; } if (!split) lines = [{ ...lines[0], amount: c.total }]; $('#splitBtn', m).textContent = split ? '↩ ชำระช่องทางเดียว' : '🔀 แบ่งชำระหลายช่องทาง'; draw(); };
+  draw();
+
+  $('#cfm', m).onclick = async () => {
+    if (busy) return;
+    let payments, paid, change;
+    if (!split) {
+      const L = lines[0];
+      if (L.method === 'cash') { if (received + 0.001 < c.total) return sfx('error'), toast('ยอดเงินที่รับไม่พอ', 'bad'); paid = received; change = r2(received - c.total); }
+      else { paid = c.total; change = 0; }
+      if (L.method === 'store_credit' && !S.customer) return toast('กรุณาเลือกลูกค้าก่อน', 'bad');
+      payments = [{ method: L.method, amount: c.total, ref: L.ref || '', status: (['promptpay', 'qr'].includes(L.method) && !L.verified) ? 'pending' : 'confirmed' }];
+    } else {
+      const sum = r2(lines.reduce((a, l) => a + num(l.amount), 0));
+      const cash = cashLine();
+      if (sum + 0.001 < c.total) return toast('ยอดชำระรวมยังไม่ครบ', 'bad');
+      if (sum - c.total > 0.001 && !cash) return toast('ยอดรวมเกินยอดชำระ (เกินได้เฉพาะเงินสดเพื่อทอน)', 'bad');
+      if (lines.some(l => l.method === 'store_credit') && !S.customer) return toast('การขายเงินเชื่อต้องเลือกลูกค้า', 'bad');
+      change = r2(sum - c.total); paid = sum;
+      payments = lines.filter(l => num(l.amount) > 0).map(l => ({ method: l.method, amount: l.method === 'cash' ? r2(num(l.amount) - change) : num(l.amount), ref: l.ref || '',
+        status: (['promptpay', 'qr'].includes(l.method) && !l.verified) ? 'pending' : 'confirmed' })).filter(x => x.amount > 0);
+    }
+    let tax = {};
+    if ($('#taxBox', m)?.open && $('#txName', m).value.trim()) {
+      const id = $('#txId', m).value.trim();
+      if (!/^\d{13}$/.test(id)) return toast('เลขประจำตัวผู้เสียภาษีต้องมี 13 หลัก', 'bad');
+      tax = { invoice_type: 'full', tax_name: $('#txName', m).value.trim(), tax_id: id, tax_address: $('#txAddr', m).value.trim(), tax_branch: $('#txBr', m).value.trim() };
+    }
+    localStorage.setItem('pos_autoprint', $('#autoPrint', m).checked ? '1' : '0');
+    busy = true; const btn = $('#cfm', m); btn.disabled = true; btn.textContent = 'กำลังบันทึก…';
+    const payload = { client_id: clientId, customer_id: S.customer?.id || '', shift_id: S.shift?.id || '', subtotal: c.subtotal, discount: c.discount,
+      points_used: c.pointsUse, points_earned: c.pointsEarned, vat: c.vat, total: c.total, paid, change, payments, payment_method: payments.length > 1 ? 'mixed' : payments[0].method,
+      note: S.promo ? 'โปรโมชั่น: ' + S.promo.name : '', customer_note: S.note || '', ...tax,
+      items: S.cart.map(l => ({ product_id: l.product_id, name: l.name, qty: l.qty, price: l.price, discount: num(l.discount), unit: l.unit || '', factor: l.factor || 1 })) };
+    try {
+      const { sale, queued } = await submitSale(payload);
+      S.cart.forEach(l => { const p = S.products.find(x => x.id === l.product_id); if (p?.track_stock) p.stock -= l.qty * (l.factor || 1); });
+      if (S.customer && !queued) { S.customer.points = Math.max(0, num(S.customer.points) - c.pointsUse + c.pointsEarned);
+        S.customer.balance = num(S.customer.balance) + payments.filter(p => p.method === 'store_credit').reduce((a, p) => a + p.amount, 0); }
+      const items = S.cart.map(l => ({ ...l })), cust = S.customer;
+      sale._payments = payments; sale.change = change; sale.paid = paid;
+      m.close();
+      bc?.postMessage({ type: 'thanks', total: c.total, change });
+      sfx('pay'); say(change > 0 ? 'เงินทอน ' + bahtWords(change) : 'ขอบคุณค่ะ');
+      S.note = ''; resetSale(); drawGrid(); loadPosStats().catch(() => {});
+      if (queued) toast('บันทึกบิลแบบออฟไลน์แล้ว — จะส่งขึ้นระบบอัตโนมัติเมื่อออนไลน์', 'ok');
+      else if (sale.pay_status === 'pending') toast('บันทึกแล้ว — สถานะ “รอตรวจสอบการชำระ”', 'bad');
+      else toast('ชำระเงินสำเร็จ', 'ok');
+      showReceipt(sale, items, cust, localStorage.getItem('pos_autoprint') === '1');
+    } catch (e) { busy = false; btn.disabled = false; btn.textContent = '✔ ยืนยันชำระเงิน'; sfx('error'); fail(e); }
+  };
+};
+/* ---------------- helpers ---------------- */
+let CHART_P = null;
+const loadChart = () => (CHART_P ||= loadScript('https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js'));
+const CHARTS = {};
+function chart(id, cfg) { CHARTS[id]?.destroy?.(); const el = document.getElementById(id); if (!el || !window.Chart) return; CHARTS[id] = new Chart(el, cfg); }
+const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+function rangeOf(k, a, b) {
+  const now = new Date(), d0 = x => { x = new Date(x); x.setHours(0, 0, 0, 0); return x; }, d1 = x => { x = new Date(x); x.setHours(23, 59, 59, 999); return x; };
+  const day = 864e5;
+  switch (k) {
+    case 'today': return [d0(now), d1(now)];
+    case 'yest': return [d0(now - day), d1(now - day)];
+    case 'd7': return [d0(now - 6 * day), d1(now)];
+    case 'd30': return [d0(now - 29 * day), d1(now)];
+    case 'month': return [new Date(now.getFullYear(), now.getMonth(), 1), d1(now)];
+    case 'last': return [new Date(now.getFullYear(), now.getMonth() - 1, 1), d1(new Date(now.getFullYear(), now.getMonth(), 0))];
+    default: return [d0(a), d1(b)];
+  }
+}
+const RANGES = [['today', 'วันนี้'], ['yest', 'เมื่อวาน'], ['d7', '7 วันล่าสุด'], ['d30', '30 วันล่าสุด'], ['month', 'เดือนนี้'], ['last', 'เดือนก่อน'], ['custom', 'กำหนดเอง']];
+function rangeBar(el, onChange, def = 'today') {
+  el.innerHTML = `<div class="tabs">${RANGES.map(([k, l]) => `<button class="tab ${k === def ? 'on' : ''}" data-r="${k}">${l}</button>`).join('')}
+    <span class="row hidden" id="rcustom"><input type="date" class="in" id="ra" style="width:auto"> – <input type="date" class="in" id="rb" style="width:auto"></span></div>`;
+  let cur = def;
+  const fire = () => { const [a, b] = rangeOf(cur, $('#ra', el).value, $('#rb', el).value); onChange(a, b, cur); };
+  $$('[data-r]', el).forEach(b => b.onclick = () => { cur = b.dataset.r; $$('[data-r]', el).forEach(x => x.classList.toggle('on', x === b));
+    $('#rcustom', el).classList.toggle('hidden', cur !== 'custom'); if (cur === 'custom') { $('#ra', el).value ||= ymd(new Date(Date.now() - 6 * 864e5)); $('#rb', el).value ||= ymd(new Date()); } fire(); });
+  $('#ra', el).onchange = $('#rb', el).onchange = fire;
+  fire();
+}
+const pct = (a, b) => b ? ((a - b) / Math.abs(b) * 100) : (a ? 100 : 0);
+const trend = (a, b) => { const p = pct(a, b); return `<small style="color:${p >= 0 ? 'var(--ok)' : 'var(--bad)'};font-weight:700">${p >= 0 ? '▲' : '▼'} ${Math.abs(p).toFixed(0)}%</small>`; };
+async function salesIn(a, b, extra = '') {
+  return fetchAll(() => sb.from('sales').select('id,bill_no,total,vat,discount,cost_total,refunded_total,status,pay_status,payment_method,cashier_name,cashier_id,customer_id,items_count,created_at' + extra)
+    .eq('shop_id', S.shop.id).in('status', ['paid', 'partial_refund', 'refunded']).gte('created_at', a.toISOString()).lte('created_at', b.toISOString()).order('created_at'));
+}
+
+/* ================= DASHBOARD ================= */
+VIEWS.dashboard = pg => {
+  const prof = canDo('view_profit');
+  pg.innerHTML = `<div id="dr"></div><div id="db"><div class="skel"><i></i><i></i><i></i></div></div>`;
+  rangeBar($('#dr'), async (a, b) => {
+    const len = b - a + 1, pa = new Date(a - len), pb2 = new Date(a - 1);
+    const [cur, prev, pays, items, exps, refs, yearS] = await Promise.all([
+      salesIn(a, b), salesIn(pa, pb2),
+      fetchAll(() => sb.from('sale_payments').select('method,amount,status,sales!inner(status)').eq('shop_id', S.shop.id).neq('sales.status', 'void').gte('created_at', a.toISOString()).lte('created_at', b.toISOString())),
+      fetchAll(() => sb.from('sale_items').select('product_id,name,qty,price,discount,cost,refunded_qty,sales!inner(created_at,status)').eq('shop_id', S.shop.id).neq('sales.status', 'void').gte('sales.created_at', a.toISOString()).lte('sales.created_at', b.toISOString())),
+      fetchAll(() => sb.from('expenses').select('amount,category,status').eq('shop_id', S.shop.id).gte('spent_on', ymd(a)).lte('spent_on', ymd(b))),
+      fetchAll(() => sb.from('refunds').select('amount,method').eq('shop_id', S.shop.id).gte('created_at', a.toISOString()).lte('created_at', b.toISOString())),
+      fetchAll(() => sb.from('sales').select('total,refunded_total,created_at').eq('shop_id', S.shop.id).neq('status', 'void').gte('created_at', new Date(new Date().getFullYear(), new Date().getMonth() - 11, 1).toISOString())),
+    ]);
+    const sum = (arr, f) => arr.reduce((x, r) => x + num(typeof f === 'function' ? f(r) : r[f]), 0);
+    const gross = sum(cur, 'total'), refund = sum(refs, 'amount'), revenue = gross - refund, vat = sum(cur, 'vat');
+    const cogs = sum(cur, 'cost_total') - items.reduce((x, i) => x + num(i.refunded_qty) * num(i.cost), 0);
+    const netSales = revenue - vat * (revenue / (gross || 1)), gp = netSales - cogs;
+    const exp = sum(exps.filter(e => e.status !== 'pending'), 'amount'), np = gp - exp;
+    const prevRev = sum(prev, x => num(x.total) - num(x.refunded_total));
+    const by = {}; pays.forEach(p => { by[p.method] = (by[p.method] || 0) + num(p.amount); });
+    const pendingAmt = pays.filter(p => p.status === 'pending').reduce((x, p) => x + num(p.amount), 0);
+    const qtySold = items.reduce((x, i) => x + num(i.qty) - num(i.refunded_qty), 0);
+    const prod = {}; items.forEach(i => { const k = i.product_id || i.name; const o = prod[k] ||= { id: i.product_id, name: i.name, qty: 0, rev: 0 }; o.qty += num(i.qty) - num(i.refunded_qty); o.rev += (num(i.qty) - num(i.refunded_qty)) * num(i.price); });
+    const top = Object.values(prod).sort((x, y) => y.rev - x.rev).slice(0, 8);
+    const sold = new Set(Object.values(prod).filter(x => x.qty > 0).map(x => x.id));
+    const slow = S.products.filter(p => p.active && !sold.has(p.id)).slice(0, 8);
+    const low = S.products.filter(p => p.active && p.track_stock && p.stock > 0 && p.stock <= p.low_stock);
+    const out = S.products.filter(p => p.active && p.track_stock && p.stock <= 0);
+    const days = []; for (let d = new Date(a); d <= b && days.length < 62; d.setDate(d.getDate() + 1)) days.push(ymd(d));
+    const dayTot = {}, prevDay = {}; cur.forEach(s => { const k = ymd(s.created_at); dayTot[k] = (dayTot[k] || 0) + num(s.total) - num(s.refunded_total); });
+    prev.forEach(s => { const k = Math.floor((new Date(s.created_at) - pa) / 864e5); prevDay[k] = (prevDay[k] || 0) + num(s.total) - num(s.refunded_total); });
+    const hours = Array(24).fill(0); cur.forEach(s => { hours[new Date(s.created_at).getHours()] += num(s.total); });
+    const months = []; for (let i = 11; i >= 0; i--) { const d = new Date(new Date().getFullYear(), new Date().getMonth() - i, 1); months.push([d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'), d]); }
+    const monTot = {}; yearS.forEach(s => { const k = s.created_at.slice(0, 7); monTot[k] = (monTot[k] || 0) + num(s.total) - num(s.refunded_total); });
+    const kpi = (ic, k, v, sub = '', col = '') => `<div class="stat"><div class="k">${ic} ${k}</div><div class="v" ${col ? `style="color:${col}"` : ''}>${v}</div>${sub ? `<div class="muted" style="font-size:12px;margin-top:4px">${sub}</div>` : ''}</div>`;
+    $('#db').innerHTML = `
+      <div class="stats">
+        ${kpi('💰', 'ยอดขายสุทธิ (หลังคืนเงิน)', baht(revenue), trend(revenue, prevRev) + ' เทียบช่วงก่อนหน้า')}
+        ${kpi('🧾', 'จำนวนบิล', qtyf(cur.length), trend(cur.length, prev.length) + ` · เฉลี่ย ${baht(cur.length ? revenue / cur.length : 0)}/บิล`)}
+        ${kpi('📦', 'จำนวนสินค้าที่ขาย', qtyf(qtySold))}
+        ${prof ? kpi('📈', 'กำไรขั้นต้น', baht(gp), `ยอดขายก่อน VAT ${baht(netSales)} − ต้นทุน ${baht(cogs)}`, gp >= 0 ? 'var(--ok)' : 'var(--bad)') : ''}
+        ${kpi('💸', 'ค่าใช้จ่าย', baht(exp), exps.some(e => e.status === 'pending') ? 'มีรายการรออนุมัติ' : '', 'var(--bad)')}
+        ${prof ? kpi('🏁', 'กำไรสุทธิ', baht(np), 'กำไรขั้นต้น − ค่าใช้จ่าย', np >= 0 ? 'var(--ok)' : 'var(--bad)') : ''}
+        ${kpi('↩️', 'คืนเงิน', baht(refund), `${refs.length} รายการ`)}
+        ${pendingAmt ? kpi('⏳', 'รอตรวจสอบการชำระ', baht(pendingAmt), 'พร้อมเพย์/QR ที่ยังไม่ยืนยัน', 'var(--warn)') : ''}
+      </div>
+      <div class="stats">${['cash', 'transfer', 'promptpay', 'qr', 'credit_card', 'debit_card', 'ewallet', 'store_credit'].filter(k => by[k]).map(k => kpi(payIcon(k), 'ยอด' + payName(k), baht(by[k]))).join('') || kpi('💳', 'ยอดตามช่องทางชำระ', baht(0))}</div>
+      <div class="grid2">
+        <div class="card"><div class="row"><b style="flex:1">แนวโน้มยอดขาย</b><span class="muted" style="font-size:12px">— เส้นประ = ช่วงก่อนหน้า</span></div><div class="chartbox"><canvas id="cTrend"></canvas></div></div>
+        <div class="card"><b>ยอดขายรายเดือน (12 เดือน)</b><div class="chartbox"><canvas id="cMonth"></canvas></div></div>
+      </div><br>
+      <div class="grid2">
+        <div class="card"><b>ช่องทางการชำระเงิน</b><div class="chartbox"><canvas id="cPay"></canvas></div></div>
+        <div class="card"><b>ช่วงเวลาที่ขายดี</b><div class="chartbox"><canvas id="cHour"></canvas></div></div>
+      </div><br>
+      <div class="grid2">
+        <div class="card"><b>🔥 สินค้าขายดี</b><table class="rtable">${top.map((p, i) => `<tr><td>${i + 1}. ${esc(p.name)}</td><td class="right">${qtyf(p.qty)}</td><td class="right b">${baht(p.rev)}</td></tr>`).join('') || '<tr><td class="muted">ยังไม่มีการขาย</td></tr>'}</table></div>
+        <div class="card"><b>🐢 สินค้าขายช้า (ไม่มีการขายในช่วงนี้)</b><table class="rtable">${slow.map(p => `<tr><td>${esc(p.name)}</td><td class="right muted">${p.track_stock ? qtyf(p.stock) + ' ' + esc(p.unit) : ''}</td></tr>`).join('') || '<tr><td class="muted">—</td></tr>'}</table></div>
+      </div><br>
+      <div class="grid2">
+        <div class="card"><b>⚠️ สินค้าใกล้หมด (${low.length})</b><table class="rtable">${low.slice(0, 10).map(p => `<tr><td>${esc(p.name)}</td><td class="right"><span class="chip warn">${qtyf(p.stock)} ${esc(p.unit)}</span></td></tr>`).join('') || '<tr><td class="muted">—</td></tr>'}</table></div>
+        <div class="card"><b>⛔ สินค้าหมดสต็อก (${out.length})</b><table class="rtable">${out.slice(0, 10).map(p => `<tr><td>${esc(p.name)}</td><td class="right"><span class="chip bad">${qtyf(p.stock)}</span></td></tr>`).join('') || '<tr><td class="muted">—</td></tr>'}</table></div>
+      </div>`;
+    await loadChart();
+    const brand = css('--brand'), muted = css('--muted'), grid = css('--line');
+    const base = { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => ' ' + baht(c.parsed.y ?? c.parsed) } } },
+      scales: { x: { grid: { display: false }, ticks: { color: muted } }, y: { grid: { color: grid }, ticks: { color: muted, callback: v => '฿' + Number(v).toLocaleString('th-TH') } } } };
+    if (days.length > 1) chart('cTrend', { type: 'line', data: { labels: days.map(d => new Date(d).toLocaleDateString(dateLoc(), { day: 'numeric', month: 'short' })),
+      datasets: [{ data: days.map(d => dayTot[d] || 0), borderColor: brand, backgroundColor: brand + '22', fill: true, tension: .3, pointRadius: 2 },
+        { data: days.map((d, i) => prevDay[i] || 0), borderColor: muted, borderDash: [5, 5], pointRadius: 0, tension: .3 }] }, options: base });
+    else chart('cTrend', { type: 'bar', data: { labels: [...Array(24).keys()].map(h => h + ':00'), datasets: [{ data: hours, backgroundColor: brand, borderRadius: 4 }] }, options: base });
+    chart('cMonth', { type: 'bar', data: { labels: months.map(([, d]) => d.toLocaleDateString(dateLoc(), { month: 'short', year: '2-digit' })), datasets: [{ data: months.map(([k]) => monTot[k] || 0), backgroundColor: brand, borderRadius: 6 }] }, options: base });
+    const pk = Object.keys(by);
+    chart('cPay', { type: 'doughnut', data: { labels: pk.map(payName), datasets: [{ data: pk.map(k => by[k]), backgroundColor: ['#4338ca', '#0ea5e9', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#14b8a6', '#64748b'] }] },
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { color: muted } }, tooltip: { callbacks: { label: c => ` ${c.label}: ${baht(c.parsed)}` } } } } });
+    chart('cHour', { type: 'bar', data: { labels: [...Array(24).keys()].map(h => String(h)), datasets: [{ data: hours, backgroundColor: brand + 'cc', borderRadius: 4 }] }, options: base });
+  }, 'today');
+};
+
+/* ================= SALES HISTORY ================= */
+const ST_CHIP = { paid: ['ok', 'ชำระแล้ว'], void: ['bad', 'ยกเลิก'], refunded: ['bad', 'คืนเงินทั้งบิล'], partial_refund: ['warn', 'คืนบางส่วน'] };
+const statusChip = s => { const [c, l] = ST_CHIP[s.status] || ['', s.status]; return `<span class="chip ${c}">${l}</span>${s.pay_status === 'pending' && s.status !== 'void' ? ' <span class="chip warn">⏳ รอตรวจสอบ</span>' : ''}`; };
+VIEWS.sales = pg => {
+  pg.innerHTML = `<div id="sr"></div><div class="row" style="margin-bottom:12px">
+      <div class="sbox" style="max-width:320px"><span>🔍</span><input class="in" id="bs" placeholder="เลขบิล / ลูกค้า / พนักงาน"></div>
+      <select class="in" id="bst" style="width:auto"><option value="">ทุกสถานะ</option><option value="paid">ชำระแล้ว</option><option value="pending">รอตรวจสอบการชำระ</option><option value="partial_refund">คืนบางส่วน</option><option value="refunded">คืนเงินทั้งบิล</option><option value="void">ยกเลิก</option></select>
+      <select class="in" id="bpm" style="width:auto"><option value="">ทุกช่องทาง</option>${Object.keys(PAY).map(k => `<option value="${k}">${payName(k)}</option>`).join('')}</select>
+      <span class="sp"></span><button class="btn" id="bx">⬇ CSV</button></div><div id="bl"></div>`;
+  let rows = [];
+  const draw = () => {
+    const v = $('#bs').value.trim().toLowerCase(), st = $('#bst').value, pm = $('#bpm').value;
+    const list = rows.filter(r => (!v || r.bill_no.toLowerCase().includes(v) || (r.customer?.name || '').toLowerCase().includes(v) || (r.cashier_name || '').toLowerCase().includes(v))
+      && (!st || (st === 'pending' ? r.pay_status === 'pending' && r.status !== 'void' : r.status === st)) && (!pm || r.payment_method === pm));
+    const ok = list.filter(r => r.status !== 'void');
+    $('#bl').innerHTML = `<div class="stats"><div class="stat"><div class="k">จำนวนบิล</div><div class="v">${ok.length}</div></div>
+      <div class="stat"><div class="k">ยอดขาย</div><div class="v">${baht(ok.reduce((a, r) => a + num(r.total), 0))}</div></div>
+      <div class="stat"><div class="k">คืนเงิน</div><div class="v">${baht(ok.reduce((a, r) => a + num(r.refunded_total), 0))}</div></div></div>
+      ${list.length ? `<div class="tblwrap"><table class="tbl"><tr><th>เลขที่บิล</th><th>วันเวลา</th><th>ลูกค้า</th><th>ชำระโดย</th><th>พนักงาน</th><th class="right">ยอดรวม</th><th>สถานะ</th></tr>
+      ${list.map(r => `<tr class="click" data-id="${r.id}"><td><b>${esc(r.bill_no)}</b>${r.invoice_type === 'full' ? ' <span class="chip info">ใบกำกับเต็มรูป</span>' : ''}</td><td>${dt(r.created_at)}</td><td>${esc(r.customer?.name || 'ลูกค้าทั่วไป')}</td>
+        <td>${payIcon(r.payment_method)} ${payName(r.payment_method)}</td><td>${esc(r.cashier_name)}</td><td class="right b">${baht(r.total)}</td><td>${statusChip(r)}</td></tr>`).join('')}</table></div>`
+      : `<div class="empty">ไม่พบรายการขายในช่วงเวลานี้</div>`}`;
+    $$('[data-id]', pg).forEach(tr => tr.onclick = () => billDetail(rows.find(r => r.id === tr.dataset.id), () => load()));
+  };
+  let A, B;
+  const load = async () => {
+    rows = await fetchAll(() => sb.from('sales').select('*, customer:customers(name,tax_id,address,tax_branch,points,balance)').eq('shop_id', S.shop.id).gte('created_at', A.toISOString()).lte('created_at', B.toISOString()).order('created_at', { ascending: false }));
+    if (S.role === 'cashier') rows = rows.filter(r => r.cashier_id === S.user.id);
+    draw();
+  };
+  $('#bs').oninput = $('#bst').onchange = $('#bpm').onchange = draw;
+  $('#bx').onclick = () => download(`sales_${ymd(A)}_${ymd(B)}.csv`, toCSV(rows.map(r => ({ ...r, customer: r.customer?.name || '' })), ['bill_no', 'created_at', 'customer', 'cashier_name', 'payment_method', 'subtotal', 'discount', 'vat', 'total', 'refunded_total', 'status', 'pay_status', 'invoice_type']));
+  rangeBar($('#sr'), (a, b) => { A = a; B = b; load().catch(fail); }, 'today');
+};
+
+billDetail = async function (sale, reload) {
+  const [items, pays, refs] = await Promise.all([
+    q(sb.from('sale_items').select('*').eq('sale_id', sale.id)),
+    q(sb.from('sale_payments').select('*').eq('sale_id', sale.id)),
+    q(sb.from('refunds').select('*').eq('sale_id', sale.id).order('created_at')),
+  ]);
+  sale._payments = pays;
+  const cust = sale.customer_id ? S.customers.find(c => c.id === sale.customer_id) : null;
+  const html = receiptHTML(sale, items, cust);
+  const open = sale.status === 'paid' || sale.status === 'partial_refund';
+  const m = modal(`บิล ${sale.bill_no}`, `
+    <div class="row" style="margin-bottom:10px">${statusChip(sale)}<span class="muted">${dLong(sale.created_at)} ${new Date(sale.created_at).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', timeZone: TZ })} · ${esc(sale.cashier_name)}</span></div>
+    ${sale.customer_note ? `<p>📝 ${esc(sale.customer_note)}</p>` : ''}
+    <div class="kv" style="margin-bottom:12px">${pays.map(p => `<span>${payIcon(p.method)} ${payName(p.method)}${p.status === 'pending' ? ' <span class="chip warn">รอตรวจสอบ</span>' : ''}${p.ref ? ` <small class="muted">${esc(p.ref)}</small>` : ''}</span><b>${baht(p.amount)}</b>`).join('')}</div>
+    ${refs.length ? `<div class="card" style="box-shadow:none;background:var(--badsoft);padding:10px;margin-bottom:12px"><b>ประวัติการคืนเงิน</b>${refs.map(r => `<div class="tline"><span>${esc(r.refund_no)} · ${dt(r.created_at)} · ${payName(r.method)}${r.reason ? ' · ' + esc(r.reason) : ''}</span><b>-${baht(r.amount)}</b></div>`).join('')}</div>` : ''}
+    <div class="rcptbox">${html}</div>`, { wide: true, foot: `
+    ${sale.pay_status === 'pending' && sale.status !== 'void' ? `<button class="btn ok" id="cpay">✔ ยืนยันได้รับเงินแล้ว</button>` : ''}
+    ${open && canDo('refund') ? `<button class="btn" id="rfd">↩️ คืนสินค้า / คืนเงิน</button>` : ''}
+    ${sale.status === 'paid' && !num(sale.refunded_total) && canDo('cancel_sale') ? `<button class="btn bad" id="vd">ยกเลิกบิล</button>` : ''}
+    <span style="flex:1"></span>
+    ${S.shop.vat_mode !== 'none' && sale.invoice_type !== 'full' && sale.status !== 'void' ? `<button class="btn" id="ftx">🧾 ออกใบกำกับภาษีเต็มรูป</button>` : ''}
+    <button class="btn" id="shr">📤 ใบเสร็จดิจิทัล</button><button class="btn p" id="rp">🖨️ พิมพ์ซ้ำ</button>` });
+  $('#rp', m).onclick = () => printReceipt(html);
+  $('#shr', m).onclick = () => shareReceipt(sale, items);
+  if ($('#cpay', m)) $('#cpay', m).onclick = async () => { if (!await confirmBox('ยืนยันว่าตรวจสอบแล้วว่าเงินเข้าบัญชีจริง?')) return; try { await q(sb.rpc('confirm_payment', { p_sale: sale.id })); toast('ยืนยันการชำระเงินแล้ว', 'ok'); m.close(); reload?.(); } catch (e) { fail(e); } };
+  if ($('#vd', m)) $('#vd', m).onclick = () => formModal('ยกเลิกบิล ' + sale.bill_no, [{ k: 'reason', label: 'เหตุผลการยกเลิก', req: true, full: true }], {}, async o => {
+    if (!await confirmBox('คุณต้องการยกเลิกรายการขายนี้หรือไม่? สต็อกจะถูกคืนอัตโนมัติ')) throw new Error('ยกเลิกการทำรายการ');
+    await q(sb.rpc('void_sale', { p_sale: sale.id, p_reason: o.reason })); m.close(); await loadMaster(); reload?.(); });
+  if ($('#rfd', m)) $('#rfd', m).onclick = () => { m.close(); refundDialog(sale, items, reload); };
+  if ($('#ftx', m)) $('#ftx', m).onclick = () => formModal('ใบกำกับภาษีเต็มรูป', [
+    { k: 'name', label: 'ชื่อผู้ซื้อ / บริษัท', req: true, full: true }, { k: 'tax_id', label: 'เลขประจำตัวผู้เสียภาษี 13 หลัก', req: true },
+    { k: 'branch', label: 'สาขา', def: 'สำนักงานใหญ่' }, { k: 'address', label: 'ที่อยู่', full: true }],
+    { name: cust?.name || '', tax_id: cust?.tax_id || '', address: cust?.address || '', branch: cust?.tax_branch || 'สำนักงานใหญ่' }, async o => {
+      if (!/^\d{13}$/.test(o.tax_id)) throw new Error('เลขประจำตัวผู้เสียภาษีต้องมี 13 หลัก');
+      const s2 = await q(sb.rpc('issue_tax_invoice', { p_sale: sale.id, p_name: o.name, p_tax_id: o.tax_id, p_address: o.address, p_branch: o.branch }));
+      m.close(); Object.assign(sale, s2); billDetail(sale, reload); });
+};
+
+/* ================= REFUNDS ================= */
+function refundDialog(sale, items, reload) {
+  const left = items.map(i => ({ ...i, left: num(i.qty) - num(i.refunded_qty), r: 0 })).filter(i => i.left > 0);
+  const methods = ['cash', 'transfer', 'promptpay', ...(sale.customer_id ? ['store_credit'] : [])];
+  const m = modal(`คืนสินค้า / คืนเงิน — ${sale.bill_no}`, `
+    <p class="muted" style="margin-top:0">เลือกจำนวนที่ลูกค้าคืน ระบบคำนวณยอดคืนตามสัดส่วนส่วนลดของบิล</p>
+    <div id="rl">${left.map((i, k) => `<div class="citem"><div class="nm"><div>${esc(i.name)}</div><small>${baht(i.price)} · คืนได้ ${qtyf(i.left)}</small></div>
+      <div class="qty"><button data-d="${k}">−</button><span id="rq${k}">0</span><button data-u="${k}">+</button></div><button class="btn sm" data-all="${k}">ทั้งหมด</button></div>`).join('')}</div>
+    <div class="grid2" style="margin-top:12px">
+      <div class="fg"><label class="f">เหตุผล</label><select class="in" id="rr">${['สินค้าชำรุด', 'สินค้าหมดอายุ', 'ไม่ตรงตามความต้องการ', 'คิดเงินผิด / ทอนผิด', 'เปลี่ยนสินค้า', 'อื่น ๆ'].map(x => `<option>${x}</option>`).join('')}</select></div>
+      <div class="fg"><label class="f">คืนเงินผ่าน</label><select class="in" id="rm">${methods.map(x => `<option value="${x}">${payName(x)}</option>`).join('')}</select></div></div>
+    <label class="row"><input type="checkbox" id="rs" checked> นำสินค้ากลับเข้าสต็อก (ไม่ต้องเลือกถ้าสินค้าชำรุด/ทิ้ง)</label>
+    <div class="tline big" style="margin-top:12px"><span>ยอดคืนโดยประมาณ</span><span id="rt">฿0.00</span></div>`,
+    { foot: `<button class="btn" data-c>ยกเลิก</button><button class="btn bad lg" id="rgo">↩️ ยืนยันคืนเงิน</button>` });
+  const lines = left.reduce((a, i) => a + num(i.qty) * num(i.price) - num(i.discount), 0) + items.filter(i => num(i.qty) - num(i.refunded_qty) <= 0).reduce((a, i) => a + num(i.qty) * num(i.price) - num(i.discount), 0);
+  const ratio = lines ? num(sale.total) / lines : 1;
+  const upd = () => { left.forEach((i, k) => $('#rq' + k, m).textContent = qtyf(i.r));
+    $('#rt', m).textContent = baht(r2(left.reduce((a, i) => a + i.r * (num(i.price) - num(i.discount) / num(i.qty)) * ratio, 0))); };
+  $$('[data-u]', m).forEach(b => b.onclick = () => { const i = left[+b.dataset.u]; i.r = Math.min(i.left, i.r + 1); upd(); });
+  $$('[data-d]', m).forEach(b => b.onclick = () => { const i = left[+b.dataset.d]; i.r = Math.max(0, i.r - 1); upd(); });
+  $$('[data-all]', m).forEach(b => b.onclick = () => { const i = left[+b.dataset.all]; i.r = i.left; upd(); });
+  $('[data-c]', m).onclick = m.close;
+  $('#rr', m).onchange = e => { if (['สินค้าชำรุด', 'สินค้าหมดอายุ'].includes(e.target.value)) $('#rs', m).checked = false; };
+  $('#rgo', m).onclick = async () => {
+    const its = left.filter(i => i.r > 0).map(i => ({ sale_item_id: i.id, qty: i.r }));
+    if (!its.length) return toast('กรุณาเลือกสินค้าที่ต้องการคืน', 'bad');
+    if (!await confirmBox('ยืนยันการคืนเงิน? รายการนี้จะถูกบันทึกถาวร')) return;
+    const b = $('#rgo', m); b.disabled = true;
+    try {
+      const r = await q(sb.rpc('refund_sale', { p_sale: sale.id, p: { items: its, method: $('#rm', m).value, reason: $('#rr', m).value, restock: $('#rs', m).checked, shift_id: S.shift?.id || '' } }));
+      m.close(); sfx('ok'); toast(`คืนเงินแล้ว ${baht(r.amount)} (${r.refund_no})`, 'ok'); await loadMaster(); reload?.();
+      printReceipt(creditNoteHTML(sale, r, left.filter(i => i.r > 0)));
+    } catch (e) { b.disabled = false; fail(e); }
+  };
+}
+function creditNoteHTML(sale, r, its) {
+  const sh = S.shop;
+  return `<div class="rcpt ${sh.receipt_size === '80' ? 'w80' : ''}"><div class="c t">${esc(sh.name)}</div><div class="c"><b>ใบรับคืนสินค้า / ใบลดหนี้</b></div><hr>
+    <div>เลขที่: ${esc(r.refund_no)}<br>อ้างอิงบิล: ${esc(sale.bill_no)}<br>${dt(r.created_at)}<br>ผู้ทำรายการ: ${esc(r.user_name)}</div><hr>
+    <table>${its.map(i => `<tr><td>${esc(i.name)} x ${qtyf(i.r)}</td></tr>`).join('')}</table><hr>
+    <table><tr><td class="t">คืนเงิน</td><td class="right t">${money(r.amount)}</td></tr><tr><td>ช่องทาง</td><td class="right">${payName(r.method)}</td></tr></table>
+    ${r.reason ? `<div>เหตุผล: ${esc(r.reason)}</div>` : ''}<hr><div class="c">ลงชื่อผู้รับเงิน ............................</div></div>`;
+}
+
+/* ================= RECEIPTS ================= */
+function bahtText(n) {
+  n = Math.round(num(n) * 100) / 100;
+  const D = ['', 'หนึ่ง', 'สอง', 'สาม', 'สี่', 'ห้า', 'หก', 'เจ็ด', 'แปด', 'เก้า'], P = ['', 'สิบ', 'ร้อย', 'พัน', 'หมื่น', 'แสน'];
+  const rd = (s, ed) => { let out = ''; const L = s.length; for (let i = 0; i < L; i++) { const d = +s[i], p = L - i - 1; if (!d) continue;
+    if (p === 1 && d === 1) out += 'สิบ'; else if (p === 1 && d === 2) out += 'ยี่สิบ'; else if (p === 0 && d === 1 && (L > 1 && /[1-9]/.test(s.slice(0, -1)) || ed)) out += 'เอ็ด'; else out += D[d] + P[p]; } return out; };
+  const read = (s, ed = false) => { s = s.replace(/^0+/, ''); if (!s) return ''; if (s.length > 6) return read(s.slice(0, -6)) + 'ล้าน' + rd(s.slice(-6).replace(/^0+/, ''), true); return rd(s, ed); };
+  const [b, st] = n.toFixed(2).split('.');
+  const bt = read(b);
+  return (bt ? bt + 'บาท' : (+st ? '' : 'ศูนย์บาท')) + (+st ? read(st) + 'สตางค์' : 'ถ้วน');
+}
+const branchLine = sh => sh.branch_code && sh.branch_code !== '00000' ? `สาขาที่ ${esc(sh.branch_code)} ${esc(sh.branch_name || '')}` : 'สำนักงานใหญ่';
+receiptHTML = function (sale, items, cust) {
+  const sh = S.shop, pays = sale._payments || [{ method: sale.payment_method, amount: sale.total }];
+  if (sh.receipt_size === 'A4' || sale.invoice_type === 'full') return a4HTML(sale, items, cust, pays);
+  const vatOn = sh.vat_mode !== 'none';
+  return `<div class="rcpt ${sh.receipt_size === '80' || sh.paper_width >= 80 ? 'w80' : ''}">
+    ${sh.logo_url ? `<div class="c"><img src="${esc(sh.logo_url)}" style="max-width:60%;max-height:70px"></div>` : ''}
+    <div class="c t">${esc(sh.name)}</div>
+    ${sh.receipt_header ? `<div class="c">${esc(sh.receipt_header).replace(/\n/g, '<br>')}</div>` : ''}
+    ${sh.address ? `<div class="c">${esc(sh.address)}</div>` : ''}${sh.phone ? `<div class="c">โทร ${esc(sh.phone)}</div>` : ''}
+    ${vatOn ? `<div class="c">เลขประจำตัวผู้เสียภาษี ${esc(sh.tax_id)}<br>${branchLine(sh)}<br><b>ใบเสร็จรับเงิน/ใบกำกับภาษีอย่างย่อ</b><br>${sh.vat_mode === 'included' ? '(VAT Included)' : ''}</div>` : `<div class="c"><b>ใบเสร็จรับเงิน</b></div>`}
+    <hr><div>เลขที่ ${esc(sale.bill_no)}<br>วันที่ ${dt(sale.created_at)}<br>พนักงาน ${esc(sale.cashier_name)}</div>
+    ${sale.status === 'void' ? '<div class="c t">*** ยกเลิก ***</div>' : ''}${sale.pay_status === 'pending' ? '<div class="c"><b>*** รอตรวจสอบการชำระเงิน ***</b></div>' : ''}<hr>
+    <table>${items.map(l => `<tr><td colspan="2">${esc(l.name)}</td></tr><tr><td>&nbsp;${qtyf(l.qty)} x ${money(l.price)}${num(l.discount) ? ` (ลด ${money(l.discount)})` : ''}</td><td class="right">${money(l.qty * l.price - num(l.discount))}</td></tr>`).join('')}</table><hr>
+    <table><tr><td>รวม ${qtyf(items.reduce((a, l) => a + num(l.qty), 0))} ชิ้น</td><td class="right">${money(sale.subtotal)}</td></tr>
+    ${num(sale.discount) ? `<tr><td>ส่วนลด</td><td class="right">-${money(sale.discount)}</td></tr>` : ''}
+    ${vatOn ? `<tr><td>${sh.vat_mode === 'included' ? 'มูลค่าสินค้าก่อน VAT' : 'มูลค่าสินค้า'}</td><td class="right">${money(sale.total - sale.vat)}</td></tr><tr><td>ภาษีมูลค่าเพิ่ม ${num(sh.vat_rate)}%</td><td class="right">${money(sale.vat)}</td></tr>` : ''}
+    <tr><td class="t">ยอดสุทธิ</td><td class="right t">${money(sale.total)}</td></tr>
+    ${pays.map(p => `<tr><td>${payName(p.method)}</td><td class="right">${money(p.method === 'cash' && num(sale.change) ? num(p.amount) + num(sale.change) : p.amount)}</td></tr>`).join('')}
+    ${num(sale.change) ? `<tr><td>เงินทอน</td><td class="right">${money(sale.change)}</td></tr>` : ''}</table>
+    ${cust ? `<hr><div>สมาชิก: ${esc(cust.name)}<br>แต้มที่ได้รับ: ${qtyf(sale.points_earned)} · แต้มสะสม: ${qtyf(cust.points)}${num(cust.balance) ? `<br>ยอดค้างชำระ: ${money(cust.balance)}` : ''}</div>` : ''}
+    ${sale.customer_note ? `<hr><div>หมายเหตุ: ${esc(sale.customer_note)}</div>` : ''}
+    <hr><div class="c">${esc(sh.receipt_footer || '').replace(/\n/g, '<br>')}</div></div>`;
+};
+function a4HTML(sale, items, cust, pays) {
+  const sh = S.shop, full = sale.invoice_type === 'full', vatOn = sh.vat_mode !== 'none';
+  const title = vatOn ? (full ? 'ใบเสร็จรับเงิน / ใบกำกับภาษี' : 'ใบเสร็จรับเงิน / ใบกำกับภาษีอย่างย่อ') : 'ใบเสร็จรับเงิน';
+  return `<div class="a4"><div class="hdr"><div style="display:flex;gap:12px">${sh.logo_url ? `<img src="${esc(sh.logo_url)}" style="height:64px">` : ''}<div>
+      <h2>${esc(sh.name)}</h2><div>${esc(sh.address)}</div><div>${sh.phone ? 'โทร ' + esc(sh.phone) : ''}</div>
+      ${vatOn ? `<div>เลขประจำตัวผู้เสียภาษี ${esc(sh.tax_id)} · ${branchLine(sh)}</div>` : ''}</div></div>
+    <div style="text-align:right"><h2>${title}</h2><div>(ต้นฉบับ)</div><div>เลขที่ <b>${esc(sale.bill_no)}</b></div><div>วันที่ ${dLong(sale.created_at)}</div></div></div>
+    <div class="box" style="margin-bottom:12px">${full ? `<b>ผู้ซื้อ:</b> ${esc(sale.tax_name)}<br><b>ที่อยู่:</b> ${esc(sale.tax_address)}<br><b>เลขประจำตัวผู้เสียภาษี:</b> ${esc(sale.tax_id)} · <b>สาขา:</b> ${esc(sale.tax_branch || 'สำนักงานใหญ่')}`
+      : `<b>ลูกค้า:</b> ${esc(cust?.name || 'ลูกค้าทั่วไป')}`}</div>
+    <table><tr><th style="width:40px">#</th><th>รายการ</th><th class="r">จำนวน</th><th class="r">ราคาต่อหน่วย</th><th class="r">ส่วนลด</th><th class="r">จำนวนเงิน</th></tr>
+      ${items.map((l, i) => `<tr><td>${i + 1}</td><td>${esc(l.name)}</td><td class="r">${qtyf(l.qty)} ${esc(l.unit || '')}</td><td class="r">${money(l.price)}</td><td class="r">${num(l.discount) ? money(l.discount) : '-'}</td><td class="r">${money(l.qty * l.price - num(l.discount))}</td></tr>`).join('')}
+      <tr><td colspan="4" rowspan="${vatOn ? 4 : 2}" style="vertical-align:top">(${bahtText(sale.total)})<br><br>ชำระโดย: ${pays.map(p => `${payName(p.method)} ${money(p.amount)}`).join(', ')}</td><td>รวมเป็นเงิน</td><td class="r">${money(sale.subtotal)}</td></tr>
+      <tr><td>ส่วนลด</td><td class="r">${money(sale.discount)}</td></tr>
+      ${vatOn ? `<tr><td>มูลค่าก่อนภาษี</td><td class="r">${money(sale.total - sale.vat)}</td></tr><tr><td>ภาษีมูลค่าเพิ่ม ${num(sh.vat_rate)}%</td><td class="r">${money(sale.vat)}</td></tr>` : ''}
+      <tr><th colspan="5" class="r">จำนวนเงินรวมทั้งสิ้น</th><th class="r">${money(sale.total)}</th></tr></table>
+    ${sale.customer_note ? `<p>หมายเหตุ: ${esc(sale.customer_note)}</p>` : ''}
+    <div style="display:flex;justify-content:space-between;margin-top:50px;text-align:center"><div>....................................<br>ผู้รับเงิน (${esc(sale.cashier_name)})</div><div>....................................<br>ผู้รับสินค้า</div></div></div>`;
+}
+const _showReceipt = showReceipt;
+showReceipt = function (sale, items, cust, autoPrint) {
+  _showReceipt(sale, items, cust, autoPrint);
+  const mf = $$('.mbg').pop()?.querySelector('.mf');
+  if (mf && !$('#shr2', mf)) { mf.insertAdjacentHTML('afterbegin', '<button class="btn" id="shr2">📤 ส่งใบเสร็จดิจิทัล</button>'); $('#shr2', mf).onclick = () => shareReceipt(sale, items); }
+};
+function shareReceipt(sale, items) {
+  const sh = S.shop;
+  const txt = `${sh.name}\nใบเสร็จ ${sale.bill_no}\n${dt(sale.created_at)}\n` + items.map(l => `${l.name} x${qtyf(l.qty)}  ${money(l.qty * l.price - num(l.discount))}`).join('\n') +
+    `\n------------\nยอดสุทธิ ${baht(sale.total)}\n${sh.receipt_footer || 'ขอบคุณที่ใช้บริการ'}`;
+  if (navigator.share) navigator.share({ title: 'ใบเสร็จ ' + sale.bill_no, text: txt }).catch(() => {});
+  else { navigator.clipboard?.writeText(txt); toast('คัดลอกใบเสร็จแล้ว — วางใน LINE หรือแชตได้เลย', 'ok'); }
+}
+/* ================= INVENTORY ================= */
+const MOVE = { in: ['⬆', 'รับเข้า'], out: ['⬇', 'เบิกออก'], adjust: ['⚖', 'ตรวจนับ/ปรับยอด'], sale: ['🛒', 'ขาย'], void: ['↩', 'ยกเลิกบิล'], refund: ['↩', 'รับคืนจากลูกค้า'],
+  purchase: ['📥', 'รับจากใบสั่งซื้อ'], damaged: ['💔', 'สินค้าชำรุด'], expired: ['⌛', 'สินค้าหมดอายุ'], transfer_in: ['🔁', 'รับโอนจากสาขา'], transfer_out: ['🔁', 'โอนไปสาขา'], return_supplier: ['🚚', 'คืนผู้จำหน่าย'] };
+VIEWS.stock = pg => {
+  let tab = 'list';
+  $('#tact').innerHTML = `<button class="btn p" id="rcv">+ รับสินค้าเข้า</button>${S.shops.length > 1 ? '<button class="btn" id="trf">🔁 โอนระหว่างสาขา</button>' : ''}<button class="btn" id="cnt">📋 ตรวจนับสต็อก</button>`;
+  const render = async () => {
+    const sp = S.products.filter(p => p.track_stock && p.active);
+    const val = sp.reduce((a, p) => a + Math.max(0, p.stock) * p.cost, 0), retail = sp.reduce((a, p) => a + Math.max(0, p.stock) * p.price, 0);
+    const low = sp.filter(p => p.stock > 0 && p.stock <= p.low_stock), out = sp.filter(p => p.stock <= 0);
+    const soon = S.products.filter(p => p.expiry_date && new Date(p.expiry_date) - Date.now() < 30 * 864e5).sort((a, b) => a.expiry_date.localeCompare(b.expiry_date));
+    const over = sp.filter(p => num(p.max_stock) > 0 && p.stock > p.max_stock);
+    const box = pg.querySelector('#stk') || (pg.querySelector('.skel')?.remove(), pg.insertAdjacentHTML('beforeend', '<div id="stk"></div>'), pg.querySelector('#stk'));
+    box.innerHTML = `<div class="stats">
+        ${canDo('view_profit') ? `<div class="stat"><div class="k">มูลค่าสต็อก (ราคาทุน)</div><div class="v">${baht(val)}</div></div>` : ''}
+        <div class="stat"><div class="k">มูลค่าสต็อก (ราคาขาย)</div><div class="v">${baht(retail)}</div></div>
+        <div class="stat"><div class="k">สินค้าที่ติดตามสต็อก</div><div class="v">${sp.length}</div></div>
+        <div class="stat"><div class="k">ใกล้หมด</div><div class="v" style="color:var(--warn)">${low.length}</div></div>
+        <div class="stat"><div class="k">หมดสต็อก</div><div class="v" style="color:var(--bad)">${out.length}</div></div>
+        <div class="stat"><div class="k">ใกล้หมดอายุ (30 วัน)</div><div class="v" style="color:var(--warn)">${soon.length}</div></div></div>
+      <div class="tabs">${[['list', 'คลังสินค้า'], ['low', `ใกล้หมด/หมด (${low.length + out.length})`], ['exp', `ใกล้หมดอายุ (${soon.length})`], ['over', `เกินสต็อกสูงสุด (${over.length})`], ['hist', 'ประวัติความเคลื่อนไหว']]
+        .map(([k, l]) => `<button class="tab ${tab === k ? 'on' : ''}" data-t="${k}">${l}</button>`).join('')}
+        <div class="sbox" style="max-width:260px;margin-left:auto"><span>🔍</span><input class="in" id="ss" placeholder="ค้นหาสินค้า"></div></div><div id="sbody"></div>`;
+    $$('[data-t]', box).forEach(b => b.onclick = () => { tab = b.dataset.t; render(); });
+    const draw = async () => {
+      const v = $('#ss').value.toLowerCase();
+      if (tab === 'hist') {
+        const mv = await q(sb.from('stock_moves').select('*, supplier:suppliers(name)').eq('shop_id', S.shop.id).order('created_at', { ascending: false }).limit(400));
+        $('#sbody').innerHTML = `<div class="tblwrap"><table class="tbl"><tr><th>วันเวลา</th><th>สินค้า</th><th>ประเภท</th><th class="right">จำนวน</th><th class="right">ต้นทุน</th><th>อ้างอิง / หมายเหตุ</th></tr>
+          ${mv.filter(r => !v || r.product_name.toLowerCase().includes(v)).map(r => `<tr><td>${dt(r.created_at)}</td><td>${esc(r.product_name)}</td><td>${(MOVE[r.kind] || ['', r.kind]).join(' ')}</td>
+          <td class="right b" style="color:${r.qty < 0 ? 'var(--bad)' : 'var(--ok)'}">${r.qty > 0 ? '+' : ''}${qtyf(r.qty)}</td><td class="right">${money(r.cost)}</td><td>${esc([r.ref, r.supplier?.name, r.note].filter(Boolean).join(' · '))}</td></tr>`).join('')}</table></div>`;
+        return;
+      }
+      const src = tab === 'low' ? [...out, ...low] : tab === 'exp' ? soon : tab === 'over' ? over : sp;
+      const list = src.filter(p => !v || p.name.toLowerCase().includes(v) || (p.barcode || '').includes(v));
+      $('#sbody').innerHTML = list.length ? `<div class="tblwrap"><table class="tbl"><tr><th>สินค้า</th><th class="right">คงเหลือ</th><th class="right">ขั้นต่ำ/สูงสุด</th>${tab === 'exp' ? '<th>วันหมดอายุ</th>' : ''}${canDo('view_profit') ? '<th class="right">ต้นทุน</th><th class="right">มูลค่า</th>' : ''}<th></th></tr>
+        ${list.slice(0, 400).map(p => `<tr><td><b>${esc(p.name)}</b><br><small class="muted">${esc(p.barcode)}${p.lot_no ? ' · ล็อต ' + esc(p.lot_no) : ''}</small></td>
+          <td class="right"><span class="chip ${p.stock <= 0 ? 'bad' : p.stock <= p.low_stock ? 'warn' : 'ok'}">${qtyf(p.stock)} ${esc(p.unit)}</span></td><td class="right muted">${qtyf(p.low_stock)} / ${num(p.max_stock) ? qtyf(p.max_stock) : '-'}</td>
+          ${tab === 'exp' ? `<td><span class="chip ${new Date(p.expiry_date) < Date.now() ? 'bad' : 'warn'}">${dOnly(p.expiry_date)}</span></td>` : ''}
+          ${canDo('view_profit') ? `<td class="right">${money(p.cost)}</td><td class="right">${money(Math.max(0, p.stock) * p.cost)}</td>` : ''}
+          <td class="right" style="white-space:nowrap"><button class="btn sm ok" data-k="in" data-id="${p.id}">+ รับเข้า</button> <button class="btn sm" data-k="out" data-id="${p.id}">− เบิก</button>
+            <button class="btn sm" data-k="damaged" data-id="${p.id}">💔 ชำรุด</button> <button class="btn sm" data-k="expired" data-id="${p.id}">⌛ หมดอายุ</button> <button class="btn sm" data-k="adjust" data-id="${p.id}">⚖ นับ</button></td></tr>`).join('')}</table></div>`
+        : `<div class="empty">ไม่มีรายการ</div>`;
+      $$('[data-k]', box).forEach(b => b.onclick = () => stockForm(S.products.find(p => p.id === b.dataset.id), b.dataset.k, render));
+    };
+    $('#ss').oninput = draw; await draw();
+  };
+  $('#rcv').onclick = () => productPicker('รับสินค้าเข้า', p => stockForm(p, 'in', render));
+  if ($('#trf')) $('#trf').onclick = () => transferDialog(render);
+  $('#cnt').onclick = () => stockCountSheet(render);
+  render().catch(fail);
+};
+function productPicker(title, onPick, filter = p => p.track_stock) {
+  const m = modal(title, `<div class="sbox"><span>🔍</span><input class="in" id="pp" placeholder="ค้นหาหรือสแกนบาร์โค้ด…"><button class="btn sm" id="ppScan">📷</button></div><div id="pl" style="margin-top:10px"></div>`);
+  const d = () => { const v = $('#pp', m).value.toLowerCase(); const list = S.products.filter(p => filter(p) && (!v || p.name.toLowerCase().includes(v) || p.barcode === v)).slice(0, 50);
+    $('#pl', m).innerHTML = `<table class="rtable">${list.map(p => `<tr class="click" data-id="${p.id}" style="cursor:pointer"><td>${esc(p.name)}</td><td class="right muted">${qtyf(p.stock)} ${esc(p.unit)}</td></tr>`).join('')}</table>`;
+    $$('[data-id]', m).forEach(r => r.onclick = () => { m.close(); onPick(S.products.find(p => p.id === r.dataset.id)); }); };
+  $('#pp', m).oninput = d; d(); setTimeout(() => $('#pp', m).focus(), 60);
+  $('#pp', m).onkeydown = e => { if (e.key === 'Enter') { const hit = S.products.find(p => p.barcode === $('#pp', m).value.trim()); if (hit) { m.close(); onPick(hit); } } };
+  $('#ppScan', m).onclick = () => scanBarcode(code => { const hit = S.products.find(p => p.barcode === code); if (hit) { m.close(); onPick(hit); } else toast('ไม่พบสินค้าที่ค้นหา', 'bad'); });
+}
+stockForm = function (p, kind, after) {
+  const L = { in: 'รับสินค้าเข้า', out: 'เบิกสินค้าออก', damaged: 'ตัดสต็อก — สินค้าชำรุด', expired: 'ตัดสต็อก — สินค้าหมดอายุ', adjust: 'ตรวจนับ / ปรับยอดสต็อก' }[kind];
+  formModal(`${L} · ${p.name}`, [
+    { k: 'qty', label: kind === 'adjust' ? `จำนวนที่นับได้จริง (ในระบบ ${qtyf(p.stock)} ${p.unit})` : `จำนวน (${p.unit})`, type: 'number', req: true },
+    ...(kind === 'in' ? [{ k: 'cost', label: 'ต้นทุนต่อหน่วย', type: 'number', def: p.cost }, { k: 'supplier', label: 'ผู้จำหน่าย', type: 'select', opts: [['', '—'], ...S.suppliers.map(s => [s.id, s.name])] },
+      { k: 'expiry', label: 'วันหมดอายุ (ถ้ามี)', type: 'date' }, { k: 'lot', label: 'เลขล็อต (ถ้ามี)' }] : []),
+    { k: 'note', label: 'หมายเหตุ', full: true }], {}, async o => {
+      if (!(num(o.qty) > 0) && kind !== 'adjust') throw new Error('กรุณากรอกจำนวนให้ถูกต้อง');
+      await q(sb.rpc('stock_move', { p_shop: S.shop.id, p_product: p.id, p_kind: kind, p_qty: num(o.qty), p_cost: kind === 'in' ? num(o.cost) : null, p_supplier: o.supplier || null, p_note: o.note || '' }));
+      if (kind === 'in' && (o.expiry || o.lot)) await q(sb.from('products').update({ ...(o.expiry ? { expiry_date: o.expiry } : {}), ...(o.lot ? { lot_no: o.lot } : {}) }).eq('id', p.id));
+      Object.assign(p, await q(sb.from('products').select('*').eq('id', p.id).single()));
+      after?.();
+    });
+};
+function stockCountSheet(after) {
+  const list = S.products.filter(p => p.track_stock && p.active);
+  const m = modal('ตรวจนับสต็อก', `<p class="muted" style="margin-top:0">กรอกเฉพาะรายการที่นับแล้ว — ระบบจะปรับยอดและบันทึกประวัติให้</p>
+    <div class="sbox" style="margin-bottom:10px"><span>🔍</span><input class="in" id="cs"></div><div id="cl" style="max-height:55vh;overflow:auto"></div>`,
+    { wide: true, foot: `<span class="muted" id="cn"></span><span style="flex:1"></span><button class="btn p" id="csave">บันทึกการตรวจนับ</button>` });
+  const counted = {};
+  const d = () => { const v = $('#cs', m).value.toLowerCase();
+    $('#cl', m).innerHTML = `<table class="rtable"><tr><th>สินค้า</th><th class="right">ในระบบ</th><th class="right">นับได้</th><th class="right">ส่วนต่าง</th></tr>${list.filter(p => !v || p.name.toLowerCase().includes(v) || p.barcode === v).slice(0, 200).map(p =>
+      `<tr><td>${esc(p.name)}</td><td class="right">${qtyf(p.stock)}</td><td class="right"><input class="in" style="width:100px;text-align:right" type="number" step="any" inputmode="decimal" data-c="${p.id}" value="${counted[p.id] ?? ''}"></td><td class="right" id="df${p.id}">${counted[p.id] !== undefined ? qtyf(counted[p.id] - p.stock) : ''}</td></tr>`).join('')}</table>`;
+    $$('[data-c]', m).forEach(i => i.oninput = () => { if (i.value === '') delete counted[i.dataset.c]; else counted[i.dataset.c] = num(i.value);
+      const p = S.products.find(x => x.id === i.dataset.c); $('#df' + p.id, m).textContent = i.value === '' ? '' : qtyf(num(i.value) - p.stock); $('#cn', m).textContent = `นับแล้ว ${Object.keys(counted).length} รายการ`; }); };
+  $('#cs', m).oninput = d; d();
+  $('#csave', m).onclick = async () => {
+    const ids = Object.keys(counted).filter(id => counted[id] !== S.products.find(p => p.id === id).stock);
+    if (!ids.length) return toast('ไม่มีรายการที่ต้องปรับยอด', 'ok');
+    if (!await confirmBox(`ปรับยอดสต็อก ${ids.length} รายการ?`)) return;
+    $('#csave', m).disabled = true;
+    try { for (const id of ids) { await q(sb.rpc('stock_move', { p_shop: S.shop.id, p_product: id, p_kind: 'adjust', p_qty: counted[id], p_cost: null, p_supplier: null, p_note: 'ตรวจนับสต็อก' })); S.products.find(p => p.id === id).stock = counted[id]; }
+      toast('บันทึกข้อมูลเรียบร้อยแล้ว', 'ok'); m.close(); after?.(); } catch (e) { $('#csave', m).disabled = false; fail(e); }
+  };
+}
+function transferDialog(after) {
+  const others = S.shops.filter(s => s.id !== S.shop.id); const lines = [];
+  const m = modal('โอนสินค้าระหว่างสาขา', `<div class="fg"><label class="f">โอนไปที่สาขา</label><select class="in" id="tto">${others.map(s => `<option value="${s.id}">${esc(s.name)}</option>`).join('')}</select></div>
+    <div id="tl"></div><button class="btn sm" id="tadd">➕ เพิ่มสินค้า</button><div class="fg" style="margin-top:12px"><label class="f">หมายเหตุ</label><input class="in" id="tnote"></div>`,
+    { foot: `<button class="btn" data-c>ยกเลิก</button><button class="btn p" id="tgo">🔁 ยืนยันการโอน</button>` });
+  const d = () => { $('#tl', m).innerHTML = lines.map((l, i) => `<div class="split-row"><span>${esc(l.p.name)} <small class="muted">(มี ${qtyf(l.p.stock)})</small></span><input class="in" type="number" step="any" data-q="${i}" value="${l.qty}"><button class="btn sm bad" data-x="${i}">×</button></div>`).join('');
+    $$('[data-q]', m).forEach(x => x.oninput = () => { lines[+x.dataset.q].qty = num(x.value); }); $$('[data-x]', m).forEach(x => x.onclick = () => { lines.splice(+x.dataset.x, 1); d(); }); };
+  $('#tadd', m).onclick = () => productPicker('เลือกสินค้าที่จะโอน', p => { lines.push({ p, qty: 1 }); d(); });
+  $('[data-c]', m).onclick = m.close;
+  $('#tgo', m).onclick = async () => {
+    if (!lines.length) return toast('กรุณาเพิ่มสินค้า', 'bad');
+    try { const n = await q(sb.rpc('transfer_stock', { p_from: S.shop.id, p_to: $('#tto', m).value, p_items: lines.map(l => ({ product_id: l.p.id, qty: l.qty })), p_note: $('#tnote', m).value }));
+      toast(`โอนสินค้าแล้ว ${n} รายการ`, 'ok'); m.close(); await loadMaster(); after?.(); } catch (e) { fail(e); }
+  };
+}
+
+/* ================= PURCHASING ================= */
+const PO_ST = { draft: ['', 'ร่าง'], ordered: ['info', 'สั่งซื้อแล้ว'], received: ['ok', 'รับสินค้าแล้ว'], cancelled: ['bad', 'ยกเลิก'] };
+VIEWS.purchases = async pg => {
+  $('#tact').innerHTML = `<button class="btn p" id="poNew">+ สร้างใบสั่งซื้อ</button>`;
+  const rows = await q(sb.from('purchases').select('*, supplier:suppliers(name)').eq('shop_id', S.shop.id).order('created_at', { ascending: false }).limit(300));
+  const owe = rows.filter(r => r.status === 'received').reduce((a, r) => a + num(r.total) - num(r.paid), 0);
+  pg.querySelector('.skel')?.remove(), pg.insertAdjacentHTML('beforeend', `<div class="stats"><div class="stat"><div class="k">ใบสั่งซื้อทั้งหมด</div><div class="v">${rows.length}</div></div>
+    <div class="stat"><div class="k">รอรับสินค้า</div><div class="v" style="color:var(--info)">${rows.filter(r => r.status === 'ordered').length}</div></div>
+    <div class="stat"><div class="k">ค้างชำระผู้จำหน่าย</div><div class="v" style="color:var(--bad)">${baht(owe)}</div></div></div>
+    ${rows.length ? `<div class="tblwrap"><table class="tbl"><tr><th>เลขที่</th><th>วันที่</th><th>ผู้จำหน่าย</th><th>เลขใบแจ้งหนี้</th><th class="right">ยอดรวม</th><th class="right">ชำระแล้ว</th><th>สถานะ</th></tr>
+    ${rows.map(r => `<tr class="click" data-id="${r.id}"><td><b>${esc(r.po_no)}</b></td><td>${dOnly(r.created_at)}</td><td>${esc(r.supplier?.name || '-')}</td><td>${esc(r.invoice_no)}</td>
+      <td class="right b">${baht(r.total)}</td><td class="right">${baht(r.paid)}</td><td><span class="chip ${PO_ST[r.status][0]}">${PO_ST[r.status][1]}</span></td></tr>`).join('')}</table></div>`
+    : `<div class="empty">ยังไม่มีใบสั่งซื้อ — กด “สร้างใบสั่งซื้อ” เพื่อเริ่ม</div>`}`);
+  $$('[data-id]', pg).forEach(tr => tr.onclick = () => poDetail(rows.find(r => r.id === tr.dataset.id)));
+  $('#poNew').onclick = () => poForm();
+};
+function poForm() {
+  const lines = [];
+  const m = modal('สร้างใบสั่งซื้อ', `<div class="grid2"><div class="fg"><label class="f">ผู้จำหน่าย *</label><select class="in" id="poS"><option value="">— เลือก —</option>${S.suppliers.map(s => `<option value="${s.id}">${esc(s.name)}</option>`).join('')}</select></div>
+    <div class="fg"><label class="f">เลขที่ใบแจ้งหนี้ / ใบส่งของ</label><input class="in" id="poI"></div></div>
+    <div id="poL"></div><div class="row"><button class="btn sm" id="poAdd">➕ เพิ่มสินค้า</button><button class="btn sm" id="poLow">⚠️ เพิ่มสินค้าที่ใกล้หมดทั้งหมด</button></div>
+    <div class="fg" style="margin-top:12px"><label class="f">หมายเหตุ</label><input class="in" id="poN"></div><div class="tline big"><span>ยอดรวม</span><span id="poT">฿0.00</span></div>`,
+    { wide: true, foot: `<button class="btn" data-c>ยกเลิก</button><button class="btn" id="poDraft">บันทึกร่าง</button><button class="btn p" id="poSave">บันทึกและสั่งซื้อ</button>` });
+  const d = () => { $('#poL', m).innerHTML = lines.length ? `<table class="rtable"><tr><th>สินค้า</th><th class="right">จำนวน</th><th class="right">ต้นทุน/หน่วย</th><th class="right">รวม</th><th></th></tr>${lines.map((l, i) =>
+      `<tr><td>${esc(l.p.name)}<br><small class="muted">คงเหลือ ${qtyf(l.p.stock)}</small></td><td class="right"><input class="in" style="width:90px;text-align:right" type="number" step="any" data-q="${i}" value="${l.qty}"></td>
+      <td class="right"><input class="in" style="width:100px;text-align:right" type="number" step="any" data-k="${i}" value="${l.cost}"></td><td class="right">${money(l.qty * l.cost)}</td><td><button class="btn sm bad" data-x="${i}">×</button></td></tr>`).join('')}</table>` : '<p class="muted">ยังไม่มีสินค้า</p>';
+    $('#poT', m).textContent = baht(lines.reduce((a, l) => a + l.qty * l.cost, 0));
+    $$('[data-q]', m).forEach(x => x.onchange = () => { lines[+x.dataset.q].qty = num(x.value); d(); });
+    $$('[data-k]', m).forEach(x => x.onchange = () => { lines[+x.dataset.k].cost = num(x.value); d(); });
+    $$('[data-x]', m).forEach(x => x.onclick = () => { lines.splice(+x.dataset.x, 1); d(); }); };
+  $('#poAdd', m).onclick = () => productPicker('เพิ่มสินค้าในใบสั่งซื้อ', p => { lines.push({ p, qty: Math.max(1, num(p.max_stock) - p.stock) || 1, cost: num(p.cost) }); d(); }, () => true);
+  $('#poLow', m).onclick = () => { S.products.filter(p => p.track_stock && p.active && p.stock <= p.low_stock && !lines.some(l => l.p.id === p.id)).forEach(p => lines.push({ p, qty: Math.max(1, (num(p.max_stock) || num(p.low_stock) * 2) - p.stock), cost: num(p.cost) })); d(); };
+  $('[data-c]', m).onclick = m.close;
+  const save = async status => {
+    if (!$('#poS', m).value) return toast('กรุณาเลือกผู้จำหน่าย', 'bad'); if (!lines.length) return toast('กรุณาเพิ่มสินค้า', 'bad');
+    try {
+      const no = await q(sb.rpc('doc_no', { p_shop: S.shop.id, p_prefix: 'PO', p_table: 'purchases' }));
+      const po = await q(sb.from('purchases').insert({ shop_id: S.shop.id, po_no: no, supplier_id: $('#poS', m).value, invoice_no: $('#poI', m).value, note: $('#poN', m).value, status,
+        total: r2(lines.reduce((a, l) => a + l.qty * l.cost, 0)), user_id: S.user.id, user_name: S.user.user_metadata?.full_name || S.user.email }).select().single());
+      await q(sb.from('purchase_items').insert(lines.map(l => ({ purchase_id: po.id, shop_id: S.shop.id, product_id: l.p.id, name: l.p.name, qty: l.qty, cost: l.cost }))));
+      m.close(); toast('บันทึกข้อมูลเรียบร้อยแล้ว', 'ok'); go('purchases');
+    } catch (e) { fail(e); }
+  };
+  $('#poDraft', m).onclick = () => save('draft'); $('#poSave', m).onclick = () => save('ordered');
+  d();
+}
+async function poDetail(po) {
+  const items = await q(sb.from('purchase_items').select('*').eq('purchase_id', po.id));
+  const pays = await q(sb.from('supplier_payments').select('*').eq('purchase_id', po.id).order('created_at'));
+  const m = modal(`ใบสั่งซื้อ ${po.po_no}`, `<div class="row" style="margin-bottom:10px"><span class="chip ${PO_ST[po.status][0]}">${PO_ST[po.status][1]}</span><span class="muted">${esc(po.supplier?.name || '')} · ${dLong(po.created_at)}${po.invoice_no ? ' · ใบแจ้งหนี้ ' + esc(po.invoice_no) : ''}</span></div>
+    <table class="rtable"><tr><th>สินค้า</th><th class="right">จำนวน</th><th class="right">ต้นทุน</th><th class="right">รวม</th></tr>${items.map(i => `<tr><td>${esc(i.name)}</td><td class="right">${qtyf(i.qty)}</td><td class="right">${money(i.cost)}</td><td class="right">${money(i.qty * i.cost)}</td></tr>`).join('')}</table>
+    <div class="kv" style="margin-top:12px"><span>ยอดรวม</span><b>${baht(po.total)}</b><span>ชำระแล้ว</span><b>${baht(po.paid)}</b><span>คงค้าง</span><b style="color:var(--bad)">${baht(num(po.total) - num(po.paid))}</b></div>
+    ${pays.length ? `<p class="section-title">การชำระเงิน</p>${pays.map(p => `<div class="tline"><span>${dt(p.created_at)} · ${payName(p.method)} ${esc(p.note)}</span><b>${baht(p.amount)}</b></div>`).join('')}` : ''}`,
+    { wide: true, foot: `${['draft', 'ordered'].includes(po.status) ? `<button class="btn bad" id="poX">ยกเลิกใบสั่งซื้อ</button><span style="flex:1"></span><button class="btn ok" id="poR">📥 รับสินค้าเข้าสต็อก</button>` : '<span style="flex:1"></span>'}
+      ${po.status !== 'cancelled' && num(po.total) - num(po.paid) > 0 ? `<button class="btn" id="poP">💸 ชำระเงิน</button>` : ''}<button class="btn" id="poPr">🖨️ พิมพ์</button>` });
+  if ($('#poR', m)) $('#poR', m).onclick = async () => { if (!await confirmBox('รับสินค้าทั้งหมดเข้าสต็อก? ต้นทุนเฉลี่ยจะถูกคำนวณใหม่')) return; try { await q(sb.rpc('receive_purchase', { p_purchase: po.id })); toast('รับสินค้าเข้าสต็อกแล้ว', 'ok'); m.close(); await loadMaster(); go('purchases'); } catch (e) { fail(e); } };
+  if ($('#poX', m)) $('#poX', m).onclick = async () => { if (!await confirmBox('ยกเลิกใบสั่งซื้อนี้หรือไม่?')) return; try { await q(sb.from('purchases').update({ status: 'cancelled' }).eq('id', po.id)); m.close(); go('purchases'); } catch (e) { fail(e); } };
+  if ($('#poP', m)) $('#poP', m).onclick = () => formModal('ชำระเงินผู้จำหน่าย', [{ k: 'amount', label: 'จำนวนเงิน', type: 'number', req: true, def: r2(num(po.total) - num(po.paid)) },
+    { k: 'method', label: 'ช่องทาง', type: 'select', opts: ['transfer', 'cash', 'promptpay', 'credit_card'].map(k => [k, payName(k)]) }, { k: 'note', label: 'หมายเหตุ', full: true }], {}, async o => {
+      await q(sb.rpc('pay_supplier', { p_shop: S.shop.id, p_supplier: po.supplier_id, p_purchase: po.id, p_amount: num(o.amount), p_method: o.method, p_note: o.note })); m.close(); go('purchases'); });
+  $('#poPr', m).onclick = () => printReceipt(`<div class="a4"><div class="hdr"><div><h2>${esc(S.shop.name)}</h2><div>${esc(S.shop.address)}</div><div>เลขประจำตัวผู้เสียภาษี ${esc(S.shop.tax_id)}</div></div><div style="text-align:right"><h2>ใบสั่งซื้อ</h2><div>เลขที่ ${esc(po.po_no)}</div><div>วันที่ ${dLong(po.created_at)}</div></div></div>
+    <div class="box">ผู้จำหน่าย: <b>${esc(po.supplier?.name || '')}</b></div><br><table><tr><th>#</th><th>รายการ</th><th class="r">จำนวน</th><th class="r">ราคาต่อหน่วย</th><th class="r">จำนวนเงิน</th></tr>
+    ${items.map((i, k) => `<tr><td>${k + 1}</td><td>${esc(i.name)}</td><td class="r">${qtyf(i.qty)}</td><td class="r">${money(i.cost)}</td><td class="r">${money(i.qty * i.cost)}</td></tr>`).join('')}
+    <tr><th colspan="4" class="r">รวมทั้งสิ้น (${bahtText(po.total)})</th><th class="r">${money(po.total)}</th></tr></table><div style="margin-top:50px;text-align:right">....................................<br>ผู้สั่งซื้อ</div></div>`);
+}
+
+/* ================= CUSTOMERS (CRM) ================= */
+VIEWS.members = pg => {
+  const draw = crudPage(pg, { table: 'customers', title: 'ลูกค้า', list: () => S.customers,
+    rowExtra: rows => `<div class="stats"><div class="stat"><div class="k">ลูกค้าทั้งหมด</div><div class="v">${rows.length}</div></div>
+      <div class="stat"><div class="k">ยอดค้างชำระรวม</div><div class="v" style="color:var(--bad)">${baht(rows.reduce((a, r) => a + Math.max(0, num(r.balance)), 0))}</div></div>
+      <div class="stat"><div class="k">แต้มสะสมรวม</div><div class="v">${qtyf(rows.reduce((a, r) => a + num(r.points), 0))}</div></div></div>`,
+    cols: [{ l: 'ชื่อ', f: r => `<b>${esc(r.name)}</b>${r.group_name ? ` <span class="chip">${esc(r.group_name)}</span>` : ''}${r.level ? ` <span class="chip info">${esc(r.level)}</span>` : ''}<br><small class="muted">${esc(r.phone)}</small>` },
+      { l: 'แต้ม', r: 1, f: r => qtyf(r.points) }, { l: 'ยอดซื้อสะสม', r: 1, f: r => money(r.total_spent) }, { l: 'ค้างชำระ', r: 1, f: r => num(r.balance) > 0 ? `<b style="color:var(--bad)">${money(r.balance)}</b>` : '-' },
+      { l: 'ซื้อล่าสุด', f: r => r.last_purchase_at ? dOnly(r.last_purchase_at) : '-' }, { l: '', f: r => `<button class="btn sm" data-h="${r.id}">ประวัติ</button>` }],
+    fields: customerFields() });
+  pg.addEventListener('click', e => { const b = e.target.closest('[data-h]'); if (b) { e.stopPropagation(); customerDetail(S.customers.find(c => c.id === b.dataset.h), draw); } }, true);
+};
+function customerFields() {
+  return [{ k: 'name', label: 'ชื่อ-นามสกุล / ชื่อบริษัท', req: true, full: true }, { k: 'phone', label: 'เบอร์โทร', type: 'tel' },
+    { k: 'ctype', label: 'ประเภทลูกค้า', type: 'select', opts: [['individual', 'บุคคลทั่วไป'], ['company', 'นิติบุคคล / บริษัท'], ['wholesale', 'ลูกค้าขายส่ง']] },
+    { k: 'tax_id', label: 'เลขประจำตัวผู้เสียภาษี' }, { k: 'tax_branch', label: 'สาขา (สำหรับใบกำกับภาษี)', def: 'สำนักงานใหญ่' },
+    { k: 'address', label: 'ที่อยู่', full: true }, { k: 'group_name', label: 'กลุ่มลูกค้า' }, { k: 'level', label: 'ระดับสมาชิก (เช่น Silver, Gold)' },
+    { k: 'discount_pct', label: 'ส่วนลดสมาชิก (%)', type: 'number', def: 0 }, { k: 'credit_limit', label: 'วงเงินเครดิต (0 = ไม่จำกัด)', type: 'number', def: 0 },
+    { k: 'points', label: 'แต้มสะสม', type: 'number', def: 0 }, { k: 'note', label: 'หมายเหตุ', full: true }];
+}
+memberForm = function (v, after) {
+  formModal(v.id ? 'แก้ไขลูกค้า' : 'เพิ่มลูกค้า', customerFields(), v, async o => {
+    const row = await q(v.id ? sb.from('customers').update(o).eq('id', v.id).select().single() : sb.from('customers').insert({ ...o, shop_id: S.shop.id }).select().single());
+    const i = S.customers.findIndex(c => c.id === row.id); if (i >= 0) S.customers[i] = row; else S.customers.push(row);
+    after?.(row);
+  });
+};
+async function customerDetail(c, after) {
+  const [sales, pays] = await Promise.all([q(sb.from('sales').select('id,bill_no,total,status,created_at,payment_method').eq('customer_id', c.id).order('created_at', { ascending: false }).limit(100)),
+    q(sb.from('customer_payments').select('*').eq('customer_id', c.id).order('created_at', { ascending: false }).limit(50))]);
+  const m = modal(c.name, `<div class="kv"><span>เบอร์โทร</span><b>${esc(c.phone || '-')}</b><span>เลขผู้เสียภาษี</span><b>${esc(c.tax_id || '-')}</b><span>แต้มสะสม</span><b>${qtyf(c.points)}</b>
+      <span>ยอดซื้อสะสม</span><b>${baht(c.total_spent)}</b><span>จำนวนครั้ง</span><b>${c.visits}</b><span>ค้างชำระ</span><b style="color:var(--bad)">${baht(c.balance)}</b></div>
+    <p class="section-title">ประวัติการซื้อ</p><table class="rtable">${sales.map(s => `<tr><td>${esc(s.bill_no)}</td><td>${dt(s.created_at)}</td><td>${payName(s.payment_method)}</td><td class="right">${baht(s.total)}</td><td>${statusChip(s)}</td></tr>`).join('') || '<tr><td class="muted">ยังไม่มีการซื้อ</td></tr>'}</table>
+    ${pays.length ? `<p class="section-title">การชำระหนี้</p>${pays.map(p => `<div class="tline"><span>${dt(p.created_at)} · ${payName(p.method)}</span><b>${baht(p.amount)}</b></div>`).join('')}` : ''}`,
+    { wide: true, foot: num(c.balance) > 0 ? `<button class="btn ok" id="cpay">💵 รับชำระหนี้</button>` : '' });
+  if ($('#cpay', m)) $('#cpay', m).onclick = () => formModal('รับชำระหนี้ — ' + c.name, [{ k: 'amount', label: 'จำนวนเงิน', type: 'number', req: true, def: c.balance },
+    { k: 'method', label: 'ช่องทาง', type: 'select', opts: ['cash', 'transfer', 'promptpay'].map(k => [k, payName(k)]) }, { k: 'note', label: 'หมายเหตุ' }], {}, async o => {
+      await q(sb.rpc('customer_pay', { p_customer: c.id, p_amount: num(o.amount), p_method: o.method, p_note: o.note, p_shift: S.shift?.id || null }));
+      c.balance = num(c.balance) - num(o.amount); m.close(); after?.(); });
+}
+
+/* ================= SUPPLIERS ================= */
+VIEWS.suppliers = pg => crudPage(pg, { table: 'suppliers', title: 'ผู้จำหน่าย', list: () => S.suppliers,
+  cols: [{ l: 'ชื่อ', f: r => `<b>${esc(r.name)}</b><br><small class="muted">${esc(r.tax_id || '')}</small>` }, { l: 'ผู้ติดต่อ', k: 'contact' }, { l: 'เบอร์โทร', k: 'phone' },
+    { l: 'ยอดค้างชำระ', r: 1, f: r => num(r.balance) > 0 ? `<b style="color:var(--bad)">${money(r.balance)}</b>` : '-' }],
+  fields: [{ k: 'name', label: 'ชื่อผู้จำหน่าย / บริษัท', req: true, full: true }, { k: 'contact', label: 'ผู้ติดต่อ' }, { k: 'phone', label: 'เบอร์โทร', type: 'tel' },
+    { k: 'tax_id', label: 'เลขประจำตัวผู้เสียภาษี' }, { k: 'address', label: 'ที่อยู่', full: true }, { k: 'note', label: 'หมายเหตุ', full: true }] });
+
+/* ================= EXPENSES ================= */
+const EXP_CATS = ['ค่าเช่าร้าน', 'ค่าไฟฟ้า', 'ค่าน้ำ', 'ค่าแรง / เงินเดือน', 'ค่าขนส่ง', 'ค่าวัตถุดิบ', 'ค่าอุปกรณ์', 'ค่าการตลาด', 'ค่าโทรศัพท์ / อินเทอร์เน็ต', 'ค่าใช้จ่ายอื่น ๆ'];
+VIEWS.expenses = async pg => {
+  S.expenses = await fetchAll(() => sb.from('expenses').select('*').eq('shop_id', S.shop.id).order('spent_on', { ascending: false }));
+  const approver = can('owner', 'manager') || S.role === 'accountant';
+  $('#tact').innerHTML = `<button class="btn p" id="eAdd">+ เพิ่มค่าใช้จ่าย</button><button class="btn" id="eX">⬇ CSV</button>`;
+  const draw = () => {
+    const m0 = ymd(new Date()).slice(0, 7), month = S.expenses.filter(r => (r.spent_on || '').startsWith(m0) && r.status !== 'pending');
+    const byCat = {}; month.forEach(r => { byCat[r.category] = (byCat[r.category] || 0) + num(r.amount); });
+    const box = pg.querySelector('#ex') || (pg.querySelector('.skel')?.remove(), pg.insertAdjacentHTML('beforeend', '<div id="ex"></div>'), pg.querySelector('#ex'));
+    box.innerHTML = `<div class="stats"><div class="stat"><div class="k">ค่าใช้จ่ายเดือนนี้</div><div class="v" style="color:var(--bad)">${baht(month.reduce((a, r) => a + num(r.amount), 0))}</div></div>
+      <div class="stat"><div class="k">รออนุมัติ</div><div class="v" style="color:var(--warn)">${S.expenses.filter(r => r.status === 'pending').length}</div></div></div>
+      ${Object.keys(byCat).length ? `<div class="card" style="margin-bottom:14px"><b>สรุปเดือนนี้ตามหมวด</b>${Object.entries(byCat).sort((a, b) => b[1] - a[1]).map(([k, v]) => `<div class="tline"><span>${esc(k)}</span><b>${baht(v)}</b></div>`).join('')}</div>` : ''}
+      ${S.expenses.length ? `<div class="tblwrap"><table class="tbl"><tr><th>วันที่</th><th>หมวด</th><th>รายละเอียด</th><th>ชำระโดย</th><th>ผู้บันทึก</th><th class="right">จำนวนเงิน</th><th>สถานะ</th></tr>
+      ${S.expenses.map(r => `<tr class="click" data-id="${r.id}"><td>${dOnly(r.spent_on)}</td><td>${esc(r.category)}</td><td>${esc(r.note)}${r.receipt_url ? ' 📎' : ''}</td><td>${payName(r.payment_method)}</td><td>${esc(r.user_name)}</td>
+        <td class="right b">${money(r.amount)}</td><td>${r.status === 'pending' ? `<span class="chip warn">รออนุมัติ</span>${approver ? ` <button class="btn sm ok" data-ap="${r.id}">อนุมัติ</button>` : ''}` : '<span class="chip ok">อนุมัติแล้ว</span>'}</td></tr>`).join('')}</table></div>`
+      : '<div class="empty">ยังไม่มีค่าใช้จ่าย</div>'}`;
+    $$('[data-ap]', box).forEach(b => b.onclick = async e => { e.stopPropagation(); try { await q(sb.from('expenses').update({ status: 'approved', approved_by: S.user.id }).eq('id', b.dataset.ap)); S.expenses.find(x => x.id === b.dataset.ap).status = 'approved'; draw(); } catch (er) { fail(er); } });
+    $$('[data-id]', box).forEach(tr => tr.onclick = () => expenseForm(S.expenses.find(x => x.id === tr.dataset.id), draw));
+  };
+  $('#eAdd').onclick = () => expenseForm({}, draw);
+  $('#eX').onclick = () => download('expenses.csv', toCSV(S.expenses, ['spent_on', 'category', 'note', 'payment_method', 'amount', 'status', 'user_name', 'receipt_url']));
+  draw();
+};
+function expenseForm(v, after) {
+  const approver = can('owner', 'manager') || S.role === 'accountant';
+  const m = formModal(v.id ? 'แก้ไขค่าใช้จ่าย' : 'เพิ่มค่าใช้จ่าย', [
+    { k: 'spent_on', label: 'วันที่', type: 'date', req: true, def: ymd(new Date()) }, { k: 'category', label: 'หมวดค่าใช้จ่าย', type: 'select', opts: EXP_CATS.map(c => [c, c]) },
+    { k: 'amount', label: 'จำนวนเงิน (บาท)', type: 'number', req: true }, { k: 'payment_method', label: 'ชำระโดย', type: 'select', opts: ['cash', 'transfer', 'promptpay', 'credit_card'].map(k => [k, payName(k)]) },
+    { k: 'note', label: 'รายละเอียด', full: true }, { k: 'receipt_url', label: 'ใบเสร็จ / หลักฐาน', full: true, after: `<button type="button" class="btn sm" id="eUp" style="margin-top:6px">📎 แนบรูปใบเสร็จ</button>` }],
+    { category: EXP_CATS[0], payment_method: 'cash', ...v }, async o => {
+      if (!(num(o.amount) > 0)) throw new Error('ยอดเงินไม่ถูกต้อง');
+      const rec = { ...o, amount: num(o.amount) };
+      if (!v.id) Object.assign(rec, { shop_id: S.shop.id, user_id: S.user.id, user_name: S.user.user_metadata?.full_name || S.user.email, status: approver ? 'approved' : 'pending', shift_id: o.payment_method === 'cash' ? S.shift?.id || null : null });
+      const row = await q(v.id ? sb.from('expenses').update(rec).eq('id', v.id).select().single() : sb.from('expenses').insert(rec).select().single());
+      const i = S.expenses.findIndex(x => x.id === row.id); if (i >= 0) S.expenses[i] = row; else S.expenses.unshift(row);
+      after?.();
+    }, { extraFoot: v.id && approver ? `<button class="btn bad" id="eDel">ลบ</button>` : '' });
+  $('#eUp', m).onclick = async () => { const f = await pickImage(false); if (!f) return; try { const u = await uploadImageFile(f); $('[name=receipt_url]', m).value = u; toast('แนบไฟล์แล้ว', 'ok'); } catch (e) { fail(e); } };
+  if ($('#eDel', m)) $('#eDel', m).onclick = async () => { if (!await confirmBox('คุณต้องการยืนยันการลบข้อมูลนี้หรือไม่?')) return; try { await q(sb.from('expenses').delete().eq('id', v.id)); S.expenses = S.expenses.filter(x => x.id !== v.id); m.close(); after?.(); } catch (e) { fail(e); } };
+}
+
+/* ================= SHIFTS / CASH REGISTER ================= */
+async function shiftSummary(sh) {
+  const [pays, refs, moves, exps, cpay] = await Promise.all([
+    q(sb.from('sale_payments').select('method,amount,sales!inner(status)').eq('shift_id', sh.id).neq('sales.status', 'void')),
+    q(sb.from('refunds').select('amount,method').eq('shift_id', sh.id)),
+    q(sb.from('cash_moves').select('*').eq('shift_id', sh.id).order('created_at')),
+    q(sb.from('expenses').select('amount,payment_method,status').eq('shift_id', sh.id)),
+    q(sb.from('customer_payments').select('amount,method').eq('shift_id', sh.id)),
+  ]);
+  const sum = (a, f = () => true) => a.filter(f).reduce((x, r) => x + num(r.amount), 0);
+  const o = { opening: num(sh.opening_cash), cashSales: sum(pays, p => p.method === 'cash'), otherSales: sum(pays, p => p.method !== 'cash'),
+    cashRefunds: sum(refs, r => r.method === 'cash'), cashIn: sum(moves, m => m.kind === 'in'), cashOut: sum(moves, m => m.kind === 'out'),
+    cashExp: sum(exps, e => e.payment_method === 'cash' && e.status !== 'pending'), debtCash: sum(cpay, p => p.method === 'cash'), moves, byMethod: {} };
+  pays.forEach(p => { o.byMethod[p.method] = (o.byMethod[p.method] || 0) + num(p.amount); });
+  o.expected = r2(o.opening + o.cashSales + o.cashIn + o.debtCash - o.cashOut - o.cashRefunds - o.cashExp);
+  return o;
+}
+const summaryHTML = (o, sh) => `<div class="kv"><span>เงินทอนตั้งต้น</span><b>${baht(o.opening)}</b><span>+ ขายเงินสด</span><b>${baht(o.cashSales)}</b><span>+ รับชำระหนี้ (เงินสด)</span><b>${baht(o.debtCash)}</b>
+  <span>+ นำเงินเข้า</span><b>${baht(o.cashIn)}</b><span>− นำเงินออก</span><b>${baht(o.cashOut)}</b><span>− คืนเงินสด</span><b>${baht(o.cashRefunds)}</b><span>− ค่าใช้จ่ายเงินสด</span><b>${baht(o.cashExp)}</b>
+  <span style="font-size:16px"><b>= เงินสดที่ควรมีในลิ้นชัก</b></span><b style="font-size:18px">${baht(o.expected)}</b></div>
+  <p class="section-title">ยอดขายตามช่องทาง</p><div class="kv">${Object.entries(o.byMethod).map(([k, v]) => `<span>${payIcon(k)} ${payName(k)}</span><b>${baht(v)}</b>`).join('') || '<span class="muted">—</span>'}</div>
+  ${o.moves.length ? `<p class="section-title">เงินเข้า-ออกลิ้นชัก</p>${o.moves.map(m => `<div class="tline"><span>${dt(m.created_at)} · ${m.kind === 'in' ? 'นำเข้า' : 'นำออก'} · ${esc(m.reason)} (${esc(m.user_name)})</span><b>${m.kind === 'in' ? '+' : '−'}${baht(m.amount)}</b></div>`).join('')}` : ''}`;
+VIEWS.shifts = async pg => {
+  const rows = await q(sb.from('shifts').select('*').eq('shop_id', S.shop.id).order('opened_at', { ascending: false }).limit(100));
+  const mine = S.shift;
+  let o = null; if (mine) o = await shiftSummary(mine);
+  pg.querySelector('.skel')?.remove(), pg.insertAdjacentHTML('beforeend', `<div class="card" style="margin-bottom:16px">${mine ? `
+      <div class="row"><span class="chip ok">● กะเปิดอยู่</span><span class="muted">เปิดเมื่อ ${dt(mine.opened_at)} · ${esc(mine.user_name)}</span><span class="sp"></span>
+        ${canDo('cash_moves') ? `<button class="btn" id="cIn">➕ นำเงินเข้า</button><button class="btn" id="cOut">➖ นำเงินออก</button>` : ''}</div><br>
+      ${summaryHTML(o, mine)}<br><div class="row"><button class="btn" id="sPr">🖨️ พิมพ์รายงานกะ (X)</button><span class="sp"></span><button class="btn bad lg" id="cls">ปิดกะ / นับเงิน</button></div>`
+    : `<div class="row"><span class="chip warn">ยังไม่เปิดกะ</span><span class="muted">เปิดกะเพื่อบันทึกเงินสดในลิ้นชักของคุณ</span><span class="sp"></span><button class="btn p lg" id="opn">เปิดกะ</button></div>`}</div>
+    <p class="section-title">ประวัติกะ</p><div class="tblwrap"><table class="tbl"><tr><th>พนักงาน</th><th>เปิด</th><th>ปิด</th><th class="right">เงินตั้งต้น</th><th class="right">ควรมี</th><th class="right">นับได้</th><th class="right">ส่วนต่าง</th></tr>
+    ${rows.map(r => { const d = r.closed_at ? num(r.closing_cash) - num(r.expected_cash) : null; return `<tr class="click" data-s="${r.id}"><td>${esc(r.user_name)}</td><td>${dt(r.opened_at)}</td><td>${r.closed_at ? dt(r.closed_at) : '<span class="chip ok">เปิดอยู่</span>'}</td>
+      <td class="right">${money(r.opening_cash)}</td><td class="right">${r.closed_at ? money(r.expected_cash) : ''}</td><td class="right">${r.closed_at ? money(r.closing_cash) : ''}</td>
+      <td class="right b" style="color:${d < 0 ? 'var(--bad)' : 'var(--ok)'}">${d === null ? '' : (d > 0 ? '+' : '') + money(d)}</td></tr>`; }).join('')}</table></div>`);
+  $$('[data-s]', pg).forEach(tr => tr.onclick = async () => { const sh = rows.find(r => r.id === tr.dataset.s); const so = await shiftSummary(sh);
+    const md = modal(`รายงานกะ — ${sh.user_name}`, `<p class="muted">${dt(sh.opened_at)} → ${sh.closed_at ? dt(sh.closed_at) : 'ยังเปิดอยู่'}</p>${summaryHTML(so, sh)}${sh.closed_at ? `<br><div class="kv"><span>นับได้จริง</span><b>${baht(sh.closing_cash)}</b><span>ส่วนต่าง</span><b>${baht(num(sh.closing_cash) - num(sh.expected_cash))}</b></div>${sh.note ? `<p>หมายเหตุ: ${esc(sh.note)}</p>` : ''}` : ''}`, { foot: '<button class="btn p" id="pp">🖨️ พิมพ์</button>' });
+    $('#pp', md).onclick = () => printReceipt(`<div class="rcpt"><div class="c t">${esc(S.shop.name)}</div><div class="c">รายงานกะ</div><hr>${summaryHTML(so, sh).replace(/class="kv"/g, '')}</div>`); });
+  if ($('#opn')) $('#opn').onclick = () => formModal('เปิดกะ', [{ k: 'opening_cash', label: 'เงินทอนตั้งต้นในลิ้นชัก', type: 'number', req: true, def: 0 }], {}, async v => {
+    S.shift = await q(sb.from('shifts').insert({ shop_id: S.shop.id, user_id: S.user.id, user_name: S.user.user_metadata?.full_name || S.user.user_metadata?.name || S.user.email, opening_cash: num(v.opening_cash) }).select().single());
+    await sb.rpc('log_action', { p_shop: S.shop.id, p_action: 'shift_open', p_entity: 'shift', p_id: S.shift.id, p_detail: { opening: num(v.opening_cash) } }); go('shifts'); });
+  const mv = kind => formModal(kind === 'in' ? 'นำเงินเข้าลิ้นชัก' : 'นำเงินออกจากลิ้นชัก', [{ k: 'amount', label: 'จำนวนเงิน', type: 'number', req: true },
+    { k: 'reason', label: 'เหตุผล', req: true, full: true, ph: kind === 'in' ? 'เช่น เติมเงินทอน' : 'เช่น นำส่งเจ้าของ / ฝากธนาคาร' }], {}, async v => {
+      if (!(num(v.amount) > 0)) throw new Error('ยอดเงินไม่ถูกต้อง');
+      await q(sb.from('cash_moves').insert({ shop_id: S.shop.id, shift_id: mine.id, kind, amount: num(v.amount), reason: v.reason, user_id: S.user.id, user_name: S.user.user_metadata?.full_name || S.user.email }));
+      await sb.rpc('log_action', { p_shop: S.shop.id, p_action: 'cash_' + kind, p_entity: 'shift', p_id: mine.id, p_detail: { amount: num(v.amount), reason: v.reason } }); go('shifts'); });
+  if ($('#cIn')) $('#cIn').onclick = () => mv('in');
+  if ($('#cOut')) $('#cOut').onclick = () => mv('out');
+  if ($('#sPr')) $('#sPr').onclick = () => printReceipt(`<div class="rcpt"><div class="c t">${esc(S.shop.name)}</div><div class="c">รายงานกะ (X) — ${dt(new Date())}</div><hr>${summaryHTML(o, mine).replace(/class="kv"/g, '')}</div>`);
+  if ($('#cls')) $('#cls').onclick = () => formModal('ปิดกะ', [{ k: 'closing_cash', label: `เงินสดที่นับได้จริง (ควรมี ${baht(o.expected)})`, type: 'number', req: true }, { k: 'note', label: 'หมายเหตุ', full: true }], {}, async v => {
+    const diff = r2(num(v.closing_cash) - o.expected);
+    if (Math.abs(diff) > 0.009 && !await confirmBox(`เงินสด${diff > 0 ? 'เกิน' : 'ขาด'} ${baht(Math.abs(diff))} — ยืนยันปิดกะ?`)) throw new Error('ยกเลิกการปิดกะ');
+    await q(sb.from('shifts').update({ closed_at: new Date().toISOString(), closing_cash: num(v.closing_cash), expected_cash: o.expected, note: v.note }).eq('id', mine.id));
+    await sb.rpc('log_action', { p_shop: S.shop.id, p_action: 'shift_close', p_entity: 'shift', p_id: mine.id, p_detail: { expected: o.expected, counted: num(v.closing_cash), diff } });
+    S.shift = null; go('shifts'); });
+};
+/* ================= REPORTS ================= */
+let XLSX_P = null;
+const loadXLSX = () => (XLSX_P ||= loadScript('https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js'));
+const REPORTS = [
+  ['sales', 'ยอดขายรายวัน'], ['profit', 'กำไร'], ['product', 'ผลงานสินค้า'], ['category', 'หมวดหมู่'], ['inventory', 'สินค้าคงคลัง'], ['moves', 'ความเคลื่อนไหวสต็อก'],
+  ['purchase', 'การสั่งซื้อ'], ['expense', 'ค่าใช้จ่าย'], ['customer', 'ลูกค้า'], ['staff', 'ผลงานพนักงาน'], ['payment', 'ช่องทางชำระเงิน'], ['vat', 'ภาษีขาย (VAT)'],
+  ['shift', 'กะ / ลิ้นชักเงิน'], ['refund', 'คืนเงิน'],
+];
+VIEWS.reports = pg => {
+  let rep = 'sales', A, B, cur = null;
+  pg.innerHTML = `<div class="pills" id="rk" style="margin-bottom:12px">${REPORTS.filter(r => canDo('view_profit') || !['profit'].includes(r[0])).map(([k, l]) => `<button data-k="${k}" class="${k === rep ? 'on' : ''}">${l}</button>`).join('')}</div>
+    <div id="rr"></div><div class="row" style="margin-bottom:12px"><div class="sbox" style="max-width:280px"><span>🔍</span><input class="in" id="rq" placeholder="ค้นหาในรายงาน"></div><span class="sp"></span>
+    <button class="btn" id="rcsv">⬇ CSV</button><button class="btn" id="rxl">📗 Excel</button><button class="btn" id="rpr">🖨️ พิมพ์ / PDF</button></div><div id="rb"></div>`;
+  $$('#rk button').forEach(b => b.onclick = () => { rep = b.dataset.k; $$('#rk button').forEach(x => x.classList.toggle('on', x === b)); run(); });
+  let sortK = null, sortD = -1;
+  const show = () => {
+    if (!cur) return; const v = $('#rq').value.toLowerCase();
+    let rows = cur.rows.filter(r => !v || JSON.stringify(r).toLowerCase().includes(v));
+    if (sortK) rows = [...rows].sort((a, b) => (typeof a[sortK] === 'number' ? a[sortK] - b[sortK] : String(a[sortK]).localeCompare(String(b[sortK]), 'th')) * sortD);
+    const tot = {}; cur.cols.forEach(([k, , t]) => { if (t === 'm' || t === 'n') tot[k] = rows.reduce((a, r) => a + num(r[k]), 0); });
+    const fmt = (t, v) => t === 'm' ? money(v) : t === 'n' ? qtyf(v) : t === 'p' ? num(v).toFixed(1) + '%' : t === 'd' ? (v ? dOnly(v) : '') : t === 'dt' ? (v ? dt(v) : '') : esc(v ?? '');
+    const page = rows.slice(0, 500);
+    $('#rb').innerHTML = `${cur.summary ? `<div class="stats">${cur.summary.map(([k, v]) => `<div class="stat"><div class="k">${k}</div><div class="v">${v}</div></div>`).join('')}</div>` : ''}
+      ${cur.note ? `<p class="muted" style="font-size:13px">${cur.note}</p>` : ''}
+      <div class="tblwrap" id="rtbl"><table class="tbl"><tr>${cur.cols.map(([k, l, t]) => `<th class="${['m', 'n', 'p'].includes(t) ? 'right' : ''}" data-s="${k}" style="cursor:pointer">${l}${sortK === k ? (sortD > 0 ? ' ▲' : ' ▼') : ''}</th>`).join('')}</tr>
+      ${page.map(r => `<tr>${cur.cols.map(([k, , t]) => `<td class="${['m', 'n', 'p'].includes(t) ? 'right' : ''}">${fmt(t, r[k])}</td>`).join('')}</tr>`).join('')}
+      ${Object.keys(tot).length ? `<tr>${cur.cols.map(([k, , t], i) => `<td class="${['m', 'n'].includes(t) ? 'right' : ''} b">${i === 0 ? 'รวม' : k in tot ? fmt(t, tot[k]) : ''}</td>`).join('')}</tr>` : ''}</table></div>
+      <p class="muted">${rows.length} รายการ${rows.length > 500 ? ' (แสดง 500 แรก — ส่งออกเพื่อดูทั้งหมด)' : ''}</p>`;
+    $$('[data-s]', $('#rb')).forEach(th => th.onclick = () => { sortD = sortK === th.dataset.s ? -sortD : -1; sortK = th.dataset.s; show(); });
+    cur._rows = rows;
+  };
+  const run = async () => { $('#rb').innerHTML = '<div class="skel"><i></i><i></i></div>'; try { sortK = null; cur = await REPORT_FN[rep](A, B); show(); } catch (e) { fail(e); $('#rb').innerHTML = ''; } };
+  $('#rq').oninput = show;
+  const fname = () => `report_${rep}_${ymd(A)}_${ymd(B)}`;
+  $('#rcsv').onclick = () => cur && download(fname() + '.csv', toCSV(cur._rows.map(r => Object.fromEntries(cur.cols.map(([k, l]) => [l, r[k]]))), cur.cols.map(c => c[1])));
+  $('#rxl').onclick = async () => { if (!cur) return; await loadXLSX(); const ws = XLSX.utils.json_to_sheet(cur._rows.map(r => Object.fromEntries(cur.cols.map(([k, l]) => [l, r[k]]))));
+    const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'รายงาน');
+    const out = XLSX.write(wb, { bookType: 'xlsx', type: 'array' }); const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([out], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })); a.download = fname().replace(/[\\/:*?"<>|()]/g, '').replace(/\s+/g, '_') + '.xlsx'; document.body.appendChild(a); a.click(); setTimeout(() => a.remove(), 1000); };
+  $('#rpr').onclick = () => cur && printReceipt(`<div class="a4"><h2>${esc(S.shop.name)} — รายงาน${REPORTS.find(r => r[0] === rep)[1]}</h2><p>ช่วงวันที่ ${dLong(A)} – ${dLong(B)} · พิมพ์เมื่อ ${dt(new Date())}</p>${$('#rtbl').innerHTML.replace(/class="tbl"/, '')}</div>`);
+  rangeBar($('#rr'), (a, b) => { A = a; B = b; run(); }, 'month');
+};
+const groupSum = (arr, key, fields) => { const m = {}; arr.forEach(r => { const k = key(r); const o = m[k] ||= { _k: k }; fields.forEach(([f, fn]) => { o[f] = (o[f] || 0) + num(fn(r)); }); }); return Object.values(m); };
+const iso = d => d.toISOString();
+const REPORT_FN = {
+  async sales(a, b) {
+    const s = await salesIn(a, b); const rows = groupSum(s, r => ymd(r.created_at), [['bills', () => 1], ['total', r => r.total], ['discount', r => r.discount], ['vat', r => r.vat], ['refund', r => r.refunded_total], ['net', r => num(r.total) - num(r.refunded_total)]]).map(r => ({ ...r, date: r._k })).sort((x, y) => x.date.localeCompare(y.date));
+    return { cols: [['date', 'วันที่', 'd'], ['bills', 'จำนวนบิล', 'n'], ['total', 'ยอดขาย', 'm'], ['discount', 'ส่วนลด', 'm'], ['vat', 'VAT', 'm'], ['refund', 'คืนเงิน', 'm'], ['net', 'ยอดสุทธิ', 'm']], rows };
+  },
+  async profit(a, b) {
+    const s = await salesIn(a, b); const ex = await fetchAll(() => sb.from('expenses').select('amount,spent_on,status').eq('shop_id', S.shop.id).gte('spent_on', ymd(a)).lte('spent_on', ymd(b)));
+    const exD = {}; ex.filter(e => e.status !== 'pending').forEach(e => { exD[e.spent_on] = (exD[e.spent_on] || 0) + num(e.amount); });
+    const rows = groupSum(s, r => ymd(r.created_at), [['rev', r => num(r.total) - num(r.refunded_total)], ['vat', r => r.vat], ['cogs', r => r.cost_total]]).map(r => {
+      const net = r.rev - r.vat, gp = net - r.cogs, e = exD[r._k] || 0; return { date: r._k, rev: r.rev, net, cogs: r.cogs, gp, gm: net ? gp / net * 100 : 0, exp: e, np: gp - e }; }).sort((x, y) => x.date.localeCompare(y.date));
+    return { note: 'ยอดขายสุทธิ = หลังหักคืนเงิน · กำไรขั้นต้น = ยอดขายก่อน VAT − ต้นทุนสินค้า · กำไรสุทธิ = กำไรขั้นต้น − ค่าใช้จ่ายที่อนุมัติแล้ว',
+      cols: [['date', 'วันที่', 'd'], ['rev', 'ยอดขายสุทธิ', 'm'], ['net', 'ก่อน VAT', 'm'], ['cogs', 'ต้นทุนสินค้า', 'm'], ['gp', 'กำไรขั้นต้น', 'm'], ['gm', 'อัตรากำไร', 'p'], ['exp', 'ค่าใช้จ่าย', 'm'], ['np', 'กำไรสุทธิ', 'm']], rows };
+  },
+  async product(a, b) {
+    const it = await fetchAll(() => sb.from('sale_items').select('product_id,name,qty,price,discount,cost,refunded_qty,sales!inner(created_at,status)').eq('shop_id', S.shop.id).neq('sales.status', 'void').gte('sales.created_at', iso(a)).lte('sales.created_at', iso(b)));
+    const rows = groupSum(it, r => r.name, [['qty', r => num(r.qty) - num(r.refunded_qty)], ['rev', r => (num(r.qty) - num(r.refunded_qty)) * num(r.price) - num(r.discount)], ['cogs', r => (num(r.qty) - num(r.refunded_qty)) * num(r.cost)]])
+      .map(r => ({ name: r._k, qty: r.qty, rev: r.rev, cogs: r.cogs, gp: r.rev - r.cogs, gm: r.rev ? (r.rev - r.cogs) / r.rev * 100 : 0 })).sort((x, y) => y.rev - x.rev);
+    return { cols: [['name', 'สินค้า'], ['qty', 'จำนวนขาย', 'n'], ['rev', 'ยอดขาย', 'm'], ...(canDo('view_profit') ? [['cogs', 'ต้นทุน', 'm'], ['gp', 'กำไร', 'm'], ['gm', 'อัตรากำไร', 'p']] : [])], rows };
+  },
+  async category(a, b) {
+    const it = await fetchAll(() => sb.from('sale_items').select('product_id,qty,price,discount,cost,refunded_qty,sales!inner(created_at,status)').eq('shop_id', S.shop.id).neq('sales.status', 'void').gte('sales.created_at', iso(a)).lte('sales.created_at', iso(b)));
+    const catOf = id => S.categories.find(c => c.id === S.products.find(p => p.id === id)?.category_id)?.name || 'ไม่มีหมวด';
+    const rows = groupSum(it, r => catOf(r.product_id), [['qty', r => num(r.qty) - num(r.refunded_qty)], ['rev', r => (num(r.qty) - num(r.refunded_qty)) * num(r.price) - num(r.discount)], ['cogs', r => (num(r.qty) - num(r.refunded_qty)) * num(r.cost)]])
+      .map(r => ({ cat: r._k, qty: r.qty, rev: r.rev, gp: r.rev - r.cogs })).sort((x, y) => y.rev - x.rev);
+    return { cols: [['cat', 'หมวดหมู่'], ['qty', 'จำนวนขาย', 'n'], ['rev', 'ยอดขาย', 'm'], ...(canDo('view_profit') ? [['gp', 'กำไรขั้นต้น', 'm']] : [])], rows };
+  },
+  async inventory() {
+    const rows = S.products.filter(p => p.track_stock).map(p => ({ name: p.name, cat: S.categories.find(c => c.id === p.category_id)?.name || '', barcode: p.barcode, stock: p.stock, unit: p.unit, cost: p.cost, value: Math.max(0, p.stock) * p.cost, retail: Math.max(0, p.stock) * p.price,
+      st: p.stock <= 0 ? 'หมด' : p.stock <= p.low_stock ? 'ใกล้หมด' : 'ปกติ', exp: p.expiry_date }));
+    return { summary: [['มูลค่าทุนรวม', baht(rows.reduce((a, r) => a + r.value, 0))], ['มูลค่าขายรวม', baht(rows.reduce((a, r) => a + r.retail, 0))]],
+      cols: [['name', 'สินค้า'], ['cat', 'หมวด'], ['barcode', 'บาร์โค้ด'], ['stock', 'คงเหลือ', 'n'], ['unit', 'หน่วย'], ['cost', 'ต้นทุน', 'm'], ['value', 'มูลค่าทุน', 'm'], ['retail', 'มูลค่าขาย', 'm'], ['st', 'สถานะ'], ['exp', 'วันหมดอายุ', 'd']], rows };
+  },
+  async moves(a, b) {
+    const mv = await fetchAll(() => sb.from('stock_moves').select('*').eq('shop_id', S.shop.id).gte('created_at', iso(a)).lte('created_at', iso(b)).order('created_at', { ascending: false }));
+    return { cols: [['created_at', 'วันเวลา', 'dt'], ['product_name', 'สินค้า'], ['kindL', 'ประเภท'], ['qty', 'จำนวน', 'n'], ['cost', 'ต้นทุน', 'm'], ['ref', 'อ้างอิง'], ['note', 'หมายเหตุ']], rows: mv.map(r => ({ ...r, kindL: (MOVE[r.kind] || ['', r.kind])[1] })) };
+  },
+  async purchase(a, b) {
+    const po = await fetchAll(() => sb.from('purchases').select('*, supplier:suppliers(name)').eq('shop_id', S.shop.id).gte('created_at', iso(a)).lte('created_at', iso(b)));
+    return { cols: [['po_no', 'เลขที่'], ['created_at', 'วันที่', 'd'], ['sup', 'ผู้จำหน่าย'], ['stL', 'สถานะ'], ['total', 'ยอดรวม', 'm'], ['paid', 'ชำระแล้ว', 'm'], ['owe', 'ค้างชำระ', 'm']],
+      rows: po.map(r => ({ ...r, sup: r.supplier?.name || '', stL: PO_ST[r.status][1], owe: r.status === 'received' ? num(r.total) - num(r.paid) : 0 })) };
+  },
+  async expense(a, b) {
+    const ex = await fetchAll(() => sb.from('expenses').select('*').eq('shop_id', S.shop.id).gte('spent_on', ymd(a)).lte('spent_on', ymd(b)).order('spent_on'));
+    const byC = groupSum(ex.filter(e => e.status !== 'pending'), r => r.category, [['amount', r => r.amount]]);
+    return { summary: byC.sort((x, y) => y.amount - x.amount).slice(0, 4).map(r => [r._k, baht(r.amount)]),
+      cols: [['spent_on', 'วันที่', 'd'], ['category', 'หมวด'], ['note', 'รายละเอียด'], ['pm', 'ชำระโดย'], ['user_name', 'ผู้บันทึก'], ['stL', 'สถานะ'], ['amount', 'จำนวนเงิน', 'm']],
+      rows: ex.map(r => ({ ...r, pm: payName(r.payment_method), stL: r.status === 'pending' ? 'รออนุมัติ' : 'อนุมัติแล้ว' })) };
+  },
+  async customer(a, b) {
+    const s = await salesIn(a, b); const g = groupSum(s.filter(x => x.customer_id), r => r.customer_id, [['bills', () => 1], ['spent', r => num(r.total) - num(r.refunded_total)]]);
+    return { cols: [['name', 'ลูกค้า'], ['phone', 'เบอร์โทร'], ['bills', 'จำนวนบิล', 'n'], ['spent', 'ยอดซื้อในช่วง', 'm'], ['total_spent', 'ยอดซื้อสะสม', 'm'], ['points', 'แต้ม', 'n'], ['balance', 'ค้างชำระ', 'm']],
+      rows: S.customers.map(c => { const x = g.find(r => r._k === c.id) || {}; return { ...c, bills: x.bills || 0, spent: x.spent || 0 }; }).sort((x, y) => y.spent - x.spent) };
+  },
+  async staff(a, b) {
+    const s = await salesIn(a, b); const r = await fetchAll(() => sb.from('refunds').select('amount,user_name').eq('shop_id', S.shop.id).gte('created_at', iso(a)).lte('created_at', iso(b)));
+    const rows = groupSum(s, x => x.cashier_name || '-', [['bills', () => 1], ['total', x => x.total], ['items', x => x.items_count], ['disc', x => x.discount]]).map(x => ({ name: x._k, bills: x.bills, total: x.total, avg: x.total / x.bills, items: x.items, disc: x.disc, ref: r.filter(y => y.user_name === x._k).reduce((t, y) => t + num(y.amount), 0) }));
+    return { cols: [['name', 'พนักงาน'], ['bills', 'จำนวนบิล', 'n'], ['items', 'จำนวนสินค้า', 'n'], ['total', 'ยอดขาย', 'm'], ['avg', 'เฉลี่ย/บิล', 'm'], ['disc', 'ส่วนลดที่ให้', 'm'], ['ref', 'คืนเงินที่ทำ', 'm']], rows };
+  },
+  async payment(a, b) {
+    const p = await fetchAll(() => sb.from('sale_payments').select('method,amount,status,sales!inner(status)').eq('shop_id', S.shop.id).neq('sales.status', 'void').gte('created_at', iso(a)).lte('created_at', iso(b)));
+    const rows = groupSum(p, r => r.method, [['cnt', () => 1], ['amount', r => r.amount], ['pending', r => r.status === 'pending' ? r.amount : 0]]).map(r => ({ m: payName(r._k), cnt: r.cnt, amount: r.amount, pending: r.pending }));
+    return { cols: [['m', 'ช่องทาง'], ['cnt', 'จำนวนรายการ', 'n'], ['amount', 'ยอดเงิน', 'm'], ['pending', 'รอตรวจสอบ', 'm']], rows };
+  },
+  async vat(a, b) {
+    const s = await salesIn(a, b, ',subtotal,tax_name,tax_id,invoice_type');
+    const rate = num(S.shop.vat_rate);
+    const rows = s.map(r => { const tot = num(r.total) - num(r.refunded_total), vat = r.refunded_total ? r2(num(r.vat) * tot / num(r.total || 1)) : num(r.vat);
+      return { date: r.created_at, no: r.bill_no, type: r.invoice_type === 'full' ? 'เต็มรูป' : 'อย่างย่อ', buyer: r.tax_name || '', tid: r.tax_id || '', base: r2(tot - vat), vat, total: tot }; });
+    return { note: S.shop.vat_mode === 'none' ? '⚠️ ร้านตั้งค่าเป็น “ไม่จด VAT” — รายงานนี้ใช้สำหรับร้านที่จดทะเบียนภาษีมูลค่าเพิ่ม' : `รายงานภาษีขาย อัตรา ${rate}% · ตรวจสอบกับผู้ทำบัญชีก่อนยื่นแบบ ภ.พ.30`,
+      cols: [['date', 'วันที่', 'd'], ['no', 'เลขที่'], ['type', 'ประเภทใบกำกับ'], ['buyer', 'ชื่อผู้ซื้อ'], ['tid', 'เลขผู้เสียภาษี'], ['base', 'มูลค่าสินค้า', 'm'], ['vat', 'ภาษีมูลค่าเพิ่ม', 'm'], ['total', 'รวม', 'm']], rows };
+  },
+  async shift(a, b) {
+    const sh = await fetchAll(() => sb.from('shifts').select('*').eq('shop_id', S.shop.id).gte('opened_at', iso(a)).lte('opened_at', iso(b)).order('opened_at'));
+    return { cols: [['user_name', 'พนักงาน'], ['opened_at', 'เปิดกะ', 'dt'], ['closed_at', 'ปิดกะ', 'dt'], ['opening_cash', 'เงินตั้งต้น', 'm'], ['expected_cash', 'ควรมี', 'm'], ['closing_cash', 'นับได้', 'm'], ['diff', 'ส่วนต่าง', 'm']],
+      rows: sh.map(r => ({ ...r, diff: r.closed_at ? num(r.closing_cash) - num(r.expected_cash) : 0 })) };
+  },
+  async refund(a, b) {
+    const r = await fetchAll(() => sb.from('refunds').select('*, sale:sales(bill_no)').eq('shop_id', S.shop.id).gte('created_at', iso(a)).lte('created_at', iso(b)).order('created_at', { ascending: false }));
+    return { cols: [['created_at', 'วันเวลา', 'dt'], ['refund_no', 'เลขที่คืน'], ['bill', 'บิลอ้างอิง'], ['reason', 'เหตุผล'], ['mL', 'คืนผ่าน'], ['user_name', 'ผู้ทำรายการ'], ['amount', 'จำนวนเงิน', 'm']],
+      rows: r.map(x => ({ ...x, bill: x.sale?.bill_no || '', mL: payName(x.method) })) };
+  },
+};
+
+/* ================= STAFF ================= */
+VIEWS.staff = async pg => {
+  const [mem, inv] = await Promise.all([q(sb.from('shop_members').select('*').eq('shop_id', S.shop.id)), q(sb.from('shop_invites').select('*').eq('shop_id', S.shop.id).is('accepted_at', null))]);
+  const roles = ['admin', 'manager', 'cashier', 'stock', 'accountant'].map(r => [r, ROLE_NAME(r)]);
+  $('#tact').innerHTML = `<button class="btn p" id="inv">+ เชิญพนักงาน</button>${can('owner') ? '<button class="btn" id="perm">🔐 ตั้งค่าสิทธิ์ตามตำแหน่ง</button>' : ''}`;
+  pg.innerHTML = `<div class="tblwrap"><table class="tbl"><tr><th>ชื่อ</th><th>อีเมล</th><th>ตำแหน่ง</th><th></th></tr>
+    ${mem.map(m => `<tr><td><b>${esc(m.display_name)}</b></td><td>${esc(m.email)}</td><td>${m.role === 'owner' ? `<span class="chip">${ROLE_NAME('owner')}</span>` :
+      `<select class="in" data-u="${m.user_id}" style="width:auto">${roles.map(r => `<option value="${r[0]}" ${r[0] === m.role ? 'selected' : ''}>${r[1]}</option>`).join('')}</select>`}</td>
+      <td class="right">${m.role === 'owner' ? '' : `<button class="btn sm bad" data-x="${m.user_id}">ลบออก</button>`}</td></tr>`).join('')}</table></div>
+    <p class="section-title">คำเชิญที่รอการตอบรับ</p><div class="tblwrap"><table class="tbl">${inv.map(i => `<tr><td>${esc(i.display_name)}</td><td>${esc(i.email)}</td><td>${ROLE_NAME(i.role)}</td><td class="right"><button class="btn sm bad" data-i="${i.id}">ยกเลิก</button></td></tr>`).join('') || '<tr><td class="muted">ไม่มี</td></tr>'}</table></div>
+    <p class="muted">พนักงานจะเข้าร้านอัตโนมัติเมื่อเข้าสู่ระบบด้วยบัญชี Google ของอีเมลที่เชิญ<br>🔗 ${esc(location.href.split('#')[0])}</p>`;
+  $$('[data-u]', pg).forEach(s => s.onchange = async () => { try { await q(sb.from('shop_members').update({ role: s.value }).eq('shop_id', S.shop.id).eq('user_id', s.dataset.u)); toast('บันทึกข้อมูลเรียบร้อยแล้ว', 'ok'); } catch (e) { fail(e); } });
+  $$('[data-x]', pg).forEach(b => b.onclick = async () => { if (!await confirmBox('ลบพนักงานคนนี้ออกจากร้าน?')) return; try { await q(sb.from('shop_members').delete().eq('shop_id', S.shop.id).eq('user_id', b.dataset.x)); go('staff'); } catch (e) { fail(e); } });
+  $$('[data-i]', pg).forEach(b => b.onclick = async () => { try { await q(sb.from('shop_invites').delete().eq('id', b.dataset.i)); go('staff'); } catch (e) { fail(e); } });
+  $('#inv').onclick = () => formModal('เชิญพนักงาน', [{ k: 'display_name', label: 'ชื่อพนักงาน', req: true }, { k: 'email', label: 'อีเมล (Gmail)', type: 'email', req: true }, { k: 'role', label: 'ตำแหน่ง', type: 'select', opts: roles }], { role: 'cashier' },
+    async o => { o.email = o.email.toLowerCase(); await q(sb.from('shop_invites').upsert({ ...o, shop_id: S.shop.id, accepted_at: null }, { onConflict: 'shop_id,email' })); go('staff'); });
+  if ($('#perm')) $('#perm').onclick = permEditor;
+};
+function permEditor() {
+  const roles = ['manager', 'cashier', 'stock', 'accountant'];
+  const cur = Object.fromEntries(roles.map(r => [r, new Set(Array.isArray(S.shop.permissions?.[r]) ? S.shop.permissions[r] : PERM_DEF[r])]));
+  const m = modal('สิทธิ์การใช้งานตามตำแหน่ง', `<p class="muted" style="margin-top:0">เจ้าของร้านและผู้ดูแลระบบมีสิทธิ์ทั้งหมดเสมอ · การยกเลิกบิลและคืนเงินในฐานข้อมูลจำกัดเฉพาะผู้จัดการขึ้นไปเพื่อความปลอดภัย</p>
+    <div class="tblwrap"><table class="tbl perm-table"><tr><th>สิทธิ์</th>${roles.map(r => `<th>${ROLE_NAME(r)}</th>`).join('')}</tr>
+    ${PERMS.map(([k, l]) => `<tr><td>${l}</td>${roles.map(r => `<td><input type="checkbox" data-r="${r}" data-k="${k}" ${cur[r].has(k) ? 'checked' : ''}></td>`).join('')}</tr>`).join('')}</table></div>`,
+    { wide: true, foot: `<button class="btn" id="pr">คืนค่าเริ่มต้น</button><span style="flex:1"></span><button class="btn p" id="ps">บันทึก</button>` });
+  $('#pr', m).onclick = () => { $$('[data-r]', m).forEach(c => { c.checked = PERM_DEF[c.dataset.r].includes(c.dataset.k); }); };
+  $('#ps', m).onclick = async () => {
+    const perms = Object.fromEntries(roles.map(r => [r, $$(`[data-r="${r}"]`, m).filter(c => c.checked).map(c => c.dataset.k)]));
+    try { const row = await q(sb.from('shops').update({ permissions: perms }).eq('id', S.shop.id).select().single()); Object.assign(S.shop, row); m.close(); toast('บันทึกข้อมูลเรียบร้อยแล้ว', 'ok');
+      await sb.rpc('log_action', { p_shop: S.shop.id, p_action: 'permissions', p_entity: 'shop', p_id: S.shop.name, p_detail: perms }); } catch (e) { fail(e); }
+  };
+}
+
+/* ================= AUDIT LOG ================= */
+const AUDIT_L = { sale: 'ขาย', void_sale: 'ยกเลิกบิล', refund: 'คืนเงิน', confirm_payment: 'ยืนยันการชำระ', tax_invoice: 'ออกใบกำกับภาษี', product_edit: 'แก้ไขสินค้า/ราคา',
+  stock_adjust: 'ปรับยอดสต็อก', stock_damaged: 'ตัดสินค้าชำรุด', stock_expired: 'ตัดสินค้าหมดอายุ', transfer_stock: 'โอนสินค้า', receive_purchase: 'รับสินค้า (PO)', pay_supplier: 'จ่ายผู้จำหน่าย',
+  customer_payment: 'รับชำระหนี้', shift_open: 'เปิดกะ', shift_close: 'ปิดกะ', cash_in: 'นำเงินเข้า', cash_out: 'นำเงินออก', staff_update: 'เปลี่ยนตำแหน่งพนักงาน', staff_delete: 'ลบพนักงาน', permissions: 'แก้ไขสิทธิ์', settings: 'แก้ไขตั้งค่า' };
+VIEWS.audit = async pg => {
+  const rows = await q(sb.from('audit_log').select('*').eq('shop_id', S.shop.id).order('created_at', { ascending: false }).limit(500));
+  pg.innerHTML = `<div class="row" style="margin-bottom:12px"><div class="sbox" style="max-width:300px"><span>🔍</span><input class="in" id="aq" placeholder="ค้นหา"></div>
+    <select class="in" id="aa" style="width:auto"><option value="">ทุกการกระทำ</option>${[...new Set(rows.map(r => r.action))].map(a => `<option value="${a}">${AUDIT_L[a] || a}</option>`).join('')}</select></div><div id="al"></div>`;
+  const draw = () => { const v = $('#aq').value.toLowerCase(), a = $('#aa').value;
+    const list = rows.filter(r => (!a || r.action === a) && (!v || JSON.stringify(r).toLowerCase().includes(v)));
+    $('#al').innerHTML = list.length ? `<div class="tblwrap"><table class="tbl"><tr><th>วันเวลา</th><th>ผู้ใช้</th><th>การกระทำ</th><th>รายการ</th><th>รายละเอียด</th></tr>${list.map(r => `<tr><td>${dt(r.created_at)}</td><td>${esc(r.user_name)}</td><td><span class="chip">${AUDIT_L[r.action] || esc(r.action)}</span></td><td>${esc(r.entity_id)}</td>
+      <td><small class="muted">${esc(Object.entries(r.detail || {}).map(([k, x]) => `${k}: ${Array.isArray(x) ? x.join(' → ') : typeof x === 'object' ? JSON.stringify(x) : x}`).join(' · ')).slice(0, 200)}</small></td></tr>`).join('')}</table></div>` : '<div class="empty">ยังไม่มีบันทึก</div>'; };
+  $('#aq').oninput = $('#aa').onchange = draw; draw();
+};
+
+/* ================= SETTINGS ================= */
+VIEWS.settings = pg => {
+  const sh = S.shop, edit = canDo('manage_settings');
+  const sec = (t, inner) => `<div class="card" style="margin-bottom:16px"><h3 style="margin-top:0">${t}</h3>${inner}</div>`;
+  const f = (k, l, type = 'text', opts) => `<div class="fg"><label class="f">${l}</label>${type === 'select' ? `<select class="in" name="${k}" ${edit ? '' : 'disabled'}>${opts.map(o => `<option value="${o[0]}" ${String(sh[k]) === String(o[0]) ? 'selected' : ''}>${o[1]}</option>`).join('')}</select>`
+    : type === 'textarea' ? `<textarea class="in" name="${k}" rows="2" ${edit ? '' : 'disabled'}>${esc(sh[k])}</textarea>` : type === 'check' ? `<label class="row"><input type="checkbox" name="${k}" ${sh[k] ? 'checked' : ''} ${edit ? '' : 'disabled'}> ${l}</label>`
+    : `<input class="in" name="${k}" ${type === 'number' ? 'type="number" step="any"' : ''} value="${esc(sh[k] ?? '')}" ${edit ? '' : 'disabled'}>`}</div>`;
+  const pm = new Set(shopMethods());
+  pg.innerHTML = `<form id="stf"><div class="grid2"><div>
+    ${sec('🏪 ข้อมูลร้าน', `<div class="row" style="margin-bottom:12px"><div class="qm-img" id="logoP" style="width:72px;height:72px;${sh.logo_url ? `background-image:url('${esc(sh.logo_url)}');background-size:contain` : ''}"></div>${edit ? '<button type="button" class="btn sm" id="logoU">อัปโหลดโลโก้</button><button type="button" class="btn sm" id="logoX">ลบโลโก้</button>' : ''}<input type="hidden" name="logo_url" value="${esc(sh.logo_url || '')}"></div>
+      ${f('name', 'ชื่อร้าน *')}${f('phone', 'เบอร์โทร')}${f('address', 'ที่อยู่', 'textarea')}
+      ${f('business_type', 'ประเภทธุรกิจ', 'select', [['retail', 'ร้านค้าปลีกทั่วไป'], ['grocery', 'ร้านขายของชำ / มินิมาร์ท'], ['fruit', 'ร้านผลไม้'], ['food', 'ร้านอาหาร / เครื่องดื่ม'], ['restaurant', 'ภัตตาคาร'], ['clothing', 'ร้านเสื้อผ้า'], ['convenience', 'ร้านสะดวกซื้อ'], ['wholesale', 'ค้าส่งและค้าปลีก']])}`)}
+    ${sec('🧾 ภาษีและสาขา (กรมสรรพากร)', `${f('vat_mode', 'การจดทะเบียน VAT', 'select', [['none', 'ไม่จด VAT (ออกใบเสร็จรับเงิน)'], ['included', 'จด VAT — ราคารวม VAT แล้ว'], ['excluded', 'จด VAT — บวก VAT เพิ่มจากราคา']])}
+      <div class="grid2">${f('vat_rate', 'อัตรา VAT (%)', 'number')}${f('tax_id', 'เลขประจำตัวผู้เสียภาษี (13 หลัก)')}${f('branch_code', 'รหัสสาขา (00000 = สำนักงานใหญ่)')}${f('branch_name', 'ชื่อสาขา')}</div>`)}
+    ${sec('🖨️ ใบเสร็จ', `${f('receipt_size', 'ขนาดใบเสร็จ', 'select', [['58', 'เครื่องพิมพ์ความร้อน 58 มม.'], ['80', 'เครื่องพิมพ์ความร้อน 80 มม.'], ['A4', 'กระดาษ A4']])}${f('receipt_header', 'ข้อความหัวใบเสร็จ', 'textarea')}${f('receipt_footer', 'ข้อความท้ายใบเสร็จ', 'textarea')}
+      <button type="button" class="btn sm" id="testPrint">🖨️ ทดสอบพิมพ์</button>`)}
+  </div><div>
+    ${sec('💳 การชำระเงิน', `<div class="pills" id="pmS">${Object.keys(PAY).filter(k => !['card', 'mixed'].includes(k)).map(k => `<button type="button" data-pm="${k}" class="${pm.has(k) ? 'on' : ''}" ${edit ? '' : 'disabled'}>${payIcon(k)} ${payName(k)}</button>`).join('')}</div><br>
+      ${f('promptpay_id', 'พร้อมเพย์ (เบอร์โทร / เลขผู้เสียภาษี)')}<p class="muted" style="font-size:13px">QR พร้อมเพย์สร้างยอดเงินอัตโนมัติ — การยืนยันว่าเงินเข้าทำโดยแคชเชียร์ (การยืนยันอัตโนมัติต้องใช้ผู้ให้บริการชำระเงินของธนาคาร)</p>`)}
+    ${sec('🌐 ภาษาและรูปแบบ', `<div class="tabs"><button type="button" class="tab ${LANG === 'th' ? 'on' : ''}" data-l="th">ไทย</button><button type="button" class="tab ${LANG === 'en' ? 'on' : ''}" data-l="en">English</button></div>
+      <div class="grid2">${f('era', 'ปีปฏิทิน', 'select', [['BE', 'พุทธศักราช (พ.ศ.)'], ['CE', 'คริสต์ศักราช (ค.ศ.)']])}${f('decimals', 'ทศนิยมของเงิน', 'select', [['2', '2 ตำแหน่ง (฿1,250.00)'], ['0', 'ไม่มีทศนิยม (฿1,250)']])}</div>${f('thai_digits', 'ใช้เลขไทย (๑๒๓)', 'check')}
+      <p class="muted" style="font-size:13px">ตัวอย่าง: ${dLong(new Date())} · ${baht(1250)}</p>`)}
+    ${sec('📦 สต็อกและสมาชิก', `${f('allow_negative_stock', 'อนุญาตให้ขายเมื่อสต็อกไม่พอ (ติดลบ)', 'check')}<div class="grid2">${f('points_per_baht', 'แต้มต่อ 1 บาท', 'number')}${f('baht_per_point', 'มูลค่า 1 แต้ม (บาท)', 'number')}</div>`)}
+    ${sec('🔌 ฮาร์ดแวร์', `<div class="kv" style="font-size:14px"><span>สแกนเนอร์ USB / Bluetooth</span><b>รองรับ (โหมดคีย์บอร์ด)</b><span>กล้องมือถือสแกนบาร์โค้ด</span><b>รองรับ</b><span>เครื่องพิมพ์ใบเสร็จ</span><b>ผ่านหน้าต่างพิมพ์ของระบบ</b><span>ลิ้นชักเงิน</span><b>เปิดผ่านไดรเวอร์เครื่องพิมพ์</b><span>จอลูกค้า</span><b>รองรับ</b></div>
+      <div class="fg" style="margin-top:10px"><label class="f">ทดสอบสแกนเนอร์: คลิกช่องนี้แล้วสแกน</label><input class="in" id="scanTest" placeholder="รอสแกน…"></div><div class="row"><button type="button" class="btn sm" id="dispT">🖥️ เปิดจอลูกค้า</button>${'serial' in navigator ? '<button type="button" class="btn sm" id="scaleT">⚖️ เชื่อมต่อเครื่องชั่ง (Web Serial)</button>' : ''}</div><p id="scaleOut" class="muted"></p>`)}
+  </div></div>${edit ? '<div class="row" style="position:sticky;bottom:0;background:var(--bg);padding:10px 0"><span class="sp"></span><button class="btn p lg">💾 บันทึกการตั้งค่า</button></div>' : ''}</form>
+  <div class="grid2"><div class="card"><h3 style="margin-top:0">🏬 ร้าน / สาขา</h3><table class="rtable">${S.shops.map(s => `<tr><td>${esc(s.name)}<br><small class="muted">${ROLE_NAME(s._role)}</small></td><td class="right">${s.id === sh.id ? '<span class="chip ok">ใช้งานอยู่</span>' : `<button class="btn sm" data-s="${s.id}">สลับ</button>`}</td></tr>`).join('')}</table><br><button class="btn" id="nb">+ เพิ่มสาขา</button></div>
+  <div class="card"><h3 style="margin-top:0">👤 บัญชีผู้ใช้</h3><p>${esc(S.user.email)} · ${ROLE_NAME(S.role)}</p><div class="row">${canDo('manage_settings') ? '<button class="btn" id="bk">💾 สำรองข้อมูล (JSON)</button>' : ''}<button class="btn install" data-install>📲 ติดตั้งแอป</button>
+    ${S.user.app_metadata?.provider === 'email' ? '<button class="btn" id="cpw">🔑 เปลี่ยนรหัสผ่าน</button>' : ''}<button class="btn bad" id="lo">ออกจากระบบ</button></div>
+    <p class="muted" style="font-size:12px">เวอร์ชัน ${VERSION} · ข้อมูลส่วนบุคคลจัดเก็บตาม พ.ร.บ.คุ้มครองข้อมูลส่วนบุคคล (PDPA) — เข้าถึงได้เฉพาะพนักงานที่ได้รับสิทธิ์</p></div></div>`;
+  $$('[data-pm]', pg).forEach(b => b.onclick = () => b.classList.toggle('on'));
+  $$('[data-l]', pg).forEach(b => b.onclick = () => { LANG = b.dataset.l; localStorage.setItem('pos_lang', LANG); renderShell(); go('settings'); });
+  $$('[data-s]', pg).forEach(b => b.onclick = () => { localStorage.setItem('pos_shop', b.dataset.s); S.cart = []; boot(); });
+  $('#nb').onclick = () => renderCreateShop(false);
+  $('#lo').onclick = logout;
+  $$('[data-install]', pg).forEach(b => b.onclick = installApp); updateInstallUI();
+  $('#dispT').onclick = () => window.open('display.html', 'posdisplay', 'width=900,height=600');
+  $('#scanTest').onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); const v = e.target.value.trim(); const p = S.products.find(x => x.barcode === v); toast(p ? `✓ สแกนได้: ${p.name}` : `สแกนได้: ${v} (ไม่พบสินค้า)`, p ? 'ok' : ''); sfx(p ? 'scan' : 'error'); e.target.value = ''; } };
+  $('#testPrint').onclick = () => printReceipt(receiptHTML({ bill_no: 'TEST-0001', created_at: new Date().toISOString(), cashier_name: 'ทดสอบ', subtotal: 100, discount: 0, vat: sh.vat_mode === 'none' ? 0 : r2(100 * sh.vat_rate / (100 + num(sh.vat_rate))), total: 100, change: 0, payment_method: 'cash', _payments: [{ method: 'cash', amount: 100 }] }, [{ name: 'สินค้าทดสอบ', qty: 1, price: 100, discount: 0 }], null));
+  if ($('#scaleT')) $('#scaleT').onclick = async () => {
+    try { const port = await navigator.serial.requestPort(); await port.open({ baudRate: 9600 }); const rd = port.readable.getReader(); const dec = new TextDecoder(); let buf = '';
+      $('#scaleOut').textContent = 'เชื่อมต่อแล้ว — วางสินค้าบนเครื่องชั่ง…';
+      for (let i = 0; i < 40; i++) { const { value, done } = await rd.read(); if (done) break; buf += dec.decode(value); const mm = buf.match(/(\d+\.\d+)\s*(kg|g)?/i); if (mm) { $('#scaleOut').textContent = `น้ำหนัก: ${mm[1]} ${mm[2] || 'kg'}`; break; } }
+      rd.releaseLock(); await port.close();
+    } catch (e) { $('#scaleOut').textContent = 'เชื่อมต่อเครื่องชั่งไม่สำเร็จ: ' + e.message; }
+  };
+  if ($('#logoU')) $('#logoU').onclick = async () => { const fl = await pickImage(false); if (!fl) return; try { const u = await savePngLogo(fl); $('[name=logo_url]').value = u; $('#logoP').style.backgroundImage = `url('${u}')`; } catch (e) { fail(e); } };
+  if ($('#logoX')) $('#logoX').onclick = () => { $('[name=logo_url]').value = ''; $('#logoP').style.backgroundImage = ''; };
+  if ($('#cpw')) $('#cpw').onclick = () => formModal('เปลี่ยนรหัสผ่าน', [{ k: 'p1', label: 'รหัสผ่านใหม่', type: 'password', req: true }, { k: 'p2', label: 'ยืนยันรหัสผ่านใหม่', type: 'password', req: true }], {}, async o => {
+    if (o.p1.length < 6) throw new Error('รหัสผ่านอย่างน้อย 6 ตัวอักษร'); if (o.p1 !== o.p2) throw new Error('รหัสผ่านไม่ตรงกัน'); const { error } = await sb.auth.updateUser({ password: o.p1 }); if (error) throw error; });
+  if ($('#bk')) $('#bk').onclick = async () => { const id = S.shop.id; const out = { shop: sh, exported_at: new Date().toISOString() };
+    for (const tb of ['categories', 'products', 'customers', 'suppliers', 'promotions', 'expenses', 'shifts', 'sales', 'sale_items', 'sale_payments', 'refunds', 'refund_items', 'stock_moves', 'purchases', 'purchase_items', 'cash_moves', 'customer_payments'])
+      out[tb] = await fetchAll(() => sb.from(tb).select('*').eq('shop_id', id));
+    download(`backup_shop_pos_${ymd(new Date())}.json`, JSON.stringify(out, null, 1), 'application/json'); };
+  $('#stf').onsubmit = async e => {
+    e.preventDefault(); if (!edit) return; const fm = e.target, o = {};
+    ['name', 'phone', 'address', 'business_type', 'vat_mode', 'tax_id', 'branch_code', 'branch_name', 'receipt_size', 'receipt_header', 'receipt_footer', 'promptpay_id', 'era', 'logo_url'].forEach(k => { o[k] = fm[k].value.trim(); });
+    ['vat_rate', 'points_per_baht', 'baht_per_point', 'decimals'].forEach(k => { o[k] = num(fm[k].value); });
+    o.thai_digits = fm.thai_digits.checked; o.allow_negative_stock = fm.allow_negative_stock.checked;
+    o.payment_methods = $$('[data-pm].on', pg).map(b => b.dataset.pm); if (!o.payment_methods.length) return toast('กรุณาเลือกช่องทางชำระเงินอย่างน้อย 1 ช่องทาง', 'bad');
+    if (!o.name) return toast('กรุณากรอกข้อมูลให้ครบถ้วน', 'bad');
+    if (o.vat_mode !== 'none' && !/^\d{13}$/.test(o.tax_id)) return toast('ร้านที่จด VAT ต้องมีเลขประจำตัวผู้เสียภาษี 13 หลัก', 'bad');
+    o.paper_width = o.receipt_size === '80' ? 80 : 58;
+    try { const row = await q(sb.from('shops').update(o).eq('id', sh.id).select().single()); Object.assign(sh, row); toast('บันทึกข้อมูลเรียบร้อยแล้ว', 'ok');
+      await sb.rpc('log_action', { p_shop: sh.id, p_action: 'settings', p_entity: 'shop', p_id: sh.name, p_detail: {} }); renderShell(); go('settings'); } catch (err) { fail(err); }
+  };
+};
+async function savePngLogo(file) {
+  const png = await toPng(file, 400); const path = `${S.shop.id}/logo-${Date.now()}.png`;
+  const { error } = await sb.storage.from('product-images').upload(path, png, { contentType: 'image/png' }); if (error) throw error;
+  return sb.storage.from('product-images').getPublicUrl(path).data.publicUrl;
+}
+
+/* ================= PRODUCT FORM (extended) ================= */
+const UNITS = ['ชิ้น', 'กล่อง', 'แพ็ก', 'กิโลกรัม', 'กรัม', 'ลิตร', 'มิลลิลิตร', 'ขวด', 'ถุง', 'จาน', 'ชุด', 'แก้ว', 'ห่อ', 'โหล', 'ลัง'];
+productForm = function (p, after) {
+  const isNew = !p.id, units = Array.isArray(p.units) ? p.units.map(u => ({ ...u })) : [];
+  const canPrice = canDo('edit_prices') || isNew;
+  const m = formModal(isNew ? 'เพิ่มสินค้า' : 'แก้ไขสินค้า', [
+    { k: 'name', label: 'ชื่อสินค้า (ไทย)', req: true, full: true }, { k: 'name_en', label: 'ชื่อสินค้า (อังกฤษ)' }, { k: 'brand', label: 'ยี่ห้อ' },
+    { k: 'barcode', label: 'บาร์โค้ด', after: `<button type="button" class="btn sm" id="pscan" style="margin-top:6px">📷 สแกน</button>` }, { k: 'sku', label: 'รหัสสินค้า (SKU)' },
+    { k: 'category_id', label: 'หมวดหมู่', type: 'select', opts: [['', '—'], ...S.categories.map(c => [c.id, c.name])] },
+    { k: 'supplier_id', label: 'ผู้จำหน่ายหลัก', type: 'select', opts: [['', '—'], ...S.suppliers.map(s => [s.id, s.name])] },
+    { k: 'unit', label: 'หน่วยนับหลัก', type: 'select', opts: [...new Set([p.unit || 'ชิ้น', ...UNITS])].map(u => [u, u]) },
+    ...(canPrice ? [{ k: 'price', label: 'ราคาขายปลีก', type: 'number', req: true }, { k: 'promo_price', label: 'ราคาโปรโมชั่น (0 = ไม่ใช้)', type: 'number', def: 0 },
+      { k: 'wholesale_price', label: 'ราคาขายส่ง', type: 'number', def: 0 }] : []),
+    ...(canDo('view_profit') ? [{ k: 'cost', label: 'ราคาทุน', type: 'number', def: 0 }] : []),
+    ...(isNew ? [{ k: 'stock', label: 'สต็อกเริ่มต้น', type: 'number', def: 0 }] : []),
+    { k: 'low_stock', label: 'สต็อกขั้นต่ำ (แจ้งเตือน)', type: 'number', def: 5 }, { k: 'max_stock', label: 'สต็อกสูงสุด', type: 'number', def: 0 },
+    { k: 'expiry_date', label: 'วันหมดอายุ (ถ้ามี)', type: 'date' }, { k: 'lot_no', label: 'เลขล็อต / แบทช์' },
+    { k: 'image_url', label: 'รูปสินค้า', full: true, after: `<div class="row" style="margin-top:8px"><div id="pimgPrev" class="qm-img" style="width:72px;height:72px;${p.image_url ? `background-image:url('${esc(p.image_url)}')` : ''}"></div>
+      <button type="button" class="btn sm" id="pimgUp">🖼️ อัปโหลด</button><button type="button" class="btn sm" id="pimgCam">📸 ถ่ายรูป</button><button type="button" class="btn sm" id="pimgWeb">🔎 หาจากเว็บ</button><button type="button" class="btn sm" id="pimgX">×</button></div>` },
+    { k: '_units', label: 'หน่วยขายเพิ่มเติม (เช่น แพ็ก 6 = 6 ชิ้น)', full: true, type: 'hidden', after: '<div id="uBox"></div><button type="button" class="btn sm" id="uAdd">➕ เพิ่มหน่วย</button>' },
+    { k: 'tile_color', label: 'สีไทล์', type: 'color', def: catColor(p.category_id) }, { k: 'favorite', label: '★ รายการโปรด', type: 'check' },
+    { k: 'track_stock', label: 'ตัดสต็อกเมื่อขาย', type: 'check', def: true }, { k: 'active', label: 'เปิดขาย', type: 'check', def: true },
+  ], isNew ? { track_stock: true, active: true, unit: 'ชิ้น' } : p, async o => {
+    delete o._units; o.units = units.filter(u => u.unit && num(u.factor) > 0).map(u => ({ unit: u.unit, factor: num(u.factor), price: num(u.price) }));
+    ['category_id', 'supplier_id', 'expiry_date'].forEach(k => { o[k] = o[k] || null; });
+    ['cost', 'low_stock', 'max_stock', 'promo_price', 'wholesale_price'].forEach(k => { if (k in o) o[k] = num(o[k]); });
+    if (isNew) {
+      const st = num(o.stock); delete o.stock;
+      const row = await q(sb.from('products').insert({ ...o, shop_id: S.shop.id }).select().single());
+      if (st) { await q(sb.rpc('stock_move', { p_shop: S.shop.id, p_product: row.id, p_kind: 'in', p_qty: st, p_cost: num(o.cost), p_supplier: o.supplier_id, p_note: 'สต็อกเริ่มต้น' })); row.stock = st; }
+      S.products.push(row); toast('เพิ่มสินค้าเรียบร้อยแล้ว', 'ok');
+    } else { const row = await q(sb.from('products').update(o).eq('id', p.id).select().single()); Object.assign(p, row); }
+    S.products.sort((a, b) => a.name.localeCompare(b.name, 'th')); after?.();
+  }, { extraFoot: isNew ? '' : `<button class="btn bad" id="pdel">ปิดการขาย / ลบ</button>` });
+  const uDraw = () => { $('#uBox', m).innerHTML = units.map((u, i) => `<div class="split-row" style="grid-template-columns:1fr 1fr 1fr auto"><input class="in" placeholder="หน่วย" data-uu="${i}" value="${esc(u.unit || '')}" list="unitList">
+      <input class="in" type="number" step="any" placeholder="= กี่หน่วยหลัก" data-uf="${i}" value="${u.factor ?? ''}"><input class="in" type="number" step="any" placeholder="ราคาขาย" data-up="${i}" value="${u.price ?? ''}"><button type="button" class="btn sm bad" data-ux="${i}">×</button></div>`).join('') + `<datalist id="unitList">${UNITS.map(u => `<option value="${u}">`).join('')}</datalist>`;
+    $$('[data-uu]', m).forEach(x => x.oninput = () => units[+x.dataset.uu].unit = x.value); $$('[data-uf]', m).forEach(x => x.oninput = () => units[+x.dataset.uf].factor = x.value);
+    $$('[data-up]', m).forEach(x => x.oninput = () => units[+x.dataset.up].price = x.value); $$('[data-ux]', m).forEach(x => x.onclick = () => { units.splice(+x.dataset.ux, 1); uDraw(); }); };
+  $('#uAdd', m).onclick = () => { units.push({ unit: 'แพ็ก', factor: 6, price: '' }); uDraw(); }; uDraw();
+  $('#pscan', m).onclick = () => scanBarcode(code => { $('[name=barcode]', m).value = code; });
+  const setImg = u => { $('[name=image_url]', m).value = u; $('#pimgPrev', m).style.backgroundImage = u ? `url('${u}')` : ''; };
+  const up = async cap => { const fl = await pickImage(cap); if (!fl) return; try { const png = await toPng(fl); const path = `${S.shop.id}/${uid()}.png`; const { error } = await sb.storage.from('product-images').upload(path, png, { contentType: 'image/png' }); if (error) throw error; setImg(sb.storage.from('product-images').getPublicUrl(path).data.publicUrl); } catch (e) { fail(e); } };
+  $('#pimgUp', m).onclick = () => up(false); $('#pimgCam', m).onclick = () => up(true); $('#pimgX', m).onclick = () => setImg('');
+  $('#pimgWeb', m).onclick = async () => { const name = $('[name=name]', m).value.trim(); if (!name) return toast('กรุณากรอกชื่อสินค้าก่อน', 'bad');
+    const w = modal('🔎 ' + name, `<div class="picgrid" id="fw">${Array(8).fill('<i class="sk"></i>').join('')}</div>`, { wide: true });
+    try { const imgs = await webImageSearch(name, $('[name=barcode]', m).value.trim());
+      $('#fw', w).innerHTML = imgs.map((x, i) => `<button data-i="${i}"><img src="${esc(x.thumb)}" loading="lazy" referrerpolicy="no-referrer" onerror="this.parentNode.remove()"></button>`).join('') || '<div class="empty">ไม่พบรูป</div>';
+      $$('[data-i]', w).forEach(b => b.onclick = async () => { b.classList.add('busy'); try { let bl; try { bl = await webImageBlob(imgs[+b.dataset.i].url); } catch (e) { bl = await webImageBlob(imgs[+b.dataset.i].thumb); }
+        const png = await toPng(bl); const path = `${S.shop.id}/${uid()}.png`; const { error } = await sb.storage.from('product-images').upload(path, png, { contentType: 'image/png' }); if (error) throw error;
+        setImg(sb.storage.from('product-images').getPublicUrl(path).data.publicUrl); w.close(); } catch (e) { b.classList.remove('busy'); fail(e); } }); } catch (e) { fail(e); } };
+  $('[name=image_url]', m).oninput = e => setImg(e.target.value.trim());
+  if (!isNew) $('#pdel', m).onclick = async () => {
+    if (!await confirmBox(`ปิดการขาย “${p.name}”? (สินค้าที่เคยขายแล้วจะถูกเก็บไว้ในประวัติ ไม่ถูกลบ)`)) return;
+    try { await q(sb.from('products').update({ active: false }).eq('id', p.id)); p.active = false; m.close(); toast('ปิดการขายแล้ว', 'ok'); after?.(); } catch (e) { fail(e); }
+  };
+};
+
+/* ================= start ================= */
+updateNet();
+boot().then(() => { updateNet(); syncQueue(); }).catch(e => { fail(e); renderAuth(); });

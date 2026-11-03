@@ -397,3 +397,13 @@ begin
 end $$;
 create trigger trg_block_email_signup before insert on auth.users
 for each row execute function app_private.block_email_signup();
+
+
+-- ============ v3 (applied as migrations pos_09 … pos_13) ============
+-- Widened checks (roles admin/accountant; sale statuses refunded/partial_refund/pending; stock kinds refund/purchase/damaged/expired/transfer_in/transfer_out/return_supplier)
+-- New columns on shops/products/customers/suppliers/sales/sale_items/expenses (branch, logo, era, decimals, payment_methods, permissions, units, promo/wholesale price,
+--   expiry/lot, tax info, credit limit/balance, client_id idempotency, invoice_type, refunded_qty, receipt_url, approval)
+-- New tables: sale_payments, refunds, refund_items, purchases, purchase_items, supplier_payments, cash_moves, customer_payments, audit_log (all RLS-protected)
+-- Functions: create_sale v2 (idempotent, split payments, units, store credit, negative-stock rule), confirm_payment, void_sale v2, refund_sale,
+--   stock_move v2, transfer_stock, receive_purchase, pay_supplier, customer_pay, issue_tax_invoice, log_action, doc_no; audit triggers on products & staff.
+-- Full SQL is stored in the Supabase project's migration history (supabase_migrations.schema_migrations).

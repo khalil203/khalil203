@@ -1,6 +1,6 @@
 /* Shop POS — free, open POS + stock web app.  Data: Supabase.  Hosting: GitHub Pages. */
 'use strict';
-const VERSION = '2.2.0';
+const VERSION = '3.0.0';
 const sb = supabase.createClient(window.POS_CONFIG.url, window.POS_CONFIG.key, { auth: { flowType: 'pkce', detectSessionInUrl: true, persistSession: true } });
 
 /* ================= i18n ================= */
@@ -53,10 +53,17 @@ const $$ = (s, el = document) => [...el.querySelectorAll(s)];
 const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const num = v => { const n = parseFloat(v); return isNaN(n) ? 0 : n; };
 const r2 = n => Math.round((n + Number.EPSILON) * 100) / 100;
-const money = n => num(n).toLocaleString('th-TH', {minimumFractionDigits: 2, maximumFractionDigits: 2});
-const qtyf = n => num(n).toLocaleString('th-TH', {maximumFractionDigits: 3});
-const dt = d => new Date(d).toLocaleString(LANG === 'th' ? 'th-TH' : 'en-GB', {dateStyle: 'short', timeStyle: 'short'});
-const dOnly = d => new Date(d).toLocaleDateString(LANG === 'th' ? 'th-TH' : 'en-GB');
+/* Thai formatting: Baht with configurable decimals, Thai/Arabic digits, พ.ศ./ค.ศ., Asia/Bangkok */
+const numLoc = () => 'th-TH' + (S?.shop?.thai_digits ? '-u-nu-thai' : '');
+const dateLoc = () => (LANG === 'th' ? 'th-TH' : 'en-GB') + '-u-ca-' + (S?.shop?.era === 'CE' ? 'gregory' : (LANG === 'th' ? 'buddhist' : 'gregory')) + (S?.shop?.thai_digits && LANG === 'th' ? '-nu-thai' : '');
+const decs = () => S?.shop?.decimals ?? 2;
+const money = n => num(n).toLocaleString(numLoc(), {minimumFractionDigits: decs(), maximumFractionDigits: decs()});
+const baht = n => '฿' + money(n);
+const qtyf = n => num(n).toLocaleString(numLoc(), {maximumFractionDigits: 3});
+const TZ = 'Asia/Bangkok';
+const dt = d => new Date(d).toLocaleString(dateLoc(), {day: 'numeric', month: 'short', year: '2-digit', hour: '2-digit', minute: '2-digit', timeZone: TZ});
+const dOnly = d => new Date(d).toLocaleDateString(dateLoc(), {day: 'numeric', month: 'short', year: 'numeric', timeZone: TZ});
+const dLong = d => new Date(d).toLocaleDateString(dateLoc(), {day: 'numeric', month: 'long', year: 'numeric', timeZone: TZ});
 const ymd = d => { const x = new Date(d); return `${x.getFullYear()}-${String(x.getMonth()+1).padStart(2,'0')}-${String(x.getDate()).padStart(2,'0')}`; };
 function toast(msg, kind = '') {
   const el = document.createElement('div'); el.className = 'toast ' + kind;
@@ -72,7 +79,7 @@ async function fetchAll(build) { // pages past Supabase's 1000-row limit
 }
 function download(name, text, type = 'text/csv') {
   const a = document.createElement('a');
-  a.href = URL.createObjectURL(new Blob(['﻿' + text], {type: type + ';charset=utf-8'})); a.download = name; a.click();
+  a.href = URL.createObjectURL(new Blob(['﻿' + text], {type: type + ';charset=utf-8'})); a.download = name; document.body.appendChild(a); a.click(); setTimeout(() => a.remove(), 1000);
 }
 function toCSV(rows, cols) {
   const e = v => { v = String(v ?? ''); return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
@@ -92,7 +99,8 @@ function parseCSV(text) {
   const head = (rows.shift() || []).map(h => h.trim().toLowerCase());
   return rows.filter(r => r.some(x => x.trim())).map(r => Object.fromEntries(head.map((h, i) => [h, (r[i] || '').trim()])));
 }
-const ROLE_NAME = r => t({owner:'Owner', manager:'Manager', cashier:'Cashier', stock:'Stock keeper'}[r] || r);
+const ROLE_LABEL = {owner: ['เจ้าของร้าน', 'Owner'], admin: ['ผู้ดูแลระบบ', 'Administrator'], manager: ['ผู้จัดการร้าน', 'Store manager'], cashier: ['พนักงานขาย', 'Cashier'], stock: ['พนักงานสต็อก', 'Stock staff'], accountant: ['พนักงานบัญชี', 'Accountant']};
+const ROLE_NAME = r => (ROLE_LABEL[r] || [r, r])[LANG === 'th' ? 0 : 1];
 
 /* ================= state ================= */
 const S = {
@@ -101,21 +109,24 @@ const S = {
   cart: [], customer: null, promo: null, billDisc: 0, billDiscPct: false, pointsUse: 0, cat: 'all', search: '',
   shift: null, held: JSON.parse(localStorage.getItem('pos_held') || '[]'),
 };
-const can = (...roles) => roles.includes(S.role);
+const can = (...roles) => roles.includes(S.role) || (S.role === 'admin' && (roles.includes('owner') || roles.includes('manager')));
 const bc = 'BroadcastChannel' in window ? new BroadcastChannel('pos-display') : null;
 
 const PAGES = [
+  {id:'dashboard', ic:'🏠', name:'Dashboard', perm:'dashboard', roles:[]},
   {id:'pos', ic:'🛒', name:'Sell', roles:['owner','manager','cashier','stock']},
   {id:'sales', ic:'🧾', name:'Bills', roles:['owner','manager','cashier']},
   {id:'products', ic:'📦', name:'Products', roles:['owner','manager','stock']},
   {id:'stock', ic:'🏬', name:'Stock', roles:['owner','manager','stock']},
   {id:'members', ic:'⭐', name:'Members', roles:['owner','manager','cashier']},
   {id:'promotions', ic:'🏷️', name:'Promotions', roles:['owner','manager']},
+  {id:'purchases', ic:'📥', name:'Purchasing', perm:'purchasing', roles:[]},
   {id:'suppliers', ic:'🚚', name:'Suppliers', roles:['owner','manager','stock']},
   {id:'expenses', ic:'💸', name:'Expenses', roles:['owner','manager']},
   {id:'reports', ic:'📊', name:'Reports', roles:['owner','manager']},
   {id:'shifts', ic:'💰', name:'Shifts', roles:['owner','manager','cashier']},
   {id:'staff', ic:'👥', name:'Staff', roles:['owner']},
+  {id:'audit', ic:'🛡️', name:'Audit log', perm:'audit', roles:[]},
   {id:'settings', ic:'⚙️', name:'Settings', roles:['owner','manager','cashier','stock']},
 ];
 
@@ -234,8 +245,14 @@ async function boot() {
   S.user = session.user;
   if (location.search.includes('code=')) history.replaceState(null, '', location.pathname + location.hash);
   try { await sb.rpc('accept_invites'); } catch (e) { /* ignore */ }
-  const mems = await q(sb.from('shop_members').select('role, shop:shops(*)').eq('user_id', S.user.id));
-  S.shops = mems.filter(m => m.shop).map(m => ({ ...m.shop, _role: m.role }));
+  try {
+    const mems = await q(sb.from('shop_members').select('role, shop:shops(*)').eq('user_id', S.user.id));
+    S.shops = mems.filter(m => m.shop).map(m => ({ ...m.shop, _role: m.role }));
+    localStorage.setItem('pos_shops_cache', JSON.stringify(S.shops));
+  } catch (e) {
+    S.shops = JSON.parse(localStorage.getItem('pos_shops_cache') || '[]'); if (!S.shops.length) throw e;
+    setTimeout(() => toast(LANG === 'th' ? 'ออฟไลน์ — ใช้ข้อมูลที่บันทึกไว้ในเครื่อง' : 'Offline — using data saved on this device', 'bad'), 500);
+  }
   if (!S.shops.length) return renderCreateShop(true);
   const want = localStorage.getItem('pos_shop');
   S.shop = S.shops.find(s => s.id === want) || S.shops[0];
@@ -243,11 +260,15 @@ async function boot() {
   localStorage.setItem('pos_shop', S.shop.id);
   await loadMaster();
   renderShell();
-  go(location.hash.slice(1) || 'pos');
+  go(location.hash.slice(1) || (canDo('dashboard') && matchMedia('(min-width:861px)').matches ? 'dashboard' : 'pos'));
 }
 
 async function loadMaster() {
-  const id = S.shop.id;
+  const id = S.shop.id, ck = 'pos_cache_' + id;
+  try { await loadMasterOnline(id); localStorage.setItem(ck, JSON.stringify({products: S.products, categories: S.categories, customers: S.customers, promotions: S.promotions, suppliers: S.suppliers, shift: S.shift}));
+  } catch (e) { const c = JSON.parse(localStorage.getItem(ck) || 'null'); if (!c) throw e; Object.assign(S, c); }
+}
+async function loadMasterOnline(id) {
   const [p, c, cu, pr, su, sh] = await Promise.all([
     fetchAll(() => sb.from('products').select('*').eq('shop_id', id).order('name')),
     q(sb.from('categories').select('*').eq('shop_id', id).order('sort').order('name')),
@@ -261,7 +282,7 @@ async function loadMaster() {
 
 const MAIN_TABS = ['pos', 'sales', 'products', 'reports', 'stock', 'members'];
 function renderShell() {
-  const pages = PAGES.filter(p => p.roles.includes(S.role));
+  const pages = PAGES.filter(p => pageOK(p));
   const tabs = pages.filter(p => MAIN_TABS.includes(p.id)).slice(0, 4);
   const initials = (S.user.user_metadata?.full_name || S.user.user_metadata?.name || S.user.email || '?').trim().slice(0, 1).toUpperCase();
   $('#root').innerHTML = `<div id="app" class="${localStorage.getItem('pos_side') === 'mini' ? 'mini' : ''}">
@@ -299,7 +320,7 @@ function renderShell() {
 }
 
 function go(page) {
-  const p = PAGES.find(x => x.id === page && x.roles.includes(S.role)) || PAGES[0];
+  const p = PAGES.find(x => x.id === page && pageOK(x)) || PAGES.find(pageOK) || PAGES[1];
   S.page = p.id; if (location.hash.slice(1) !== p.id) history.replaceState(null, '', '#' + p.id);
   $$('[data-p]').forEach(b => b.classList.toggle('on', b.dataset.p === p.id));
   $('#moreBtn')?.classList.toggle('on', !$(`.tabbar [data-p="${p.id}"]`));
@@ -396,6 +417,7 @@ function productCard(p) {
 
 const VIEWS = {};
 let BEST = {};      // product_id -> qty sold (30 days)
+let RECENT = {};    // product_id -> last sold time
 let TODAY = null;   // today's stats
 async function loadPosStats() {
   const start = new Date(); start.setHours(0, 0, 0, 0);
@@ -410,8 +432,8 @@ async function loadPosStats() {
 async function loadBest() {
   const since = new Date(Date.now() - 30 * 864e5).toISOString();
   try {
-    const it = await fetchAll(() => sb.from('sale_items').select('product_id, qty, sales!inner(created_at,status)').eq('shop_id', S.shop.id).eq('sales.status', 'paid').gte('sales.created_at', since));
-    BEST = {}; it.forEach(i => { if (i.product_id) BEST[i.product_id] = (BEST[i.product_id] || 0) + num(i.qty); });
+    const it = await fetchAll(() => sb.from('sale_items').select('product_id, qty, sales!inner(created_at,status)').eq('shop_id', S.shop.id).neq('sales.status', 'void').gte('sales.created_at', since));
+    BEST = {}; RECENT = {}; it.forEach(i => { if (i.product_id) { BEST[i.product_id] = (BEST[i.product_id] || 0) + num(i.qty); if ((RECENT[i.product_id] || '') < i.sales.created_at) RECENT[i.product_id] = i.sales.created_at; } });
   } catch (e) { BEST = {}; }
 }
 function drawStats() {
@@ -456,7 +478,7 @@ VIEWS.pos = pg => {
     <button class="btn p lg cartfab" id="cartfab"></button>
   </div>`;
   const drawCats = () => {
-    const cats = [{id: 'all', name: '🏠 ' + t('All')}, {id: 'fav', name: '★ ' + (LANG === 'th' ? 'รายการโปรด' : 'Favorites')}, {id: 'best', name: '🔥 ' + (LANG === 'th' ? 'ขายดี' : 'Best sellers')}, ...S.categories];
+    const cats = [{id: 'all', name: '🏠 ' + t('All')}, {id: 'fav', name: '★ ' + (LANG === 'th' ? 'รายการโปรด' : 'Favorites')}, {id: 'best', name: '🔥 ' + (LANG === 'th' ? 'ขายดี' : 'Best sellers')}, {id: 'recent', name: '🕘 ' + (LANG === 'th' ? 'ขายล่าสุด' : 'Recently sold')}, ...S.categories];
     $('#cats').innerHTML = cats.map(c => `<button class="tab ${S.cat === c.id ? 'on' : ''}" data-c="${c.id}" ${c.color ? `style="--cc:${esc(c.color)}"` : ''}>${c.color ? '<i class="dot"></i>' : ''}${esc(c.name)} <small>${countIn(c.id)}</small></button>`).join('');
     $$('#cats .tab').forEach(b => b.onclick = () => { S.cat = b.dataset.c; drawCats(); drawGrid(); });
   };
@@ -486,18 +508,18 @@ VIEWS.pos = pg => {
 };
 function countIn(id) {
   const a = S.products.filter(p => p.active);
-  if (id === 'all') return a.length; if (id === 'fav') return a.filter(p => p.favorite).length; if (id === 'best') return a.filter(p => BEST[p.id]).length;
+  if (id === 'all') return a.length; if (id === 'fav') return a.filter(p => p.favorite).length; if (id === 'best') return a.filter(p => BEST[p.id]).length; if (id === 'recent') return a.filter(p => RECENT[p.id]).length;
   return a.filter(p => p.category_id === id).length;
 }
 function filtered() {
   const qs = S.search.toLowerCase();
   let list = S.products.filter(p => p.active &&
-    (S.cat === 'all' || (S.cat === 'fav' ? p.favorite : S.cat === 'best' ? BEST[p.id] : p.category_id === S.cat)) &&
+    (S.cat === 'all' || (S.cat === 'fav' ? p.favorite : S.cat === 'best' ? BEST[p.id] : S.cat === 'recent' ? RECENT[p.id] : p.category_id === S.cat)) &&
     (!qs || p.name.toLowerCase().includes(qs) || (p.barcode || '').includes(qs) || (p.sku || '').toLowerCase().includes(qs)));
-  const srt = S.cat === 'best' ? 'best' : VIEWP.sort;
+  const srt = S.cat === 'best' ? 'best' : S.cat === 'recent' ? 'recent' : VIEWP.sort;
   const by = { name: (a, b) => a.name.localeCompare(b.name, 'th'), price: (a, b) => a.price - b.price, price_d: (a, b) => b.price - a.price,
     stock: (a, b) => (a.track_stock ? a.stock : 1e9) - (b.track_stock ? b.stock : 1e9), best: (a, b) => (BEST[b.id] || 0) - (BEST[a.id] || 0),
-    new: (a, b) => (b.created_at || '').localeCompare(a.created_at || '') }[srt];
+    new: (a, b) => (b.created_at || '').localeCompare(a.created_at || ''), recent: (a, b) => (RECENT[b.id] || '').localeCompare(RECENT[a.id] || '') }[srt];
   list.sort((a, b) => (b.favorite - a.favorite) * (srt === 'name' ? 1 : 0) || by(a, b));
   return list;
 }
@@ -542,12 +564,15 @@ function wireGrid(g) {
     c.classList.remove('pop'); void c.offsetWidth; c.classList.add('pop');
   });
 }
-function addToCart(p, qty = 1) {
+function addToCart(p, qty = 1, u = null) {
   if (!p) return;
-  const line = S.cart.find(l => l.product_id === p.id);
-  const want = (line?.qty || 0) + qty;
+  if (!u && Array.isArray(p.units) && p.units.length) return unitPicker(p, qty);
+  const unit = u?.unit || '', factor = num(u?.factor) || 1;
+  const basePrice = u ? num(u.price) : (num(p.promo_price) > 0 ? num(p.promo_price) : num(p.price));
+  const line = S.cart.find(l => l.product_id === p.id && (l.unit || '') === unit);
+  const want = ((line?.qty || 0) + qty) * factor;
   if (p.track_stock && want > p.stock) { toast(`${t('Out of stock')}: ${p.name} (${qtyf(p.stock)})`, 'bad'); sfx('error'); } else sfx('add');
-  if (line) line.qty = want; else S.cart.push({product_id: p.id, name: p.name, price: num(p.price), qty, discount: 0});
+  if (line) line.qty += qty; else S.cart.push({product_id: p.id, name: p.name + (unit ? ` (${unit})` : ''), price: basePrice, qty, discount: 0, unit, factor});
   S._lastAdded = p.id; drawCart(); refreshBadges();
 }
 function refreshBadges() {
@@ -846,7 +871,7 @@ function drawCart() {
   countTo($('#cTot'), c.total); S._lastTot = c.total; S._lastAdded = null;
   const fab = $('#cartfab'); if (fab) { fab.innerHTML = `<span class="fc">${qtyf(n)}</span><span>${t('Cart')}</span><b>฿${money(c.total)}</b><span>›</span>`; fab.classList.toggle('empty', !n); }
   $('#cartClose').onclick = () => el.classList.remove('open');
-  $$('[data-u]', el).forEach(b => b.onclick = () => { const l = S.cart[b.dataset.u]; addToCart(S.products.find(p => p.id === l.product_id) || l, 1); });
+  $$('[data-u]', el).forEach(b => b.onclick = () => { const l = S.cart[b.dataset.u]; const pr = S.products.find(p => p.id === l.product_id); addToCart(pr || l, 1, (l.unit || pr?.units?.length) ? {unit: l.unit || '', factor: l.factor || 1, price: l.price} : null); });
   $$('[data-d]', el).forEach(b => b.onclick = () => { const l = S.cart[b.dataset.d]; l.qty--; sfx('remove'); if (l.qty <= 0) S.cart.splice(b.dataset.d, 1); drawCart(); refreshBadges(); });
   $$('[data-q],[data-i]', el).forEach(b => b.onclick = () => editLine(+(b.dataset.q ?? b.dataset.i)));
   $('#clrBtn').onclick = () => { resetSale(); };
@@ -890,7 +915,7 @@ function pickMember() {
     const v = $('#ms', m).value.toLowerCase();
     const list = S.customers.filter(c => !v || c.name.toLowerCase().includes(v) || (c.phone || '').includes(v)).slice(0, 50);
     $('#ml', m).innerHTML = `<table class="tbl">${list.map(c => `<tr class="click" data-id="${c.id}"><td><b>${esc(c.name)}</b><br><small class="muted">${esc(c.phone)}</small></td><td class="right">${qtyf(c.points)} ${t('Points')}</td></tr>`).join('')}</table>`;
-    $$('[data-id]', m).forEach(r => r.onclick = () => { S.customer = S.customers.find(c => c.id === r.dataset.id); S.pointsUse = 0; m.close(); drawCart(); });
+    $$('[data-id]', m).forEach(r => r.onclick = () => { S.customer = S.customers.find(c => c.id === r.dataset.id); S.pointsUse = 0; if (num(S.customer.discount_pct) > 0) { S.billDisc = num(S.customer.discount_pct); S.billDiscPct = true; toast(`${LANG === 'th' ? 'ส่วนลดสมาชิก' : 'Member discount'} ${S.customer.discount_pct}%`, 'ok'); } m.close(); drawCart(); });
   };
   $('#ms', m).oninput = draw; draw(); $('#ms', m).focus();
   $('#mAdd', m).onclick = () => { m.close(); memberForm({}, c => { S.customer = c; drawCart(); }); };
@@ -1489,4 +1514,4 @@ sb.auth.onAuthStateChange((ev) => { if (ev === 'SIGNED_OUT') renderAuth(); });
 window.addEventListener('hashchange', () => { if (S.shop && $('#pg') && location.hash.slice(1) !== S.page) go(location.hash.slice(1)); });
 { const u = new URLSearchParams(location.search + '&' + location.hash.slice(1)); const er = u.get('error_description');
   if (er) { history.replaceState(null, '', location.pathname); setTimeout(() => toast(er, 'bad'), 300); } }
-boot().catch(e => { fail(e); renderAuth(); });
+/* boot() is started by modules.js after all modules load */
