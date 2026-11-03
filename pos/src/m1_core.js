@@ -26,6 +26,7 @@ const PERM_DEF = {
 function canDo(perm) {
   if (!perm) return true;
   if (S.role === 'owner' || S.role === 'admin') return true;
+  if (Array.isArray(S.shop?._perms)) return S.shop._perms.includes(perm);   // personal permissions set by the admin
   const custom = S.shop?.permissions?.[S.role];
   return (Array.isArray(custom) ? custom : (PERM_DEF[S.role] || [])).includes(perm);
 }
@@ -132,7 +133,8 @@ function unitPicker(p, qty = 1) {
 /* ---------------- payment (split, all Thai methods, pending QR, idempotent, offline) ---------------- */
 payDialog = function () {
   const c = calc(), methods = shopMethods(), clientId = uid();
-  let lines = [{ method: methods[0] || 'cash', amount: c.total, ref: '' }], split = false, received = c.total, busy = false;
+  const preset = S._payPreset && methods.includes(S._payPreset) ? S._payPreset : (methods[0] || 'cash'); S._payPreset = null;
+  let lines = [{ method: preset, amount: c.total, ref: '' }], split = false, received = c.total, busy = false;
   const fullTax = S.shop.vat_mode !== 'none';
   const m = modal(`ชำระเงิน ${baht(c.total)}`, `
     <div id="payTop"></div><div id="pbody"></div>

@@ -4,6 +4,8 @@ Free point-of-sale + inventory web app. Runs in any browser (PC, tablet, phone) 
 
 **Open the app:** https://khalil203.github.io/khalil203/pos/
 
+**Login:** username + password only (no public sign-up). The owner/admin creates staff accounts in **พนักงาน (Staff)** and sets each person's permissions.
+
 - Hosting: GitHub Pages (free)
 - Database + login: Supabase free tier (project `shop-pos`, region Tokyo)
 - No paid plan, no feature locks
@@ -66,3 +68,8 @@ Supabase free: 500 MB database, 50,000 monthly users. A free project **pauses af
 - Automatic PromptPay confirmation needs a bank/payment-provider API (paid). Until then the cashier confirms.
 - Printing uses the browser print dialog (works with installed thermal-printer drivers; cash drawer opens via the printer driver). Raw ESC/POS over USB is not used.
 - Source of `modules.js` is in `src/` (concatenate `src/m*.js` → `modules.js`).
+
+## v3.1 — staff accounts + Option C design
+- Login is username + password only. Google sign-in and self-registration are removed; the database rejects any account not created by the shop admin.
+- Staff page: create worker accounts (username, password, role), set **personal permissions** per worker or use role defaults, reset passwords, suspend/re-enable, remove (sales history is kept). Server function `staff-admin` (service key never leaves the server).
+- Option C retail design: royal-blue palette, line icons, top bar with global product search / barcode input, branch, notification bell (low/out of stock, expiry, pending payments, offline bills, expense approvals) and cashier profile; animated category indicator; product cards with quick-add button and stock badge; cart with column header, customer card, big total, payment tiles (เงินสด / พร้อมเพย์ / บัตร); live receipt preview on wide screens (≥1600px); animated payment-success feedback.

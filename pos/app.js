@@ -1,6 +1,6 @@
 /* Shop POS — free, open POS + stock web app.  Data: Supabase.  Hosting: GitHub Pages. */
 'use strict';
-const VERSION = '3.0.0';
+const VERSION = '3.1.0';
 const sb = supabase.createClient(window.POS_CONFIG.url, window.POS_CONFIG.key, { auth: { flowType: 'pkce', detectSessionInUrl: true, persistSession: true } });
 
 /* ================= i18n ================= */
@@ -180,37 +180,29 @@ function formModal(title, fields, values = {}, onSave, {extraFoot = ''} = {}) {
 /* ================= AUTH ================= */
 const GOOGLE_SVG = '<svg width="20" height="20" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="m6.3 14.7 6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-8l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg>';
 function renderAuth() {
+  const th = LANG === 'th', last = localStorage.getItem('pos_last_user') || '';
   $('#root').innerHTML = `<div class="auth"><div class="card">
-    <div class="row"><div class="brandmark">🛒</div><span style="flex:1"></span><button class="tab" id="lng" style="align-self:flex-start">${LANG === 'th' ? 'EN' : 'ไทย'}</button></div>
-    <h2>Shop POS</h2><p class="muted" style="margin-top:0">${LANG === 'th' ? 'ระบบขายหน้าร้าน + สต็อก ฟรีทุกฟีเจอร์' : 'Free POS + stock, every feature unlocked'}</p>
-    <button class="btn lg" id="gbtn" style="width:100%;background:#fff;border:1px solid var(--line);margin-top:10px">${GOOGLE_SVG} ${LANG === 'th' ? 'เข้าสู่ระบบด้วย Google' : 'Continue with Google'}</button>
-    <p class="muted" style="font-size:13px;text-align:center">${LANG === 'th' ? 'พนักงานใช้บัญชี Google ของอีเมลที่ได้รับเชิญ' : 'Staff sign in with the Google account of their invited email'}</p>
-    <div class="row" style="margin:14px 0"><hr style="flex:1;border:0;border-top:1px solid var(--line)"><span class="muted" style="font-size:13px">${LANG === 'th' ? 'หรือ ผู้ดูแลระบบ' : 'or admin login'}</span><hr style="flex:1;border:0;border-top:1px solid var(--line)"></div>
+    <div class="row"><div class="brandmark">🛒</div><span style="flex:1"></span><button class="tab" id="lng" style="align-self:flex-start">${th ? 'EN' : 'ไทย'}</button></div>
+    <h2>Shop POS</h2><p class="muted" style="margin-top:0">${th ? 'เข้าสู่ระบบด้วยชื่อผู้ใช้และรหัสผ่านที่ได้รับจากผู้ดูแลร้าน' : 'Sign in with the username and password from your shop admin'}</p>
     <form id="af">
-      <div class="fg"><label class="f">${LANG === 'th' ? 'ชื่อผู้ใช้' : 'Username'}</label><input class="in" name="user" required autocomplete="username" autocapitalize="off" placeholder="admin"></div>
-      <div class="fg"><label class="f">${t('Password')}</label><input class="in" name="pw" type="password" required autocomplete="current-password"></div>
-      <button class="btn p lg" style="width:100%">${t('Login')}</button>
+      <div class="fg"><label class="f" for="au">${th ? 'ชื่อผู้ใช้' : 'Username'}</label><input class="in" id="au" name="user" required autocomplete="username" autocapitalize="off" spellcheck="false" value="${esc(last)}"></div>
+      <div class="fg"><label class="f" for="ap">${th ? 'รหัสผ่าน' : 'Password'}</label><div class="sbox" style="padding-left:0"><input class="in" id="ap" name="pw" type="password" required autocomplete="current-password"><button type="button" class="clr" id="eye" title="show">👁</button></div></div>
+      <button class="btn p lg" style="width:100%">${th ? 'เข้าสู่ระบบ' : 'Sign in'}</button>
     </form>
+    <p class="muted" style="font-size:13px;text-align:center;margin-bottom:0">${th ? 'ลืมรหัสผ่าน? ติดต่อเจ้าของร้านหรือผู้ดูแลระบบเพื่อตั้งรหัสใหม่' : 'Forgot your password? Ask the shop owner or admin to reset it.'}</p>
   </div></div>`;
+  $('#lng').onclick = () => { LANG = th ? 'en' : 'th'; localStorage.setItem('pos_lang', LANG); renderAuth(); };
+  $('#eye').onclick = () => { const p = $('#ap'); p.type = p.type === 'password' ? 'text' : 'password'; };
+  setTimeout(() => (last ? $('#ap') : $('#au')).focus(), 50);
   $('#af').onsubmit = async e => {
     e.preventDefault(); const f = e.target; const btn = $('button.p', f); btn.disabled = true;
     const u = f.user.value.trim().toLowerCase();
     const email = u.includes('@') ? u : `${u}@shoppos.test`;
     const { error } = await sb.auth.signInWithPassword({ email, password: f.pw.value });
-    if (error) { btn.disabled = false; return toast(LANG === 'th' ? 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง' : 'Wrong username or password', 'bad'); }
+    if (error) { btn.disabled = false; sfx?.('error');
+      return toast(/banned/i.test(error.message) ? (th ? 'บัญชีนี้ถูกระงับ — ติดต่อผู้ดูแลร้าน' : 'This account is suspended') : (th ? 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง' : 'Wrong username or password'), 'bad'); }
+    localStorage.setItem('pos_last_user', u);
     boot().catch(fail);
-  };
-  $('#lng').onclick = () => { LANG = LANG === 'th' ? 'en' : 'th'; localStorage.setItem('pos_lang', LANG); renderAuth(); };
-  $('#gbtn').onclick = async () => {
-    $('#gbtn').disabled = true;
-    try {
-      const st = await (await fetch(window.POS_CONFIG.url + '/auth/v1/settings', { headers: { apikey: window.POS_CONFIG.key } })).json();
-      if (!st.external?.google) { $('#gbtn').disabled = false; return toast(LANG === 'th' ? 'ยังไม่ได้เปิด Google Login ใน Supabase' : 'Google login is not enabled in Supabase yet', 'bad'); }
-    } catch (e) { /* offline check failed: try anyway */ }
-    const { error } = await sb.auth.signInWithOAuth({ provider: 'google',
-      options: { redirectTo: location.origin + location.pathname, queryParams: { prompt: 'select_account' } } });
-    if (error) { $('#gbtn').disabled = false; fail(/not enabled|unsupported provider/i.test(error.message)
-      ? (LANG === 'th' ? 'ยังไม่ได้เปิด Google Login ใน Supabase' : 'Google login is not enabled in Supabase yet') : error); }
   };
 }
 
@@ -246,14 +238,14 @@ async function boot() {
   if (location.search.includes('code=')) history.replaceState(null, '', location.pathname + location.hash);
   try { await sb.rpc('accept_invites'); } catch (e) { /* ignore */ }
   try {
-    const mems = await q(sb.from('shop_members').select('role, shop:shops(*)').eq('user_id', S.user.id));
-    S.shops = mems.filter(m => m.shop).map(m => ({ ...m.shop, _role: m.role }));
+    const mems = await q(sb.from('shop_members').select('role, permissions, active, display_name, username, shop:shops(*)').eq('user_id', S.user.id));
+    S.shops = mems.filter(m => m.shop && m.active !== false).map(m => ({ ...m.shop, _role: m.role, _perms: m.permissions, _name: m.display_name, _username: m.username }));
     localStorage.setItem('pos_shops_cache', JSON.stringify(S.shops));
   } catch (e) {
     S.shops = JSON.parse(localStorage.getItem('pos_shops_cache') || '[]'); if (!S.shops.length) throw e;
     setTimeout(() => toast(LANG === 'th' ? 'ออฟไลน์ — ใช้ข้อมูลที่บันทึกไว้ในเครื่อง' : 'Offline — using data saved on this device', 'bad'), 500);
   }
-  if (!S.shops.length) return renderCreateShop(true);
+  if (!S.shops.length) { await sb.auth.signOut(); renderAuth(); return toast(LANG === 'th' ? 'บัญชีนี้ยังไม่ได้รับสิทธิ์เข้าร้าน — ติดต่อผู้ดูแลร้าน' : 'This account has no shop access — contact the admin', 'bad'); }
   const want = localStorage.getItem('pos_shop');
   S.shop = S.shops.find(s => s.id === want) || S.shops[0];
   S.role = S.shop._role;

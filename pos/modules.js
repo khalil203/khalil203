@@ -26,6 +26,7 @@ const PERM_DEF = {
 function canDo(perm) {
   if (!perm) return true;
   if (S.role === 'owner' || S.role === 'admin') return true;
+  if (Array.isArray(S.shop?._perms)) return S.shop._perms.includes(perm);   // personal permissions set by the admin
   const custom = S.shop?.permissions?.[S.role];
   return (Array.isArray(custom) ? custom : (PERM_DEF[S.role] || [])).includes(perm);
 }
@@ -132,7 +133,8 @@ function unitPicker(p, qty = 1) {
 /* ---------------- payment (split, all Thai methods, pending QR, idempotent, offline) ---------------- */
 payDialog = function () {
   const c = calc(), methods = shopMethods(), clientId = uid();
-  let lines = [{ method: methods[0] || 'cash', amount: c.total, ref: '' }], split = false, received = c.total, busy = false;
+  const preset = S._payPreset && methods.includes(S._payPreset) ? S._payPreset : (methods[0] || 'cash'); S._payPreset = null;
+  let lines = [{ method: preset, amount: c.total, ref: '' }], split = false, received = c.total, busy = false;
   const fullTax = S.shop.vat_mode !== 'none';
   const m = modal(`ชำระเงิน ${baht(c.total)}`, `
     <div id="payTop"></div><div id="pbody"></div>
@@ -1008,22 +1010,90 @@ const REPORT_FN = {
   },
 };
 
-/* ================= STAFF ================= */
+/* ================= STAFF (username + password accounts, managed by owner/admin) ================= */
+async function staffCall(body) {
+  const { data: { session } } = await sb.auth.getSession();
+  const r = await fetch(window.POS_CONFIG.url + '/functions/v1/staff-admin', { method: 'POST',
+    headers: { apikey: window.POS_CONFIG.key, Authorization: 'Bearer ' + session.access_token, 'Content-Type': 'application/json' }, body: JSON.stringify({ shop_id: S.shop.id, ...body }) });
+  const d = await r.json().catch(() => ({})); if (!r.ok || d.error) throw new Error(d.error || 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้'); return d;
+}
+const roleOpts = () => ['admin', 'manager', 'cashier', 'stock', 'accountant'].filter(r => r !== 'admin' || S.role === 'owner').map(r => [r, ROLE_NAME(r)]);
+function permBoxes(selected) {
+  return `<div class="perm-grid">${PERMS.map(([k, l]) => `<label class="row"><input type="checkbox" data-pk="${k}" ${selected.includes(k) ? 'checked' : ''}> ${l}</label>`).join('')}</div>`;
+}
+const rolePerms = role => role === 'admin' ? ALL_PERMS : (Array.isArray(S.shop.permissions?.[role]) ? S.shop.permissions[role] : (PERM_DEF[role] || []));
+function staffForm(mem, after) {
+  const isNew = !mem;
+  let custom = !!(mem && Array.isArray(mem.permissions));
+  const m = modal(isNew ? 'เพิ่มพนักงาน' : `แก้ไข — ${mem.display_name}`, `
+    <div class="grid2">
+      <div class="fg"><label class="f">ชื่อพนักงาน *</label><input class="in" id="sfN" value="${esc(mem?.display_name || '')}"></div>
+      <div class="fg"><label class="f">ชื่อผู้ใช้ (ใช้เข้าสู่ระบบ) *</label><input class="in" id="sfU" value="${esc(mem?.username || '')}" ${isNew ? '' : 'disabled'} autocapitalize="off" placeholder="เช่น somchai"></div>
+      ${isNew ? `<div class="fg"><label class="f">รหัสผ่าน * (อย่างน้อย 6 ตัว)</label><div class="sbox" style="padding-left:0"><input class="in" id="sfP" type="text" value="${Math.random().toString(36).slice(2, 8)}"><button type="button" class="clr" id="sfG" title="สุ่มใหม่">🎲</button></div></div>` : ''}
+      <div class="fg"><label class="f">ตำแหน่ง</label><select class="in" id="sfR">${roleOpts().map(([k, l]) => `<option value="${k}" ${(mem?.role || 'cashier') === k ? 'selected' : ''}>${l}</option>`).join('')}</select></div>
+    </div>
+    <label class="row fg"><input type="checkbox" id="sfC" ${custom ? 'checked' : ''}> กำหนดสิทธิ์เฉพาะคนนี้ (ไม่ใช้ค่าตามตำแหน่ง)</label>
+    <div id="sfPerm"></div>`, { wide: true, foot: `<button class="btn" data-c>ยกเลิก</button><button class="btn p" id="sfS">${isNew ? 'สร้างบัญชี' : 'บันทึก'}</button>` });
+  const drawPerm = () => { const role = $('#sfR', m).value; const sel = custom ? (Array.isArray(mem?.permissions) ? mem.permissions : rolePerms(role)) : rolePerms(role);
+    $('#sfPerm', m).innerHTML = `<p class="muted" style="font-size:13px;margin:0 0 8px">${custom ? 'เลือกสิทธิ์ที่พนักงานคนนี้ใช้ได้' : `สิทธิ์ตามตำแหน่ง “${ROLE_NAME(role)}” (แก้ค่าเริ่มต้นได้ที่ปุ่ม “สิทธิ์ตามตำแหน่ง”)`}</p>${permBoxes(sel)}`;
+    $$('[data-pk]', m).forEach(c => { c.disabled = !custom || role === 'admin'; }); };
+  $('#sfR', m).onchange = drawPerm; $('#sfC', m).onchange = e => { custom = e.target.checked; drawPerm(); }; drawPerm();
+  if ($('#sfG', m)) $('#sfG', m).onclick = () => { $('#sfP', m).value = Math.random().toString(36).slice(2, 10); };
+  $('[data-c]', m).onclick = m.close;
+  $('#sfS', m).onclick = async () => {
+    const name = $('#sfN', m).value.trim(), role = $('#sfR', m).value;
+    const perms = custom && role !== 'admin' ? $$('[data-pk]', m).filter(c => c.checked).map(c => c.dataset.pk) : null;
+    if (!name) return toast('กรุณากรอกข้อมูลให้ครบถ้วน', 'bad');
+    const b = $('#sfS', m); b.disabled = true;
+    try {
+      if (isNew) {
+        const username = $('#sfU', m).value.trim().toLowerCase(), password = $('#sfP', m).value;
+        if (!/^[a-z0-9][a-z0-9._-]{2,29}$/.test(username)) throw new Error('ชื่อผู้ใช้ต้องเป็นภาษาอังกฤษ a-z, 0-9, . _ - ยาว 3–30 ตัว');
+        if (password.length < 6) throw new Error('รหัสผ่านอย่างน้อย 6 ตัวอักษร');
+        await staffCall({ action: 'create', username, password, display_name: name, role, permissions: perms });
+        m.close(); after?.();
+        modal('สร้างบัญชีพนักงานแล้ว', `<p>ส่งข้อมูลนี้ให้ <b>${esc(name)}</b> เพื่อเข้าสู่ระบบ:</p>
+          <div class="card" style="box-shadow:none;background:var(--bg2)"><div class="kv"><span>ลิงก์</span><b style="word-break:break-all">${esc(location.href.split('#')[0])}</b><span>ชื่อผู้ใช้</span><b>${esc(username)}</b><span>รหัสผ่าน</span><b>${esc(password)}</b></div></div>
+          <button class="btn" id="cpy" style="margin-top:10px">📋 คัดลอกข้อมูล</button>`).querySelector('#cpy').onclick = () => {
+            navigator.clipboard?.writeText(`Shop POS\n${location.href.split('#')[0]}\nชื่อผู้ใช้: ${username}\nรหัสผ่าน: ${password}`); toast('คัดลอกแล้ว', 'ok'); };
+      } else {
+        await staffCall({ action: 'update', user_id: mem.user_id, display_name: name, role, permissions: perms });
+        toast('บันทึกข้อมูลเรียบร้อยแล้ว', 'ok'); m.close(); after?.();
+      }
+    } catch (e) { b.disabled = false; fail(e); }
+  };
+}
 VIEWS.staff = async pg => {
-  const [mem, inv] = await Promise.all([q(sb.from('shop_members').select('*').eq('shop_id', S.shop.id)), q(sb.from('shop_invites').select('*').eq('shop_id', S.shop.id).is('accepted_at', null))]);
-  const roles = ['admin', 'manager', 'cashier', 'stock', 'accountant'].map(r => [r, ROLE_NAME(r)]);
-  $('#tact').innerHTML = `<button class="btn p" id="inv">+ เชิญพนักงาน</button>${can('owner') ? '<button class="btn" id="perm">🔐 ตั้งค่าสิทธิ์ตามตำแหน่ง</button>' : ''}`;
-  pg.innerHTML = `<div class="tblwrap"><table class="tbl"><tr><th>ชื่อ</th><th>อีเมล</th><th>ตำแหน่ง</th><th></th></tr>
-    ${mem.map(m => `<tr><td><b>${esc(m.display_name)}</b></td><td>${esc(m.email)}</td><td>${m.role === 'owner' ? `<span class="chip">${ROLE_NAME('owner')}</span>` :
-      `<select class="in" data-u="${m.user_id}" style="width:auto">${roles.map(r => `<option value="${r[0]}" ${r[0] === m.role ? 'selected' : ''}>${r[1]}</option>`).join('')}</select>`}</td>
-      <td class="right">${m.role === 'owner' ? '' : `<button class="btn sm bad" data-x="${m.user_id}">ลบออก</button>`}</td></tr>`).join('')}</table></div>
-    <p class="section-title">คำเชิญที่รอการตอบรับ</p><div class="tblwrap"><table class="tbl">${inv.map(i => `<tr><td>${esc(i.display_name)}</td><td>${esc(i.email)}</td><td>${ROLE_NAME(i.role)}</td><td class="right"><button class="btn sm bad" data-i="${i.id}">ยกเลิก</button></td></tr>`).join('') || '<tr><td class="muted">ไม่มี</td></tr>'}</table></div>
-    <p class="muted">พนักงานจะเข้าร้านอัตโนมัติเมื่อเข้าสู่ระบบด้วยบัญชี Google ของอีเมลที่เชิญ<br>🔗 ${esc(location.href.split('#')[0])}</p>`;
-  $$('[data-u]', pg).forEach(s => s.onchange = async () => { try { await q(sb.from('shop_members').update({ role: s.value }).eq('shop_id', S.shop.id).eq('user_id', s.dataset.u)); toast('บันทึกข้อมูลเรียบร้อยแล้ว', 'ok'); } catch (e) { fail(e); } });
-  $$('[data-x]', pg).forEach(b => b.onclick = async () => { if (!await confirmBox('ลบพนักงานคนนี้ออกจากร้าน?')) return; try { await q(sb.from('shop_members').delete().eq('shop_id', S.shop.id).eq('user_id', b.dataset.x)); go('staff'); } catch (e) { fail(e); } });
-  $$('[data-i]', pg).forEach(b => b.onclick = async () => { try { await q(sb.from('shop_invites').delete().eq('id', b.dataset.i)); go('staff'); } catch (e) { fail(e); } });
-  $('#inv').onclick = () => formModal('เชิญพนักงาน', [{ k: 'display_name', label: 'ชื่อพนักงาน', req: true }, { k: 'email', label: 'อีเมล (Gmail)', type: 'email', req: true }, { k: 'role', label: 'ตำแหน่ง', type: 'select', opts: roles }], { role: 'cashier' },
-    async o => { o.email = o.email.toLowerCase(); await q(sb.from('shop_invites').upsert({ ...o, shop_id: S.shop.id, accepted_at: null }, { onConflict: 'shop_id,email' })); go('staff'); });
+  const mem = await q(sb.from('shop_members').select('*').eq('shop_id', S.shop.id).order('created_at'));
+  const manage = can('owner', 'admin');
+  $('#tact').innerHTML = manage ? `<button class="btn p" id="sAdd">+ เพิ่มพนักงาน</button><button class="btn" id="perm">🔐 สิทธิ์ตามตำแหน่ง</button>` : '';
+  pg.innerHTML = `<div class="stats"><div class="stat"><div class="k">พนักงานทั้งหมด</div><div class="v">${mem.length}</div></div>
+      <div class="stat"><div class="k">ใช้งานอยู่</div><div class="v" style="color:var(--ok)">${mem.filter(m => m.active !== false).length}</div></div>
+      <div class="stat"><div class="k">ถูกระงับ</div><div class="v" style="color:var(--bad)">${mem.filter(m => m.active === false).length}</div></div></div>
+    <div class="tblwrap"><table class="tbl"><tr><th>พนักงาน</th><th>ชื่อผู้ใช้</th><th>ตำแหน่ง</th><th>สิทธิ์</th><th>สถานะ</th><th></th></tr>
+    ${mem.map(m => { const self = m.user_id === S.user.id, owner = m.role === 'owner';
+      return `<tr><td><b>${esc(m.display_name || '-')}</b>${self ? ' <span class="chip">คุณ</span>' : ''}</td><td><code>${esc(m.username || (m.email || '').split('@')[0])}</code></td>
+      <td><span class="chip ${owner ? 'info' : ''}">${ROLE_NAME(m.role)}</span></td><td>${owner || m.role === 'admin' ? 'ทั้งหมด' : Array.isArray(m.permissions) ? `<span class="chip warn">กำหนดเอง ${m.permissions.length}</span>` : 'ตามตำแหน่ง'}</td>
+      <td>${m.active === false ? '<span class="chip bad">ระงับ</span>' : '<span class="chip ok">ใช้งาน</span>'}</td>
+      <td class="right" style="white-space:nowrap">${manage && !owner ? `<button class="btn sm" data-e="${m.user_id}">✏️ แก้ไข/สิทธิ์</button> <button class="btn sm" data-p="${m.user_id}">🔑 รหัสผ่าน</button>
+        ${self ? '' : `<button class="btn sm" data-t="${m.user_id}">${m.active === false ? '✅ เปิดใช้' : '⛔ ระงับ'}</button> <button class="btn sm bad" data-x="${m.user_id}">ลบ</button>`}` : ''}
+        ${owner && self ? `<button class="btn sm" data-p="${m.user_id}">🔑 เปลี่ยนรหัสผ่าน</button>` : ''}</td></tr>`; }).join('')}</table></div>
+    <p class="muted" style="font-size:13px">พนักงานเข้าสู่ระบบด้วย <b>ชื่อผู้ใช้</b> และ <b>รหัสผ่าน</b> ที่คุณสร้างให้ ที่ลิงก์: ${esc(location.href.split('#')[0])}<br>ไม่มีการสมัครสมาชิกจากภายนอก — เฉพาะเจ้าของร้านและผู้ดูแลระบบสร้างบัญชีได้</p>`;
+  const find = id => mem.find(m => m.user_id === id);
+  $$('[data-e]', pg).forEach(b => b.onclick = () => staffForm(find(b.dataset.e), () => go('staff')));
+  $$('[data-p]', pg).forEach(b => b.onclick = () => { const m = find(b.dataset.p);
+    formModal(`ตั้งรหัสผ่านใหม่ — ${m.display_name}`, [{ k: 'pw', label: 'รหัสผ่านใหม่ (อย่างน้อย 6 ตัว)', req: true, def: Math.random().toString(36).slice(2, 9) }], {}, async o => {
+      if (o.pw.length < 6) throw new Error('รหัสผ่านอย่างน้อย 6 ตัวอักษร');
+      if (m.user_id === S.user.id) { const { error } = await sb.auth.updateUser({ password: o.pw }); if (error) throw error; }
+      else await staffCall({ action: 'password', user_id: m.user_id, password: o.pw });
+      modal('ตั้งรหัสผ่านใหม่แล้ว', `<div class="kv"><span>ชื่อผู้ใช้</span><b>${esc(m.username || m.email.split('@')[0])}</b><span>รหัสผ่านใหม่</span><b>${esc(o.pw)}</b></div>`); }); });
+  $$('[data-t]', pg).forEach(b => b.onclick = async () => { const m = find(b.dataset.t), on = m.active === false;
+    if (!await confirmBox(on ? `เปิดใช้งานบัญชี ${m.display_name}?` : `ระงับบัญชี ${m.display_name}? พนักงานจะเข้าสู่ระบบไม่ได้ทันที`)) return;
+    try { await staffCall({ action: on ? 'enable' : 'disable', user_id: m.user_id }); go('staff'); } catch (e) { fail(e); } });
+  $$('[data-x]', pg).forEach(b => b.onclick = async () => { const m = find(b.dataset.x);
+    if (!await confirmBox(`ลบ ${m.display_name} ออกจากร้าน? ประวัติการขายของพนักงานจะยังอยู่`)) return;
+    try { await staffCall({ action: 'remove', user_id: m.user_id }); go('staff'); } catch (e) { fail(e); } });
+  if ($('#sAdd')) $('#sAdd').onclick = () => staffForm(null, () => go('staff'));
   if ($('#perm')) $('#perm').onclick = permEditor;
 };
 function permEditor() {
@@ -1044,7 +1114,7 @@ function permEditor() {
 /* ================= AUDIT LOG ================= */
 const AUDIT_L = { sale: 'ขาย', void_sale: 'ยกเลิกบิล', refund: 'คืนเงิน', confirm_payment: 'ยืนยันการชำระ', tax_invoice: 'ออกใบกำกับภาษี', product_edit: 'แก้ไขสินค้า/ราคา',
   stock_adjust: 'ปรับยอดสต็อก', stock_damaged: 'ตัดสินค้าชำรุด', stock_expired: 'ตัดสินค้าหมดอายุ', transfer_stock: 'โอนสินค้า', receive_purchase: 'รับสินค้า (PO)', pay_supplier: 'จ่ายผู้จำหน่าย',
-  customer_payment: 'รับชำระหนี้', shift_open: 'เปิดกะ', shift_close: 'ปิดกะ', cash_in: 'นำเงินเข้า', cash_out: 'นำเงินออก', staff_update: 'เปลี่ยนตำแหน่งพนักงาน', staff_delete: 'ลบพนักงาน', permissions: 'แก้ไขสิทธิ์', settings: 'แก้ไขตั้งค่า' };
+  customer_payment: 'รับชำระหนี้', shift_open: 'เปิดกะ', shift_close: 'ปิดกะ', cash_in: 'นำเงินเข้า', cash_out: 'นำเงินออก', staff_update: 'แก้ไขพนักงาน/สิทธิ์', staff_delete: 'ลบพนักงาน', staff_create: 'สร้างบัญชีพนักงาน', staff_password: 'ตั้งรหัสผ่านใหม่', staff_disable: 'ระงับบัญชี', staff_enable: 'เปิดใช้บัญชี', staff_remove: 'ลบพนักงาน', permissions: 'แก้ไขสิทธิ์', settings: 'แก้ไขตั้งค่า' };
 VIEWS.audit = async pg => {
   const rows = await q(sb.from('audit_log').select('*').eq('shop_id', S.shop.id).order('created_at', { ascending: false }).limit(500));
   pg.innerHTML = `<div class="row" style="margin-bottom:12px"><div class="sbox" style="max-width:300px"><span>🔍</span><input class="in" id="aq" placeholder="ค้นหา"></div>
@@ -1082,14 +1152,14 @@ VIEWS.settings = pg => {
     ${sec('🔌 ฮาร์ดแวร์', `<div class="kv" style="font-size:14px"><span>สแกนเนอร์ USB / Bluetooth</span><b>รองรับ (โหมดคีย์บอร์ด)</b><span>กล้องมือถือสแกนบาร์โค้ด</span><b>รองรับ</b><span>เครื่องพิมพ์ใบเสร็จ</span><b>ผ่านหน้าต่างพิมพ์ของระบบ</b><span>ลิ้นชักเงิน</span><b>เปิดผ่านไดรเวอร์เครื่องพิมพ์</b><span>จอลูกค้า</span><b>รองรับ</b></div>
       <div class="fg" style="margin-top:10px"><label class="f">ทดสอบสแกนเนอร์: คลิกช่องนี้แล้วสแกน</label><input class="in" id="scanTest" placeholder="รอสแกน…"></div><div class="row"><button type="button" class="btn sm" id="dispT">🖥️ เปิดจอลูกค้า</button>${'serial' in navigator ? '<button type="button" class="btn sm" id="scaleT">⚖️ เชื่อมต่อเครื่องชั่ง (Web Serial)</button>' : ''}</div><p id="scaleOut" class="muted"></p>`)}
   </div></div>${edit ? '<div class="row" style="position:sticky;bottom:0;background:var(--bg);padding:10px 0"><span class="sp"></span><button class="btn p lg">💾 บันทึกการตั้งค่า</button></div>' : ''}</form>
-  <div class="grid2"><div class="card"><h3 style="margin-top:0">🏬 ร้าน / สาขา</h3><table class="rtable">${S.shops.map(s => `<tr><td>${esc(s.name)}<br><small class="muted">${ROLE_NAME(s._role)}</small></td><td class="right">${s.id === sh.id ? '<span class="chip ok">ใช้งานอยู่</span>' : `<button class="btn sm" data-s="${s.id}">สลับ</button>`}</td></tr>`).join('')}</table><br><button class="btn" id="nb">+ เพิ่มสาขา</button></div>
+  <div class="grid2"><div class="card"><h3 style="margin-top:0">🏬 ร้าน / สาขา</h3><table class="rtable">${S.shops.map(s => `<tr><td>${esc(s.name)}<br><small class="muted">${ROLE_NAME(s._role)}</small></td><td class="right">${s.id === sh.id ? '<span class="chip ok">ใช้งานอยู่</span>' : `<button class="btn sm" data-s="${s.id}">สลับ</button>`}</td></tr>`).join('')}</table><br>${can('owner') ? '<button class="btn" id="nb">+ เพิ่มสาขา</button>' : ''}</div>
   <div class="card"><h3 style="margin-top:0">👤 บัญชีผู้ใช้</h3><p>${esc(S.user.email)} · ${ROLE_NAME(S.role)}</p><div class="row">${canDo('manage_settings') ? '<button class="btn" id="bk">💾 สำรองข้อมูล (JSON)</button>' : ''}<button class="btn install" data-install>📲 ติดตั้งแอป</button>
     ${S.user.app_metadata?.provider === 'email' ? '<button class="btn" id="cpw">🔑 เปลี่ยนรหัสผ่าน</button>' : ''}<button class="btn bad" id="lo">ออกจากระบบ</button></div>
     <p class="muted" style="font-size:12px">เวอร์ชัน ${VERSION} · ข้อมูลส่วนบุคคลจัดเก็บตาม พ.ร.บ.คุ้มครองข้อมูลส่วนบุคคล (PDPA) — เข้าถึงได้เฉพาะพนักงานที่ได้รับสิทธิ์</p></div></div>`;
   $$('[data-pm]', pg).forEach(b => b.onclick = () => b.classList.toggle('on'));
   $$('[data-l]', pg).forEach(b => b.onclick = () => { LANG = b.dataset.l; localStorage.setItem('pos_lang', LANG); renderShell(); go('settings'); });
   $$('[data-s]', pg).forEach(b => b.onclick = () => { localStorage.setItem('pos_shop', b.dataset.s); S.cart = []; boot(); });
-  $('#nb').onclick = () => renderCreateShop(false);
+  if ($('#nb')) $('#nb').onclick = () => renderCreateShop(false);
   $('#lo').onclick = logout;
   $$('[data-install]', pg).forEach(b => b.onclick = installApp); updateInstallUI();
   $('#dispT').onclick = () => window.open('display.html', 'posdisplay', 'width=900,height=600');
@@ -1186,6 +1256,169 @@ productForm = function (p, after) {
   };
 };
 
+/* ================= DESIGN OVERRIDE — Option C (premium retail touchscreen) ================= */
+const SVG = d => `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
+const ICON = {
+  dashboard: SVG('<rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/>'),
+  pos: SVG('<circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/><path d="M2.5 3.5h2.6l2.4 11.2a1.6 1.6 0 0 0 1.6 1.3h8.5a1.6 1.6 0 0 0 1.6-1.2L21 7.5H6"/>'),
+  sales: SVG('<path d="M6 2h12v20l-3-2-3 2-3-2-3 2z"/><path d="M9 7h6M9 11h6M9 15h4"/>'),
+  products: SVG('<path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="m3 8 9 5 9-5M12 13v8"/>'),
+  stock: SVG('<path d="M3 21V8l9-5 9 5v13"/><path d="M7 21v-8h10v8M7 17h10"/>'),
+  purchases: SVG('<path d="M12 3v12m0 0-4-4m4 4 4-4"/><path d="M4 17v3h16v-3"/>'),
+  members: SVG('<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M21.5 20a6.5 6.5 0 0 0-4-6"/>'),
+  promotions: SVG('<path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8z"/><circle cx="7.5" cy="7.5" r="1.3"/>'),
+  suppliers: SVG('<path d="M3 6h11v10H3zM14 9h4l3 3v4h-7"/><circle cx="7" cy="18" r="1.8"/><circle cx="17" cy="18" r="1.8"/>'),
+  expenses: SVG('<rect x="2.5" y="6" width="19" height="13" rx="2"/><path d="M2.5 10h19M6 15h3"/>'),
+  reports: SVG('<path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-6"/>'),
+  shifts: SVG('<rect x="3" y="7" width="18" height="13" rx="2"/><path d="M3 12h18M8 4h8"/><circle cx="12" cy="16" r="1.2"/>'),
+  staff: SVG('<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>'),
+  audit: SVG('<path d="M12 3 4 6v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V6z"/><path d="m9 12 2 2 4-4"/>'),
+  settings: SVG('<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1A1.7 1.7 0 0 0 4.6 9a1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>'),
+  more: SVG('<path d="M4 6h16M4 12h16M4 18h16"/>'),
+  bell: SVG('<path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"/>'),
+  search: SVG('<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>'),
+  scan: SVG('<path d="M3 7V4h3M21 7V4h-3M3 17v3h3M21 17v3h-3M7 8v8M10 8v8M13 8v8M16 8v8"/>'),
+  plus: SVG('<path d="M12 5v14M5 12h14"/>'),
+  cash: SVG('<rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><path d="M6 12h.01M18 12h.01"/>'),
+  qr: SVG('<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3zM20 14v.01M14 20h.01M17 20h4v-3"/>'),
+  card: SVG('<rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20M6 15h4"/>'),
+  user: SVG('<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>'),
+  store: SVG('<path d="M3 9 5 4h14l2 5"/><path d="M4 9v11h16V9"/><path d="M3 9a3 3 0 0 0 6 0 3 3 0 0 0 6 0 3 3 0 0 0 6 0"/>'),
+};
+
+/* ---------- shell: line icons, global search, branch, notifications, profile ---------- */
+const _renderShellC = renderShell;
+renderShell = function () {
+  _renderShellC();
+  $$('[data-p]').forEach(b => { const ic = b.querySelector('.ic'); if (ic && ICON[b.dataset.p]) ic.innerHTML = ICON[b.dataset.p]; });
+  const mb = $('#moreBtn .ic'); if (mb) mb.innerHTML = ICON.more;
+  const logo = $('.side .logo i'); if (logo) logo.innerHTML = ICON.store;
+  const sb2 = $('#shopBtn'); if (sb2) sb2.innerHTML = ICON.store;
+  const nm = S.shop._name || S.user.user_metadata?.full_name || S.user.user_metadata?.name || S.user.email.split('@')[0];
+  $('#net')?.insertAdjacentHTML('beforebegin', `
+    <div class="gsearch">${ICON.search}<input id="gq" placeholder="ค้นหาสินค้า หรือสแกนบาร์โค้ด…" autocomplete="off"><kbd>F2</kbd></div>
+    <span class="branch" title="สาขา">${ICON.store}<span>${esc(S.shop.name)}<small>${branchLine(S.shop)}</small></span></span>`);
+  $('#net')?.insertAdjacentHTML('afterend', `<button class="iconbtn bellbtn" id="bell" title="การแจ้งเตือน">${ICON.bell}<i id="bellN" class="hidden"></i></button>
+    <button class="profile" id="prof"><span class="av">${esc(nm.slice(0, 1).toUpperCase())}</span><span class="pn">${esc(nm)}<small>${ROLE_NAME(S.role)}</small></span></button>`);
+  const gq = $('#gq');
+  gq.oninput = () => { if (S.page === 'pos') { S.search = gq.value; drawGrid(); } };
+  gq.onkeydown = e => {
+    if (e.key !== 'Enter') return; const v = gq.value.trim(); if (!v) return;
+    let qty = 1, code = v; const mm = v.match(/^(\d+(?:\.\d+)?)\*(.+)$/); if (mm) { qty = num(mm[1]); code = mm[2]; }
+    const hit = S.products.find(p => p.active && (p.barcode === code || p.sku === code));
+    if (S.page !== 'pos') { go('pos'); setTimeout(() => { if (hit) { sfx('scan'); addToCart(hit, qty); } else { S.search = v; $('#gq').value = v; drawGrid(); } }, 60); if (hit) gq.value = ''; return; }
+    const list = filtered();
+    if (hit) { sfx('scan'); addToCart(hit, qty); } else if (list.length === 1) addToCart(list[0], qty); else { if (!list.length) { sfx('error'); toast('ไม่พบสินค้าที่ค้นหา', 'bad'); } return; }
+    gq.value = ''; S.search = ''; drawGrid();
+  };
+  $('#bell').onclick = showNotifications;
+  $('#prof').onclick = profileMenu;
+  refreshBell();
+};
+async function notifItems() {
+  const items = [];
+  const out = S.products.filter(p => p.active && p.track_stock && p.stock <= 0), low = S.products.filter(p => p.active && p.track_stock && p.stock > 0 && p.stock <= p.low_stock);
+  if (out.length) items.push(['bad', '⛔', `สินค้าหมดสต็อก ${out.length} รายการ`, 'stock']);
+  if (low.length) items.push(['warn', '⚠️', `สินค้าใกล้หมด ${low.length} รายการ`, 'stock']);
+  const exp = S.products.filter(p => p.expiry_date && new Date(p.expiry_date) - Date.now() < 30 * 864e5);
+  if (exp.length) items.push(['warn', '⌛', `สินค้าใกล้หมดอายุ ${exp.length} รายการ`, 'stock']);
+  const oq = oqGet().filter(x => x.shop === S.shop.id).length; if (oq) items.push(['warn', '📶', `บิลออฟไลน์รอซิงก์ ${oq} บิล`, 'pos']);
+  try { const { count } = await sb.from('sales').select('id', { count: 'exact', head: true }).eq('shop_id', S.shop.id).eq('pay_status', 'pending').neq('status', 'void');
+    if (count) items.push(['warn', '⏳', `รอตรวจสอบการชำระเงิน ${count} บิล`, 'sales']); } catch (e) { /* offline */ }
+  if (canDo('expenses')) try { const { count } = await sb.from('expenses').select('id', { count: 'exact', head: true }).eq('shop_id', S.shop.id).eq('status', 'pending');
+    if (count) items.push(['info', '💸', `ค่าใช้จ่ายรออนุมัติ ${count} รายการ`, 'expenses']); } catch (e) { /* offline */ }
+  return items;
+}
+async function refreshBell() { const n = (await notifItems()).length; const b = $('#bellN'); if (b) { b.textContent = n; b.classList.toggle('hidden', !n); } }
+setInterval(() => S.shop && refreshBell(), 60000);
+async function showNotifications() {
+  const items = await notifItems();
+  const m = modal('การแจ้งเตือน', items.length ? items.map(([c, ic, t, pg], i) => `<button class="notif ${c}" data-g="${pg}" style="--i:${i}"><span>${ic}</span><b>${t}</b><span class="muted">›</span></button>`).join('')
+    : '<div class="empty">✓ ไม่มีการแจ้งเตือน</div>');
+  $$('[data-g]', m).forEach(b => b.onclick = () => { m.close(); go(b.dataset.g); });
+}
+function profileMenu() {
+  const nm = S.shop._name || S.user.user_metadata?.full_name || S.user.email.split('@')[0];
+  const m = modal(nm, `<p class="muted" style="margin-top:0">${ROLE_NAME(S.role)} · ${esc(S.shop._username || S.user.email.split('@')[0])} · ${esc(S.shop.name)}</p>
+    <div class="moregrid" style="grid-template-columns:repeat(3,1fr)">
+      <button data-a="pw"><span>🔑</span>เปลี่ยนรหัสผ่าน</button><button data-a="theme"><span>${document.documentElement.dataset.theme === 'dark' ? '☀️' : '🌙'}</span>โหมดสี</button>
+      ${S.shops.length > 1 ? '<button data-a="shop"><span>🏬</span>สลับสาขา</button>' : ''}<button data-a="out"><span>🚪</span>ออกจากระบบ</button></div>`);
+  $$('[data-a]', m).forEach(b => b.onclick = () => { m.close(); const a = b.dataset.a;
+    if (a === 'pw') formModal('เปลี่ยนรหัสผ่าน', [{ k: 'p1', label: 'รหัสผ่านใหม่', type: 'password', req: true }, { k: 'p2', label: 'ยืนยันรหัสผ่านใหม่', type: 'password', req: true }], {}, async o => {
+      if (o.p1.length < 6) throw new Error('รหัสผ่านอย่างน้อย 6 ตัวอักษร'); if (o.p1 !== o.p2) throw new Error('รหัสผ่านไม่ตรงกัน'); const { error } = await sb.auth.updateUser({ password: o.p1 }); if (error) throw error; });
+    if (a === 'theme') setTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark');
+    if (a === 'shop') go('settings');
+    if (a === 'out') logout(); });
+}
+document.addEventListener('keydown', e => { if (e.key === 'F2' && S.page !== 'pos') { e.preventDefault(); $('#gq')?.focus(); } });
+
+/* ---------- POS screen ---------- */
+const _posView = VIEWS.pos;
+VIEWS.pos = pg => {
+  _posView(pg);
+  pg.querySelector('.pos')?.classList.add('optc');
+  const gq = $('#gq'); if (gq) { gq.value = S.search || ''; if (matchMedia('(min-width:861px)').matches) setTimeout(() => gq.focus(), 50); }
+  const cats = $('#cats'); if (cats) {
+    const place = () => { const on = cats.querySelector('.tab.on'); let ind = cats.querySelector('.cat-ind'); if (!ind) { ind = document.createElement('i'); ind.className = 'cat-ind'; cats.prepend(ind); }
+      if (on) { ind.style.width = on.offsetWidth + 'px'; ind.style.transform = `translateX(${on.offsetLeft}px)`; ind.style.height = on.offsetHeight + 'px'; ind.style.top = on.offsetTop + 'px'; on.scrollIntoView({ inline: 'nearest', block: 'nearest', behavior: 'smooth' }); } };
+    new MutationObserver(place).observe(cats, { childList: true }); requestAnimationFrame(place); window.addEventListener('resize', place);
+  }
+  if (matchMedia('(min-width:1600px)').matches && !pg.querySelector('.rprev')) pg.querySelector('.pos').insertAdjacentHTML('beforeend', '<aside class="rprev" id="rprev"></aside>');
+  drawPreview();
+};
+const _productCardC = productCard;
+productCard = function (p) {
+  const h = _productCardC(p);
+  const st = p.track_stock ? `<span class="stk ${p.stock <= 0 ? 'bad' : p.stock <= p.low_stock ? 'warn' : 'ok'}">${p.stock <= 0 ? 'หมด' : 'คงเหลือ ' + qtyf(p.stock)}</span>` : '';
+  return h.replace(/<div class="pr">([\s\S]*?)<\/div><\/div>$/, `<div class="pr"><b>${baht(num(p.promo_price) > 0 ? p.promo_price : p.price)}</b>${num(p.promo_price) > 0 ? `<s class="muted">${money(p.price)}</s>` : ''}<button class="qadd" title="เพิ่มลงตะกร้า">${ICON.plus}</button></div>${VIEWP.showStock ? `<div class="stkrow">${st}<small class="muted">${esc(p.unit)}</small></div>` : ''}</div>`);
+};
+
+/* ---------- cart ---------- */
+const _drawCartC = drawCart;
+drawCart = function () {
+  _drawCartC();
+  const el = $('#cart'); if (!el) return;
+  const hds = el.querySelectorAll('.hd');
+  if (hds[1] && !el.querySelector('.colhead') && S.cart.length) hds[1].insertAdjacentHTML('afterend', '<div class="colhead"><span>สินค้า</span><span>จำนวน</span><span>ราคา</span></div>');
+  // customer card instead of small member button
+  const mb = $('#memBtn', el);
+  if (mb) { mb.classList.add('custbtn'); mb.innerHTML = S.customer ? `<span class="av sm">${esc(S.customer.name.slice(0, 1))}</span><span><b>${esc(S.customer.name)}</b><small>${qtyf(S.customer.points)} แต้ม${num(S.customer.balance) ? ' · ค้าง ' + money(S.customer.balance) : ''}</small></span>`
+    : `<span class="av sm">${ICON.user}</span><span><b>ลูกค้าทั่วไป</b><small>แตะเพื่อเลือกสมาชิก</small></span>`; }
+  // animated removal
+  $$('[data-d]', el).forEach(b => { const old = b.onclick; b.onclick = () => { const l = S.cart[+b.dataset.d]; if (l && l.qty <= 1) { b.closest('.citem')?.classList.add('out'); setTimeout(old, 170); } else old(); }; });
+  // payment quick tiles + big total
+  const pay = $('#payBtn', el);
+  if (pay && !el.querySelector('.paytiles')) {
+    const ms = shopMethods(); const tiles = [['cash', ICON.cash, 'เงินสด'], ['promptpay', ICON.qr, 'พร้อมเพย์'], [ms.includes('credit_card') ? 'credit_card' : 'transfer', ICON.card, ms.includes('credit_card') ? 'บัตร' : 'โอนเงิน']].filter(t => ms.includes(t[0]));
+    pay.insertAdjacentHTML('beforebegin', `<div class="paytiles">${tiles.map(([k, ic, l]) => `<button data-q="${k}" ${S.cart.length ? '' : 'disabled'}>${ic}<span>${l}</span></button>`).join('')}</div>`);
+    $$('.paytiles [data-q]', el).forEach(b => b.onclick = () => { S._payPreset = b.dataset.q; payDialog(); });
+  }
+  drawPreview();
+};
+function drawPreview() {
+  const box = $('#rprev'); if (!box) return;
+  const c = calc(), sh = S.shop;
+  box.innerHTML = `<div class="rp-h">ตัวอย่างใบเสร็จ</div><div class="rp-paper">
+    <div class="c b">${esc(sh.name)}</div><div class="c muted" style="font-size:11px">${dLong(new Date())} · ${esc(S.shop._name || '')}</div>
+    <div class="rp-cust">${S.customer ? `ลูกค้า: <b>${esc(S.customer.name)}</b>` : 'ลูกค้าทั่วไป'}</div>
+    ${S.cart.length ? S.cart.map(l => `<div class="rp-l"><span>${esc(l.name)}<small>${qtyf(l.qty)} × ${money(l.price)}</small></span><b>${money(l.qty * l.price - num(l.discount))}</b></div>`).join('') : '<div class="muted c" style="padding:20px 0">ยังไม่มีสินค้า</div>'}
+    <div class="rp-t"><span>ยอดรวม</span><span>${money(c.subtotal)}</span></div>${c.discount ? `<div class="rp-t"><span>ส่วนลด</span><span>-${money(c.discount)}</span></div>` : ''}
+    ${sh.vat_mode !== 'none' ? `<div class="rp-t"><span>VAT ${num(sh.vat_rate)}%</span><span>${money(c.vat)}</span></div>` : ''}<div class="rp-t big"><span>ยอดสุทธิ</span><span>${baht(c.total)}</span></div>
+    <div class="rp-bar"></div></div>`;
+}
+
+/* ---------- payment success feedback ---------- */
+const _showReceiptC = showReceipt;
+showReceipt = function (sale, items, cust, autoPrint) {
+  _showReceiptC(sale, items, cust, autoPrint);
+  const m = $$('.mbg').pop(); const mb = m?.querySelector('.mb'); if (!mb) return;
+  mb.insertAdjacentHTML('afterbegin', `<div class="paid-ok"><svg viewBox="0 0 52 52"><circle cx="26" cy="26" r="24"/><path d="M14 27l8 8 16-17"/></svg>
+    <div><b>${sale.pay_status === 'pending' ? 'บันทึกแล้ว — รอตรวจสอบการชำระ' : 'ชำระเงินสำเร็จ'}</b><span>${esc(sale.bill_no)} · ${baht(sale.total)}${num(sale.change) ? ` · ทอน ${baht(sale.change)}` : ''}</span></div></div>`);
+  mb.querySelector('.tline.big')?.remove();
+};
+
+const _goC = go;
+go = function (page) { _goC(page); $('.top')?.classList.toggle('posmode', S.page === 'pos'); };
 /* ================= start ================= */
 updateNet();
 boot().then(() => { updateNet(); syncQueue(); }).catch(e => { fail(e); renderAuth(); });

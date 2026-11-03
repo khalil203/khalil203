@@ -125,22 +125,90 @@ const REPORT_FN = {
   },
 };
 
-/* ================= STAFF ================= */
+/* ================= STAFF (username + password accounts, managed by owner/admin) ================= */
+async function staffCall(body) {
+  const { data: { session } } = await sb.auth.getSession();
+  const r = await fetch(window.POS_CONFIG.url + '/functions/v1/staff-admin', { method: 'POST',
+    headers: { apikey: window.POS_CONFIG.key, Authorization: 'Bearer ' + session.access_token, 'Content-Type': 'application/json' }, body: JSON.stringify({ shop_id: S.shop.id, ...body }) });
+  const d = await r.json().catch(() => ({})); if (!r.ok || d.error) throw new Error(d.error || 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้'); return d;
+}
+const roleOpts = () => ['admin', 'manager', 'cashier', 'stock', 'accountant'].filter(r => r !== 'admin' || S.role === 'owner').map(r => [r, ROLE_NAME(r)]);
+function permBoxes(selected) {
+  return `<div class="perm-grid">${PERMS.map(([k, l]) => `<label class="row"><input type="checkbox" data-pk="${k}" ${selected.includes(k) ? 'checked' : ''}> ${l}</label>`).join('')}</div>`;
+}
+const rolePerms = role => role === 'admin' ? ALL_PERMS : (Array.isArray(S.shop.permissions?.[role]) ? S.shop.permissions[role] : (PERM_DEF[role] || []));
+function staffForm(mem, after) {
+  const isNew = !mem;
+  let custom = !!(mem && Array.isArray(mem.permissions));
+  const m = modal(isNew ? 'เพิ่มพนักงาน' : `แก้ไข — ${mem.display_name}`, `
+    <div class="grid2">
+      <div class="fg"><label class="f">ชื่อพนักงาน *</label><input class="in" id="sfN" value="${esc(mem?.display_name || '')}"></div>
+      <div class="fg"><label class="f">ชื่อผู้ใช้ (ใช้เข้าสู่ระบบ) *</label><input class="in" id="sfU" value="${esc(mem?.username || '')}" ${isNew ? '' : 'disabled'} autocapitalize="off" placeholder="เช่น somchai"></div>
+      ${isNew ? `<div class="fg"><label class="f">รหัสผ่าน * (อย่างน้อย 6 ตัว)</label><div class="sbox" style="padding-left:0"><input class="in" id="sfP" type="text" value="${Math.random().toString(36).slice(2, 8)}"><button type="button" class="clr" id="sfG" title="สุ่มใหม่">🎲</button></div></div>` : ''}
+      <div class="fg"><label class="f">ตำแหน่ง</label><select class="in" id="sfR">${roleOpts().map(([k, l]) => `<option value="${k}" ${(mem?.role || 'cashier') === k ? 'selected' : ''}>${l}</option>`).join('')}</select></div>
+    </div>
+    <label class="row fg"><input type="checkbox" id="sfC" ${custom ? 'checked' : ''}> กำหนดสิทธิ์เฉพาะคนนี้ (ไม่ใช้ค่าตามตำแหน่ง)</label>
+    <div id="sfPerm"></div>`, { wide: true, foot: `<button class="btn" data-c>ยกเลิก</button><button class="btn p" id="sfS">${isNew ? 'สร้างบัญชี' : 'บันทึก'}</button>` });
+  const drawPerm = () => { const role = $('#sfR', m).value; const sel = custom ? (Array.isArray(mem?.permissions) ? mem.permissions : rolePerms(role)) : rolePerms(role);
+    $('#sfPerm', m).innerHTML = `<p class="muted" style="font-size:13px;margin:0 0 8px">${custom ? 'เลือกสิทธิ์ที่พนักงานคนนี้ใช้ได้' : `สิทธิ์ตามตำแหน่ง “${ROLE_NAME(role)}” (แก้ค่าเริ่มต้นได้ที่ปุ่ม “สิทธิ์ตามตำแหน่ง”)`}</p>${permBoxes(sel)}`;
+    $$('[data-pk]', m).forEach(c => { c.disabled = !custom || role === 'admin'; }); };
+  $('#sfR', m).onchange = drawPerm; $('#sfC', m).onchange = e => { custom = e.target.checked; drawPerm(); }; drawPerm();
+  if ($('#sfG', m)) $('#sfG', m).onclick = () => { $('#sfP', m).value = Math.random().toString(36).slice(2, 10); };
+  $('[data-c]', m).onclick = m.close;
+  $('#sfS', m).onclick = async () => {
+    const name = $('#sfN', m).value.trim(), role = $('#sfR', m).value;
+    const perms = custom && role !== 'admin' ? $$('[data-pk]', m).filter(c => c.checked).map(c => c.dataset.pk) : null;
+    if (!name) return toast('กรุณากรอกข้อมูลให้ครบถ้วน', 'bad');
+    const b = $('#sfS', m); b.disabled = true;
+    try {
+      if (isNew) {
+        const username = $('#sfU', m).value.trim().toLowerCase(), password = $('#sfP', m).value;
+        if (!/^[a-z0-9][a-z0-9._-]{2,29}$/.test(username)) throw new Error('ชื่อผู้ใช้ต้องเป็นภาษาอังกฤษ a-z, 0-9, . _ - ยาว 3–30 ตัว');
+        if (password.length < 6) throw new Error('รหัสผ่านอย่างน้อย 6 ตัวอักษร');
+        await staffCall({ action: 'create', username, password, display_name: name, role, permissions: perms });
+        m.close(); after?.();
+        modal('สร้างบัญชีพนักงานแล้ว', `<p>ส่งข้อมูลนี้ให้ <b>${esc(name)}</b> เพื่อเข้าสู่ระบบ:</p>
+          <div class="card" style="box-shadow:none;background:var(--bg2)"><div class="kv"><span>ลิงก์</span><b style="word-break:break-all">${esc(location.href.split('#')[0])}</b><span>ชื่อผู้ใช้</span><b>${esc(username)}</b><span>รหัสผ่าน</span><b>${esc(password)}</b></div></div>
+          <button class="btn" id="cpy" style="margin-top:10px">📋 คัดลอกข้อมูล</button>`).querySelector('#cpy').onclick = () => {
+            navigator.clipboard?.writeText(`Shop POS\n${location.href.split('#')[0]}\nชื่อผู้ใช้: ${username}\nรหัสผ่าน: ${password}`); toast('คัดลอกแล้ว', 'ok'); };
+      } else {
+        await staffCall({ action: 'update', user_id: mem.user_id, display_name: name, role, permissions: perms });
+        toast('บันทึกข้อมูลเรียบร้อยแล้ว', 'ok'); m.close(); after?.();
+      }
+    } catch (e) { b.disabled = false; fail(e); }
+  };
+}
 VIEWS.staff = async pg => {
-  const [mem, inv] = await Promise.all([q(sb.from('shop_members').select('*').eq('shop_id', S.shop.id)), q(sb.from('shop_invites').select('*').eq('shop_id', S.shop.id).is('accepted_at', null))]);
-  const roles = ['admin', 'manager', 'cashier', 'stock', 'accountant'].map(r => [r, ROLE_NAME(r)]);
-  $('#tact').innerHTML = `<button class="btn p" id="inv">+ เชิญพนักงาน</button>${can('owner') ? '<button class="btn" id="perm">🔐 ตั้งค่าสิทธิ์ตามตำแหน่ง</button>' : ''}`;
-  pg.innerHTML = `<div class="tblwrap"><table class="tbl"><tr><th>ชื่อ</th><th>อีเมล</th><th>ตำแหน่ง</th><th></th></tr>
-    ${mem.map(m => `<tr><td><b>${esc(m.display_name)}</b></td><td>${esc(m.email)}</td><td>${m.role === 'owner' ? `<span class="chip">${ROLE_NAME('owner')}</span>` :
-      `<select class="in" data-u="${m.user_id}" style="width:auto">${roles.map(r => `<option value="${r[0]}" ${r[0] === m.role ? 'selected' : ''}>${r[1]}</option>`).join('')}</select>`}</td>
-      <td class="right">${m.role === 'owner' ? '' : `<button class="btn sm bad" data-x="${m.user_id}">ลบออก</button>`}</td></tr>`).join('')}</table></div>
-    <p class="section-title">คำเชิญที่รอการตอบรับ</p><div class="tblwrap"><table class="tbl">${inv.map(i => `<tr><td>${esc(i.display_name)}</td><td>${esc(i.email)}</td><td>${ROLE_NAME(i.role)}</td><td class="right"><button class="btn sm bad" data-i="${i.id}">ยกเลิก</button></td></tr>`).join('') || '<tr><td class="muted">ไม่มี</td></tr>'}</table></div>
-    <p class="muted">พนักงานจะเข้าร้านอัตโนมัติเมื่อเข้าสู่ระบบด้วยบัญชี Google ของอีเมลที่เชิญ<br>🔗 ${esc(location.href.split('#')[0])}</p>`;
-  $$('[data-u]', pg).forEach(s => s.onchange = async () => { try { await q(sb.from('shop_members').update({ role: s.value }).eq('shop_id', S.shop.id).eq('user_id', s.dataset.u)); toast('บันทึกข้อมูลเรียบร้อยแล้ว', 'ok'); } catch (e) { fail(e); } });
-  $$('[data-x]', pg).forEach(b => b.onclick = async () => { if (!await confirmBox('ลบพนักงานคนนี้ออกจากร้าน?')) return; try { await q(sb.from('shop_members').delete().eq('shop_id', S.shop.id).eq('user_id', b.dataset.x)); go('staff'); } catch (e) { fail(e); } });
-  $$('[data-i]', pg).forEach(b => b.onclick = async () => { try { await q(sb.from('shop_invites').delete().eq('id', b.dataset.i)); go('staff'); } catch (e) { fail(e); } });
-  $('#inv').onclick = () => formModal('เชิญพนักงาน', [{ k: 'display_name', label: 'ชื่อพนักงาน', req: true }, { k: 'email', label: 'อีเมล (Gmail)', type: 'email', req: true }, { k: 'role', label: 'ตำแหน่ง', type: 'select', opts: roles }], { role: 'cashier' },
-    async o => { o.email = o.email.toLowerCase(); await q(sb.from('shop_invites').upsert({ ...o, shop_id: S.shop.id, accepted_at: null }, { onConflict: 'shop_id,email' })); go('staff'); });
+  const mem = await q(sb.from('shop_members').select('*').eq('shop_id', S.shop.id).order('created_at'));
+  const manage = can('owner', 'admin');
+  $('#tact').innerHTML = manage ? `<button class="btn p" id="sAdd">+ เพิ่มพนักงาน</button><button class="btn" id="perm">🔐 สิทธิ์ตามตำแหน่ง</button>` : '';
+  pg.innerHTML = `<div class="stats"><div class="stat"><div class="k">พนักงานทั้งหมด</div><div class="v">${mem.length}</div></div>
+      <div class="stat"><div class="k">ใช้งานอยู่</div><div class="v" style="color:var(--ok)">${mem.filter(m => m.active !== false).length}</div></div>
+      <div class="stat"><div class="k">ถูกระงับ</div><div class="v" style="color:var(--bad)">${mem.filter(m => m.active === false).length}</div></div></div>
+    <div class="tblwrap"><table class="tbl"><tr><th>พนักงาน</th><th>ชื่อผู้ใช้</th><th>ตำแหน่ง</th><th>สิทธิ์</th><th>สถานะ</th><th></th></tr>
+    ${mem.map(m => { const self = m.user_id === S.user.id, owner = m.role === 'owner';
+      return `<tr><td><b>${esc(m.display_name || '-')}</b>${self ? ' <span class="chip">คุณ</span>' : ''}</td><td><code>${esc(m.username || (m.email || '').split('@')[0])}</code></td>
+      <td><span class="chip ${owner ? 'info' : ''}">${ROLE_NAME(m.role)}</span></td><td>${owner || m.role === 'admin' ? 'ทั้งหมด' : Array.isArray(m.permissions) ? `<span class="chip warn">กำหนดเอง ${m.permissions.length}</span>` : 'ตามตำแหน่ง'}</td>
+      <td>${m.active === false ? '<span class="chip bad">ระงับ</span>' : '<span class="chip ok">ใช้งาน</span>'}</td>
+      <td class="right" style="white-space:nowrap">${manage && !owner ? `<button class="btn sm" data-e="${m.user_id}">✏️ แก้ไข/สิทธิ์</button> <button class="btn sm" data-p="${m.user_id}">🔑 รหัสผ่าน</button>
+        ${self ? '' : `<button class="btn sm" data-t="${m.user_id}">${m.active === false ? '✅ เปิดใช้' : '⛔ ระงับ'}</button> <button class="btn sm bad" data-x="${m.user_id}">ลบ</button>`}` : ''}
+        ${owner && self ? `<button class="btn sm" data-p="${m.user_id}">🔑 เปลี่ยนรหัสผ่าน</button>` : ''}</td></tr>`; }).join('')}</table></div>
+    <p class="muted" style="font-size:13px">พนักงานเข้าสู่ระบบด้วย <b>ชื่อผู้ใช้</b> และ <b>รหัสผ่าน</b> ที่คุณสร้างให้ ที่ลิงก์: ${esc(location.href.split('#')[0])}<br>ไม่มีการสมัครสมาชิกจากภายนอก — เฉพาะเจ้าของร้านและผู้ดูแลระบบสร้างบัญชีได้</p>`;
+  const find = id => mem.find(m => m.user_id === id);
+  $$('[data-e]', pg).forEach(b => b.onclick = () => staffForm(find(b.dataset.e), () => go('staff')));
+  $$('[data-p]', pg).forEach(b => b.onclick = () => { const m = find(b.dataset.p);
+    formModal(`ตั้งรหัสผ่านใหม่ — ${m.display_name}`, [{ k: 'pw', label: 'รหัสผ่านใหม่ (อย่างน้อย 6 ตัว)', req: true, def: Math.random().toString(36).slice(2, 9) }], {}, async o => {
+      if (o.pw.length < 6) throw new Error('รหัสผ่านอย่างน้อย 6 ตัวอักษร');
+      if (m.user_id === S.user.id) { const { error } = await sb.auth.updateUser({ password: o.pw }); if (error) throw error; }
+      else await staffCall({ action: 'password', user_id: m.user_id, password: o.pw });
+      modal('ตั้งรหัสผ่านใหม่แล้ว', `<div class="kv"><span>ชื่อผู้ใช้</span><b>${esc(m.username || m.email.split('@')[0])}</b><span>รหัสผ่านใหม่</span><b>${esc(o.pw)}</b></div>`); }); });
+  $$('[data-t]', pg).forEach(b => b.onclick = async () => { const m = find(b.dataset.t), on = m.active === false;
+    if (!await confirmBox(on ? `เปิดใช้งานบัญชี ${m.display_name}?` : `ระงับบัญชี ${m.display_name}? พนักงานจะเข้าสู่ระบบไม่ได้ทันที`)) return;
+    try { await staffCall({ action: on ? 'enable' : 'disable', user_id: m.user_id }); go('staff'); } catch (e) { fail(e); } });
+  $$('[data-x]', pg).forEach(b => b.onclick = async () => { const m = find(b.dataset.x);
+    if (!await confirmBox(`ลบ ${m.display_name} ออกจากร้าน? ประวัติการขายของพนักงานจะยังอยู่`)) return;
+    try { await staffCall({ action: 'remove', user_id: m.user_id }); go('staff'); } catch (e) { fail(e); } });
+  if ($('#sAdd')) $('#sAdd').onclick = () => staffForm(null, () => go('staff'));
   if ($('#perm')) $('#perm').onclick = permEditor;
 };
 function permEditor() {
@@ -161,7 +229,7 @@ function permEditor() {
 /* ================= AUDIT LOG ================= */
 const AUDIT_L = { sale: 'ขาย', void_sale: 'ยกเลิกบิล', refund: 'คืนเงิน', confirm_payment: 'ยืนยันการชำระ', tax_invoice: 'ออกใบกำกับภาษี', product_edit: 'แก้ไขสินค้า/ราคา',
   stock_adjust: 'ปรับยอดสต็อก', stock_damaged: 'ตัดสินค้าชำรุด', stock_expired: 'ตัดสินค้าหมดอายุ', transfer_stock: 'โอนสินค้า', receive_purchase: 'รับสินค้า (PO)', pay_supplier: 'จ่ายผู้จำหน่าย',
-  customer_payment: 'รับชำระหนี้', shift_open: 'เปิดกะ', shift_close: 'ปิดกะ', cash_in: 'นำเงินเข้า', cash_out: 'นำเงินออก', staff_update: 'เปลี่ยนตำแหน่งพนักงาน', staff_delete: 'ลบพนักงาน', permissions: 'แก้ไขสิทธิ์', settings: 'แก้ไขตั้งค่า' };
+  customer_payment: 'รับชำระหนี้', shift_open: 'เปิดกะ', shift_close: 'ปิดกะ', cash_in: 'นำเงินเข้า', cash_out: 'นำเงินออก', staff_update: 'แก้ไขพนักงาน/สิทธิ์', staff_delete: 'ลบพนักงาน', staff_create: 'สร้างบัญชีพนักงาน', staff_password: 'ตั้งรหัสผ่านใหม่', staff_disable: 'ระงับบัญชี', staff_enable: 'เปิดใช้บัญชี', staff_remove: 'ลบพนักงาน', permissions: 'แก้ไขสิทธิ์', settings: 'แก้ไขตั้งค่า' };
 VIEWS.audit = async pg => {
   const rows = await q(sb.from('audit_log').select('*').eq('shop_id', S.shop.id).order('created_at', { ascending: false }).limit(500));
   pg.innerHTML = `<div class="row" style="margin-bottom:12px"><div class="sbox" style="max-width:300px"><span>🔍</span><input class="in" id="aq" placeholder="ค้นหา"></div>
@@ -199,14 +267,14 @@ VIEWS.settings = pg => {
     ${sec('🔌 ฮาร์ดแวร์', `<div class="kv" style="font-size:14px"><span>สแกนเนอร์ USB / Bluetooth</span><b>รองรับ (โหมดคีย์บอร์ด)</b><span>กล้องมือถือสแกนบาร์โค้ด</span><b>รองรับ</b><span>เครื่องพิมพ์ใบเสร็จ</span><b>ผ่านหน้าต่างพิมพ์ของระบบ</b><span>ลิ้นชักเงิน</span><b>เปิดผ่านไดรเวอร์เครื่องพิมพ์</b><span>จอลูกค้า</span><b>รองรับ</b></div>
       <div class="fg" style="margin-top:10px"><label class="f">ทดสอบสแกนเนอร์: คลิกช่องนี้แล้วสแกน</label><input class="in" id="scanTest" placeholder="รอสแกน…"></div><div class="row"><button type="button" class="btn sm" id="dispT">🖥️ เปิดจอลูกค้า</button>${'serial' in navigator ? '<button type="button" class="btn sm" id="scaleT">⚖️ เชื่อมต่อเครื่องชั่ง (Web Serial)</button>' : ''}</div><p id="scaleOut" class="muted"></p>`)}
   </div></div>${edit ? '<div class="row" style="position:sticky;bottom:0;background:var(--bg);padding:10px 0"><span class="sp"></span><button class="btn p lg">💾 บันทึกการตั้งค่า</button></div>' : ''}</form>
-  <div class="grid2"><div class="card"><h3 style="margin-top:0">🏬 ร้าน / สาขา</h3><table class="rtable">${S.shops.map(s => `<tr><td>${esc(s.name)}<br><small class="muted">${ROLE_NAME(s._role)}</small></td><td class="right">${s.id === sh.id ? '<span class="chip ok">ใช้งานอยู่</span>' : `<button class="btn sm" data-s="${s.id}">สลับ</button>`}</td></tr>`).join('')}</table><br><button class="btn" id="nb">+ เพิ่มสาขา</button></div>
+  <div class="grid2"><div class="card"><h3 style="margin-top:0">🏬 ร้าน / สาขา</h3><table class="rtable">${S.shops.map(s => `<tr><td>${esc(s.name)}<br><small class="muted">${ROLE_NAME(s._role)}</small></td><td class="right">${s.id === sh.id ? '<span class="chip ok">ใช้งานอยู่</span>' : `<button class="btn sm" data-s="${s.id}">สลับ</button>`}</td></tr>`).join('')}</table><br>${can('owner') ? '<button class="btn" id="nb">+ เพิ่มสาขา</button>' : ''}</div>
   <div class="card"><h3 style="margin-top:0">👤 บัญชีผู้ใช้</h3><p>${esc(S.user.email)} · ${ROLE_NAME(S.role)}</p><div class="row">${canDo('manage_settings') ? '<button class="btn" id="bk">💾 สำรองข้อมูล (JSON)</button>' : ''}<button class="btn install" data-install>📲 ติดตั้งแอป</button>
     ${S.user.app_metadata?.provider === 'email' ? '<button class="btn" id="cpw">🔑 เปลี่ยนรหัสผ่าน</button>' : ''}<button class="btn bad" id="lo">ออกจากระบบ</button></div>
     <p class="muted" style="font-size:12px">เวอร์ชัน ${VERSION} · ข้อมูลส่วนบุคคลจัดเก็บตาม พ.ร.บ.คุ้มครองข้อมูลส่วนบุคคล (PDPA) — เข้าถึงได้เฉพาะพนักงานที่ได้รับสิทธิ์</p></div></div>`;
   $$('[data-pm]', pg).forEach(b => b.onclick = () => b.classList.toggle('on'));
   $$('[data-l]', pg).forEach(b => b.onclick = () => { LANG = b.dataset.l; localStorage.setItem('pos_lang', LANG); renderShell(); go('settings'); });
   $$('[data-s]', pg).forEach(b => b.onclick = () => { localStorage.setItem('pos_shop', b.dataset.s); S.cart = []; boot(); });
-  $('#nb').onclick = () => renderCreateShop(false);
+  if ($('#nb')) $('#nb').onclick = () => renderCreateShop(false);
   $('#lo').onclick = logout;
   $$('[data-install]', pg).forEach(b => b.onclick = installApp); updateInstallUI();
   $('#dispT').onclick = () => window.open('display.html', 'posdisplay', 'width=900,height=600');
@@ -303,6 +371,3 @@ productForm = function (p, after) {
   };
 };
 
-/* ================= start ================= */
-updateNet();
-boot().then(() => { updateNet(); syncQueue(); }).catch(e => { fail(e); renderAuth(); });
