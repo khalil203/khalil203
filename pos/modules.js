@@ -45,14 +45,14 @@ const PAGE_DESC = {
 
 /* ---------------- payment methods ---------------- */
 const PAY = {
-  cash: ['💵', 'เงินสด', 'Cash'], transfer: ['🏦', 'โอนเงิน', 'Bank transfer'], promptpay: ['📱', 'พร้อมเพย์', 'PromptPay'],
+  cash: ['💵', 'เงินสด', 'Cash'], transfer: ['🏦', 'โอนเงิน', 'Bank transfer'], promptpay: ['📱', 'สแกนจ่าย', 'Scan to pay'],
   qr: ['🔳', 'QR Payment', 'QR payment'], credit_card: ['💳', 'บัตรเครดิต', 'Credit card'], debit_card: ['💳', 'บัตรเดบิต', 'Debit card'],
   ewallet: ['👛', 'เงินอิเล็กทรอนิกส์', 'E-wallet'], store_credit: ['📒', 'เงินเชื่อ / ชำระภายหลัง', 'Store credit / pay later'],
   card: ['💳', 'บัตร', 'Card'], mixed: ['🔀', 'หลายช่องทาง', 'Mixed'],
 };
 const payName = m => (PAY[m] || ['', m, m])[LANG === 'th' ? 1 : 2];
 const payIcon = m => (PAY[m] || ['💰'])[0];
-const shopMethods = () => (Array.isArray(S.shop.payment_methods) && S.shop.payment_methods.length ? S.shop.payment_methods : ['cash', 'promptpay', 'transfer']).filter(m => PAY[m]);
+const shopMethods = () => ['cash', 'promptpay'];   // checkout offers only: เงินสด / สแกนจ่าย
 const uid = () => (crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2));
 
 /* ---------------- online / offline + sale queue ---------------- */
@@ -73,8 +73,8 @@ async function submitSale(payload) {
   catch (e) { if (isNetErr(e)) return queueSale(payload); throw e; }
 }
 function queueSale(payload) {
-  if (payload.payments.some(p => ['promptpay', 'qr', 'store_credit'].includes(p.method)))
-    throw new Error('ออฟไลน์อยู่ — รับได้เฉพาะเงินสด/บัตร/โอน (ยืนยันพร้อมเพย์หรือเงินเชื่อไม่ได้ขณะออฟไลน์)');
+  if (payload.payments.some(p => p.method !== 'cash'))
+    throw new Error('ออฟไลน์อยู่ — รับได้เฉพาะเงินสด (สแกนจ่ายต้องใช้อินเทอร์เน็ต)');
   const a = oqGet(); a.push({ shop: S.shop.id, payload, at: new Date().toISOString() }); oqSet(a);
   return { queued: true, sale: { id: null, bill_no: 'OFF-' + payload.client_id.slice(0, 6).toUpperCase(), created_at: new Date().toISOString(),
     cashier_name: S.user.user_metadata?.full_name || S.user.email, status: 'paid', pay_status: 'paid', ...payload } };
@@ -139,7 +139,7 @@ payDialog = function () {
   const m = modal(`ชำระเงิน ${baht(c.total)}`, `
     <div id="payTop"></div><div id="pbody"></div>
     <div class="row" style="margin-top:10px;justify-content:space-between">
-      <button class="btn sm" id="splitBtn">🔀 แบ่งชำระหลายช่องทาง</button>
+      <button class="btn sm" id="splitBtn">🔀 เงินสด + สแกน</button>
       <label class="row"><input type="checkbox" id="autoPrint" ${localStorage.getItem('pos_autoprint') === '1' ? 'checked' : ''}> 🖨️ พิมพ์ใบเสร็จอัตโนมัติ</label></div>
     ${fullTax ? `<details id="taxBox" style="margin-top:10px"><summary class="b" style="cursor:pointer">🧾 ออกใบกำกับภาษีเต็มรูป (ระบุข้อมูลผู้ซื้อ)</summary>
       <div class="grid2" style="margin-top:10px"><div class="fg"><label class="f">ชื่อผู้ซื้อ / บริษัท</label><input class="in" id="txName" value="${esc(S.customer?.name || '')}"></div>
@@ -175,7 +175,7 @@ payDialog = function () {
     }
     wireBody();
   };
-  const verifyBox = (L, i) => `<label class="row" style="margin:-2px 0 10px;font-size:13px"><input type="checkbox" data-v="${i ?? 0}" ${L.verified ? 'checked' : ''}> ตรวจสอบแล้วว่าเงินเข้าบัญชีจริง (แอปธนาคาร/SMS)</label>`;
+  const verifyBox = () => '';
   const methodBody = (L, total) => {
     if (L.method === 'cash') {
       const notes = [...new Set([total, Math.ceil(total / 20) * 20, Math.ceil(total / 100) * 100, Math.ceil(total / 500) * 500, Math.ceil(total / 1000) * 1000, 1000])].filter(v => v >= total).slice(0, 6);
@@ -187,8 +187,7 @@ payDialog = function () {
       if (!S.shop.promptpay_id) return `<p class="chip warn">กรุณาตั้งค่าพร้อมเพย์ในหน้าตั้งค่าก่อน</p>${verifyBox(L)}`;
       const payload = promptPayPayload(S.shop.promptpay_id, total);
       bc?.postMessage({ type: 'qr', svg: qrSvg(payload), total });
-      return `<div class="qr">${qrSvg(payload)}<b style="font-size:22px">${baht(total)}</b><span class="muted">ให้ลูกค้าสแกนจ่ายด้วยแอปธนาคาร</span></div>
-        <div class="card" style="padding:10px;background:var(--warnsoft);box-shadow:none;font-size:13px">⚠️ การแสดง QR ไม่ได้แปลว่าชำระสำเร็จ — ตรวจสอบยอดเงินเข้าก่อนยืนยัน หากยังไม่ได้ตรวจสอบ บิลจะถูกบันทึกเป็น <b>“รอตรวจสอบ”</b></div>${verifyBox(L)}`;
+      return `<div class="qr">${qrSvg(payload)}<b style="font-size:22px">${baht(total)}</b><span class="muted">ให้ลูกค้าสแกนจ่าย แล้วกด “ยืนยันชำระเงิน”</span></div>`;
     }
     if (L.method === 'store_credit') {
       if (!S.customer) return `<p class="chip bad">การขายเงินเชื่อต้องเลือกลูกค้าก่อน</p>`;
@@ -207,7 +206,7 @@ payDialog = function () {
     $$('[data-v]', m).forEach(cb => cb.onchange = () => { lines[+cb.dataset.v].verified = cb.checked; });
     const ref = $('#refIn', m); if (ref) ref.oninput = () => { lines[0].ref = ref.value; };
   };
-  $('#splitBtn', m).onclick = () => { split = !split; if (split && lines.length === 1) { lines[0].amount = c.total; } if (!split) lines = [{ ...lines[0], amount: c.total }]; $('#splitBtn', m).textContent = split ? '↩ ชำระช่องทางเดียว' : '🔀 แบ่งชำระหลายช่องทาง'; draw(); };
+  $('#splitBtn', m).onclick = () => { split = !split; if (split && lines.length === 1) { lines[0].amount = c.total; } if (!split) lines = [{ ...lines[0], amount: c.total }]; $('#splitBtn', m).textContent = split ? '↩ ชำระช่องทางเดียว' : '🔀 เงินสด + สแกน'; draw(); };
   draw();
 
   $('#cfm', m).onclick = async () => {
@@ -218,7 +217,7 @@ payDialog = function () {
       if (L.method === 'cash') { if (received + 0.001 < c.total) return sfx('error'), toast('ยอดเงินที่รับไม่พอ', 'bad'); paid = received; change = r2(received - c.total); }
       else { paid = c.total; change = 0; }
       if (L.method === 'store_credit' && !S.customer) return toast('กรุณาเลือกลูกค้าก่อน', 'bad');
-      payments = [{ method: L.method, amount: c.total, ref: L.ref || '', status: (['promptpay', 'qr'].includes(L.method) && !L.verified) ? 'pending' : 'confirmed' }];
+      payments = [{ method: L.method, amount: c.total, ref: L.ref || '', status: 'confirmed' }];
     } else {
       const sum = r2(lines.reduce((a, l) => a + num(l.amount), 0));
       const cash = cashLine();
@@ -227,7 +226,7 @@ payDialog = function () {
       if (lines.some(l => l.method === 'store_credit') && !S.customer) return toast('การขายเงินเชื่อต้องเลือกลูกค้า', 'bad');
       change = r2(sum - c.total); paid = sum;
       payments = lines.filter(l => num(l.amount) > 0).map(l => ({ method: l.method, amount: l.method === 'cash' ? r2(num(l.amount) - change) : num(l.amount), ref: l.ref || '',
-        status: (['promptpay', 'qr'].includes(l.method) && !l.verified) ? 'pending' : 'confirmed' })).filter(x => x.amount > 0);
+        status: 'confirmed' })).filter(x => x.amount > 0);
     }
     let tax = {};
     if ($('#taxBox', m)?.open && $('#txName', m).value.trim()) {
@@ -452,7 +451,7 @@ billDetail = async function (sale, reload) {
 /* ================= REFUNDS ================= */
 function refundDialog(sale, items, reload) {
   const left = items.map(i => ({ ...i, left: num(i.qty) - num(i.refunded_qty), r: 0 })).filter(i => i.left > 0);
-  const methods = ['cash', 'transfer', 'promptpay', ...(sale.customer_id ? ['store_credit'] : [])];
+  const methods = ['cash', 'promptpay'];
   const m = modal(`คืนสินค้า / คืนเงิน — ${sale.bill_no}`, `
     <p class="muted" style="margin-top:0">เลือกจำนวนที่ลูกค้าคืน ระบบคำนวณยอดคืนตามสัดส่วนส่วนลดของบิล</p>
     <div id="rl">${left.map((i, k) => `<div class="citem"><div class="nm"><div>${esc(i.name)}</div><small>${baht(i.price)} · คืนได้ ${qtyf(i.left)}</small></div>
@@ -1143,8 +1142,8 @@ VIEWS.settings = pg => {
     ${sec('🖨️ ใบเสร็จ', `${f('receipt_size', 'ขนาดใบเสร็จ', 'select', [['58', 'เครื่องพิมพ์ความร้อน 58 มม.'], ['80', 'เครื่องพิมพ์ความร้อน 80 มม.'], ['A4', 'กระดาษ A4']])}${f('receipt_header', 'ข้อความหัวใบเสร็จ', 'textarea')}${f('receipt_footer', 'ข้อความท้ายใบเสร็จ', 'textarea')}
       <button type="button" class="btn sm" id="testPrint">🖨️ ทดสอบพิมพ์</button>`)}
   </div><div>
-    ${sec('💳 การชำระเงิน', `<div class="pills" id="pmS">${Object.keys(PAY).filter(k => !['card', 'mixed'].includes(k)).map(k => `<button type="button" data-pm="${k}" class="${pm.has(k) ? 'on' : ''}" ${edit ? '' : 'disabled'}>${payIcon(k)} ${payName(k)}</button>`).join('')}</div><br>
-      ${f('promptpay_id', 'พร้อมเพย์ (เบอร์โทร / เลขผู้เสียภาษี)')}<p class="muted" style="font-size:13px">QR พร้อมเพย์สร้างยอดเงินอัตโนมัติ — การยืนยันว่าเงินเข้าทำโดยแคชเชียร์ (การยืนยันอัตโนมัติต้องใช้ผู้ให้บริการชำระเงินของธนาคาร)</p>`)}
+    ${sec('💳 การชำระเงิน', `<p style="margin-top:0">ช่องทางรับเงิน: <b>💵 เงินสด</b> และ <b>📱 สแกนจ่าย (QR พร้อมเพย์)</b></p>
+      ${f('promptpay_id', 'เบอร์พร้อมเพย์ / เลขผู้เสียภาษี สำหรับสร้าง QR')}<p class="muted" style="font-size:13px">QR จะแสดงยอดเงินให้ลูกค้าสแกนอัตโนมัติ — ไม่ต้องเชื่อมต่อธนาคาร</p>`)}
     ${sec('🌐 ภาษาและรูปแบบ', `<div class="tabs"><button type="button" class="tab ${LANG === 'th' ? 'on' : ''}" data-l="th">ไทย</button><button type="button" class="tab ${LANG === 'en' ? 'on' : ''}" data-l="en">English</button></div>
       <div class="grid2">${f('era', 'ปีปฏิทิน', 'select', [['BE', 'พุทธศักราช (พ.ศ.)'], ['CE', 'คริสต์ศักราช (ค.ศ.)']])}${f('decimals', 'ทศนิยมของเงิน', 'select', [['2', '2 ตำแหน่ง (฿1,250.00)'], ['0', 'ไม่มีทศนิยม (฿1,250)']])}</div>${f('thai_digits', 'ใช้เลขไทย (๑๒๓)', 'check')}
       <p class="muted" style="font-size:13px">ตัวอย่าง: ${dLong(new Date())} · ${baht(1250)}</p>`)}
@@ -1185,7 +1184,7 @@ VIEWS.settings = pg => {
     ['name', 'phone', 'address', 'business_type', 'vat_mode', 'tax_id', 'branch_code', 'branch_name', 'receipt_size', 'receipt_header', 'receipt_footer', 'promptpay_id', 'era', 'logo_url'].forEach(k => { o[k] = fm[k].value.trim(); });
     ['vat_rate', 'points_per_baht', 'baht_per_point', 'decimals'].forEach(k => { o[k] = num(fm[k].value); });
     o.thai_digits = fm.thai_digits.checked; o.allow_negative_stock = fm.allow_negative_stock.checked;
-    o.payment_methods = $$('[data-pm].on', pg).map(b => b.dataset.pm); if (!o.payment_methods.length) return toast('กรุณาเลือกช่องทางชำระเงินอย่างน้อย 1 ช่องทาง', 'bad');
+    o.payment_methods = ['cash', 'promptpay'];
     if (!o.name) return toast('กรุณากรอกข้อมูลให้ครบถ้วน', 'bad');
     if (o.vat_mode !== 'none' && !/^\d{13}$/.test(o.tax_id)) return toast('ร้านที่จด VAT ต้องมีเลขประจำตัวผู้เสียภาษี 13 หลัก', 'bad');
     o.paper_width = o.receipt_size === '80' ? 80 : 58;
@@ -1389,7 +1388,7 @@ drawCart = function () {
   // payment quick tiles + big total
   const pay = $('#payBtn', el);
   if (pay && !el.querySelector('.paytiles')) {
-    const ms = shopMethods(); const tiles = [['cash', ICON.cash, 'เงินสด'], ['promptpay', ICON.qr, 'พร้อมเพย์'], [ms.includes('credit_card') ? 'credit_card' : 'transfer', ICON.card, ms.includes('credit_card') ? 'บัตร' : 'โอนเงิน']].filter(t => ms.includes(t[0]));
+    const tiles = [['cash', ICON.cash, 'เงินสด'], ['promptpay', ICON.qr, 'สแกนจ่าย']];
     pay.insertAdjacentHTML('beforebegin', `<div class="paytiles">${tiles.map(([k, ic, l]) => `<button data-q="${k}" ${S.cart.length ? '' : 'disabled'}>${ic}<span>${l}</span></button>`).join('')}</div>`);
     $$('.paytiles [data-q]', el).forEach(b => b.onclick = () => { S._payPreset = b.dataset.q; payDialog(); });
   }

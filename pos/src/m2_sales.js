@@ -191,7 +191,7 @@ billDetail = async function (sale, reload) {
 /* ================= REFUNDS ================= */
 function refundDialog(sale, items, reload) {
   const left = items.map(i => ({ ...i, left: num(i.qty) - num(i.refunded_qty), r: 0 })).filter(i => i.left > 0);
-  const methods = ['cash', 'transfer', 'promptpay', ...(sale.customer_id ? ['store_credit'] : [])];
+  const methods = ['cash', 'promptpay'];
   const m = modal(`คืนสินค้า / คืนเงิน — ${sale.bill_no}`, `
     <p class="muted" style="margin-top:0">เลือกจำนวนที่ลูกค้าคืน ระบบคำนวณยอดคืนตามสัดส่วนส่วนลดของบิล</p>
     <div id="rl">${left.map((i, k) => `<div class="citem"><div class="nm"><div>${esc(i.name)}</div><small>${baht(i.price)} · คืนได้ ${qtyf(i.left)}</small></div>

@@ -258,8 +258,8 @@ VIEWS.settings = pg => {
     ${sec('🖨️ ใบเสร็จ', `${f('receipt_size', 'ขนาดใบเสร็จ', 'select', [['58', 'เครื่องพิมพ์ความร้อน 58 มม.'], ['80', 'เครื่องพิมพ์ความร้อน 80 มม.'], ['A4', 'กระดาษ A4']])}${f('receipt_header', 'ข้อความหัวใบเสร็จ', 'textarea')}${f('receipt_footer', 'ข้อความท้ายใบเสร็จ', 'textarea')}
       <button type="button" class="btn sm" id="testPrint">🖨️ ทดสอบพิมพ์</button>`)}
   </div><div>
-    ${sec('💳 การชำระเงิน', `<div class="pills" id="pmS">${Object.keys(PAY).filter(k => !['card', 'mixed'].includes(k)).map(k => `<button type="button" data-pm="${k}" class="${pm.has(k) ? 'on' : ''}" ${edit ? '' : 'disabled'}>${payIcon(k)} ${payName(k)}</button>`).join('')}</div><br>
-      ${f('promptpay_id', 'พร้อมเพย์ (เบอร์โทร / เลขผู้เสียภาษี)')}<p class="muted" style="font-size:13px">QR พร้อมเพย์สร้างยอดเงินอัตโนมัติ — การยืนยันว่าเงินเข้าทำโดยแคชเชียร์ (การยืนยันอัตโนมัติต้องใช้ผู้ให้บริการชำระเงินของธนาคาร)</p>`)}
+    ${sec('💳 การชำระเงิน', `<p style="margin-top:0">ช่องทางรับเงิน: <b>💵 เงินสด</b> และ <b>📱 สแกนจ่าย (QR พร้อมเพย์)</b></p>
+      ${f('promptpay_id', 'เบอร์พร้อมเพย์ / เลขผู้เสียภาษี สำหรับสร้าง QR')}<p class="muted" style="font-size:13px">QR จะแสดงยอดเงินให้ลูกค้าสแกนอัตโนมัติ — ไม่ต้องเชื่อมต่อธนาคาร</p>`)}
     ${sec('🌐 ภาษาและรูปแบบ', `<div class="tabs"><button type="button" class="tab ${LANG === 'th' ? 'on' : ''}" data-l="th">ไทย</button><button type="button" class="tab ${LANG === 'en' ? 'on' : ''}" data-l="en">English</button></div>
       <div class="grid2">${f('era', 'ปีปฏิทิน', 'select', [['BE', 'พุทธศักราช (พ.ศ.)'], ['CE', 'คริสต์ศักราช (ค.ศ.)']])}${f('decimals', 'ทศนิยมของเงิน', 'select', [['2', '2 ตำแหน่ง (฿1,250.00)'], ['0', 'ไม่มีทศนิยม (฿1,250)']])}</div>${f('thai_digits', 'ใช้เลขไทย (๑๒๓)', 'check')}
       <p class="muted" style="font-size:13px">ตัวอย่าง: ${dLong(new Date())} · ${baht(1250)}</p>`)}
@@ -300,7 +300,7 @@ VIEWS.settings = pg => {
     ['name', 'phone', 'address', 'business_type', 'vat_mode', 'tax_id', 'branch_code', 'branch_name', 'receipt_size', 'receipt_header', 'receipt_footer', 'promptpay_id', 'era', 'logo_url'].forEach(k => { o[k] = fm[k].value.trim(); });
     ['vat_rate', 'points_per_baht', 'baht_per_point', 'decimals'].forEach(k => { o[k] = num(fm[k].value); });
     o.thai_digits = fm.thai_digits.checked; o.allow_negative_stock = fm.allow_negative_stock.checked;
-    o.payment_methods = $$('[data-pm].on', pg).map(b => b.dataset.pm); if (!o.payment_methods.length) return toast('กรุณาเลือกช่องทางชำระเงินอย่างน้อย 1 ช่องทาง', 'bad');
+    o.payment_methods = ['cash', 'promptpay'];
     if (!o.name) return toast('กรุณากรอกข้อมูลให้ครบถ้วน', 'bad');
     if (o.vat_mode !== 'none' && !/^\d{13}$/.test(o.tax_id)) return toast('ร้านที่จด VAT ต้องมีเลขประจำตัวผู้เสียภาษี 13 หลัก', 'bad');
     o.paper_width = o.receipt_size === '80' ? 80 : 58;

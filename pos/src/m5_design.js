@@ -131,7 +131,7 @@ drawCart = function () {
   // payment quick tiles + big total
   const pay = $('#payBtn', el);
   if (pay && !el.querySelector('.paytiles')) {
-    const ms = shopMethods(); const tiles = [['cash', ICON.cash, 'เงินสด'], ['promptpay', ICON.qr, 'พร้อมเพย์'], [ms.includes('credit_card') ? 'credit_card' : 'transfer', ICON.card, ms.includes('credit_card') ? 'บัตร' : 'โอนเงิน']].filter(t => ms.includes(t[0]));
+    const tiles = [['cash', ICON.cash, 'เงินสด'], ['promptpay', ICON.qr, 'สแกนจ่าย']];
     pay.insertAdjacentHTML('beforebegin', `<div class="paytiles">${tiles.map(([k, ic, l]) => `<button data-q="${k}" ${S.cart.length ? '' : 'disabled'}>${ic}<span>${l}</span></button>`).join('')}</div>`);
     $$('.paytiles [data-q]', el).forEach(b => b.onclick = () => { S._payPreset = b.dataset.q; payDialog(); });
   }
