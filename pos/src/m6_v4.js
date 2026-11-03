@@ -1,6 +1,6 @@
 /* ================= Shop POS v4 — promotions engine, data center, barcodes, personal use,
    activity log, branding, receipt image, cashier upgrades, auto-update ================= */
-const APP_VERSION = '4.5.1';
+const APP_VERSION = '4.6.0';
 Object.assign(TH, { 'Data center': 'ศูนย์ข้อมูล', 'Barcodes': 'บาร์โค้ด', 'Branches': 'สาขา' });
 PAGES.splice(PAGES.findIndex(p => p.id === 'settings'), 0,
   { id: 'barcodes', ic: '🏷', name: 'Barcodes', roles: ['owner', 'manager', 'stock'] },
@@ -365,12 +365,7 @@ stockForm = function (p, kind, after) {
 const _stockView4 = VIEWS.stock;
 VIEWS.stock = pg => {
   _stockView4(pg);
-  $('#tact')?.insertAdjacentHTML('beforeend', '<button class="btn" id="pers">🙋 เบิกใช้ส่วนตัว</button>');
-  $('#pers').onclick = () => productPicker('เบิกใช้ส่วนตัว', p => stockForm(p, 'personal', () => go('stock')));
-  const addBtns = () => $$('[data-k="out"]', pg).forEach(b => { if (b.nextElementSibling?.dataset.k === 'personal') return;
-    b.insertAdjacentHTML('afterend', ` <button class="btn sm" data-k="personal" data-id="${b.dataset.id}">🙋 ใช้เอง</button>`);
-    b.nextElementSibling.onclick = () => stockForm(S.products.find(p => p.id === b.dataset.id), 'personal', () => go('stock')); });
-  new MutationObserver(addBtns).observe(pg, { childList: true, subtree: true }); addBtns();
+  /* personal use lives in the cashier screen (🙋 ใช้เอง), not here */
 };
 
 /* ===================================================================== BARCODES */

@@ -681,3 +681,17 @@ code{font-family:ui-monospace,monospace;font-size:13px;background:var(--bg);padd
 .dstbl{min-width:0!important;width:100%;table-layout:fixed}.dstbl th:first-child,.dstbl td:first-child{width:56%;white-space:normal;word-break:break-word}
 .dstbl td,.dstbl th{padding-left:8px;padding-right:8px}
 @media (max-width:860px){.dswrap{max-height:none}}
+/* ================= v4.6 scan-first stock ================= */
+.stk-scan{margin-bottom:14px;display:flex;flex-direction:column;gap:6px}
+.stk-scan .sbox svg{width:20px;height:20px;color:var(--brand)}
+.sq-head{display:flex;gap:14px;align-items:center;margin-bottom:12px}
+.sq-stock{font-size:30px;font-weight:800;font-family:var(--font-h);line-height:1.1}.sq-stock small{font-size:15px;font-weight:600}
+.sq-stock.ok{color:var(--ok)}.sq-stock.warn{color:var(--warn)}.sq-stock.bad{color:var(--bad)}
+.sq-acts{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+@media (max-width:520px){.sq-acts{grid-template-columns:repeat(3,1fr)}}
+.sq-acts button{display:flex;flex-direction:column;align-items:center;gap:4px;padding:12px 6px;border-radius:14px;border:1.5px solid var(--line);background:var(--card);cursor:pointer;font-weight:600;font-size:13px;color:var(--ink);transition:.15s}
+.sq-acts button span{font-size:22px}.sq-acts button:hover{border-color:var(--brand);transform:translateY(-1px)}
+.sq-acts button.ok{border-color:var(--ok);background:var(--oksoft)}
+.sq-hist{margin-top:14px}.sq-hist .rtable{font-size:13px;margin-top:6px}
+.sclist{margin-top:10px;max-height:52vh;overflow:auto}
+#sbody td:first-child{cursor:pointer}
