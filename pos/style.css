@@ -547,3 +547,5 @@ code{background:var(--bg2);padding:2px 6px;border-radius:6px;font-size:13px}
 .updbar .x{color:#fff;background:transparent;border:0;font-size:20px;cursor:pointer}
 code{font-family:ui-monospace,monospace;font-size:13px;background:var(--bg);padding:1px 6px;border-radius:6px}
 @media (max-width:860px){.pos .toolbar{flex-wrap:wrap!important;row-gap:8px}.pos .toolbar .sbox{flex:1 1 100%!important;min-width:0}.zctl{flex:1}.zctl input[type=range]{flex:1;width:auto}}
+.authlogo{display:block;width:170px;height:170px;margin:-30px auto 6px;object-fit:contain;filter:drop-shadow(0 10px 22px #0002);animation:fade .4s}
+.auth h2{text-align:center}

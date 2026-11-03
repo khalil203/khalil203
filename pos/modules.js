@@ -1420,7 +1420,7 @@ const _goC = go;
 go = function (page) { _goC(page); $('.top')?.classList.toggle('posmode', S.page === 'pos'); };
 /* ================= Shop POS v4 — promotions engine, data center, barcodes, personal use,
    activity log, branding, receipt image, cashier upgrades, auto-update ================= */
-const APP_VERSION = '4.0.4';
+const APP_VERSION = '4.0.5';
 Object.assign(TH, { 'Data center': 'ศูนย์ข้อมูล', 'Barcodes': 'บาร์โค้ด', 'Branches': 'สาขา' });
 PAGES.splice(PAGES.findIndex(p => p.id === 'settings'), 0,
   { id: 'barcodes', ic: '🏷', name: 'Barcodes', roles: ['owner', 'manager', 'stock'] },
@@ -2341,7 +2341,7 @@ function applyBrand() {
   else ['--brand', '--brand2', '--grad'].forEach(k => root.removeProperty(k));
   if (sh.name) { document.title = sh.name + ' · Yanisa Shop'; localStorage.setItem('pos_brand', JSON.stringify({ name: sh.name, logo: sh.logo_url || '', color: c || '' })); }
   const lg = $('.side .logo'); if (lg) {
-    if (sh.logo_url) { const i = lg.querySelector('i'); if (i) i.innerHTML = `<img src="${esc(sh.logo_url)}" alt="" style="width:100%;height:100%;object-fit:contain;border-radius:inherit;background:#fff">`; }
+    { const i = lg.querySelector('i'); if (i) { i.style.background = 'transparent'; i.style.boxShadow = 'none'; i.innerHTML = `<img src="${esc(sh.logo_url || 'logo-round.png')}" alt="" style="width:100%;height:100%;object-fit:contain">`; } }
     const lt = lg.querySelector('.lt'); if (lt && lt.firstChild?.nodeType === 3) lt.firstChild.textContent = sh.name;
     const sn = lg.querySelector('.shopname'); if (sn) sn.textContent = sh.branch_name || (S.shops.length > 1 ? 'สาขา ' + (sh.branch_code || '') : 'Yanisa Shop');
   }
@@ -2354,7 +2354,8 @@ renderAuth = function () {
   _renderAuth4();
   let br = {}; try { br = JSON.parse(localStorage.getItem('pos_brand') || '{}'); } catch {}
   if (br.color) document.documentElement.style.setProperty('--brand', br.color);
-  if (br.logo) { const bm = $('.auth .brandmark'); if (bm) bm.innerHTML = `<img src="${esc(br.logo)}" alt="" style="width:100%;height:100%;object-fit:contain">`; }
+  const bm = $('.auth .brandmark'); if (bm) bm.outerHTML = '<span style="flex:1"></span>';
+  $('.auth .card .row')?.insertAdjacentHTML('afterend', '<img class="authlogo" src="logo-round.png" alt="Yanisa Shop">');
   document.title = 'Yanisa Shop';
   $('.auth .card')?.insertAdjacentHTML('beforeend', `<p class="muted" style="font-size:11px;text-align:center;margin:10px 0 0">v${APP_VERSION}</p>`);
 };
