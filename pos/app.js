@@ -1,6 +1,6 @@
 /* Shop POS — free, open POS + stock web app.  Data: Supabase.  Hosting: GitHub Pages. */
 'use strict';
-const VERSION = '1.2.0';
+const VERSION = '2.0.0';
 const sb = supabase.createClient(window.POS_CONFIG.url, window.POS_CONFIG.key, { auth: { flowType: 'pkce', detectSessionInUrl: true, persistSession: true } });
 
 /* ================= i18n ================= */
@@ -59,8 +59,9 @@ const dt = d => new Date(d).toLocaleString(LANG === 'th' ? 'th-TH' : 'en-GB', {d
 const dOnly = d => new Date(d).toLocaleDateString(LANG === 'th' ? 'th-TH' : 'en-GB');
 const ymd = d => { const x = new Date(d); return `${x.getFullYear()}-${String(x.getMonth()+1).padStart(2,'0')}-${String(x.getDate()).padStart(2,'0')}`; };
 function toast(msg, kind = '') {
-  const el = document.createElement('div'); el.className = 'toast ' + kind; el.textContent = msg;
-  $('#toast').appendChild(el); setTimeout(() => el.remove(), 2600);
+  const el = document.createElement('div'); el.className = 'toast ' + kind;
+  el.innerHTML = `<span class="ti">${kind === 'ok' ? '✓' : kind === 'bad' ? '!' : 'i'}</span><span></span>`; el.lastChild.textContent = msg;
+  $('#toast').appendChild(el); setTimeout(() => { el.classList.add('out'); setTimeout(() => el.remove(), 250); }, 2600);
 }
 function fail(e) { console.error(e); toast(e?.message || String(e), 'bad'); }
 async function q(p) { const { data, error } = await p; if (error) throw error; return data; }
@@ -119,12 +120,12 @@ const PAGES = [
 ];
 
 /* ================= modal ================= */
-function modal(title, body, {wide = false, foot = ''} = {}) {
-  const bg = document.createElement('div'); bg.className = 'mbg';
+function modal(title, body, {wide = false, foot = '', sheet = false} = {}) {
+  const bg = document.createElement('div'); bg.className = 'mbg' + (sheet ? ' sheet' : '');
   bg.innerHTML = `<div class="modal ${wide ? 'wide' : ''}"><div class="mh"><h3>${esc(title)}</h3><button class="x">×</button></div>
     <div class="mb">${body}</div>${foot ? `<div class="mf">${foot}</div>` : ''}</div>`;
   document.body.appendChild(bg);
-  const close = () => bg.remove();
+  const close = () => { if (bg.classList.contains('closing')) return; bg.classList.add('closing'); setTimeout(() => bg.remove(), 180); };
   $('.x', bg).onclick = close;
   bg.addEventListener('mousedown', e => { if (e.target === bg) close(); });
   bg.close = close;
@@ -139,7 +140,7 @@ const confirmBox = msg => new Promise(res => {
 /* generic form: fields = [{k,label,type,opts,req,step}] */
 function formModal(title, fields, values = {}, onSave, {extraFoot = ''} = {}) {
   const inp = f => {
-    const v = values[f.k] ?? f.def ?? '';
+    const v = f.type === 'color' ? (values[f.k] || f.def || '#6366f1') : (values[f.k] ?? f.def ?? '');
     if (f.type === 'select') return `<select class="in" name="${f.k}">${f.opts.map(o => `<option value="${esc(o[0])}" ${String(o[0]) === String(v) ? 'selected' : ''}>${esc(o[1])}</option>`).join('')}</select>`;
     if (f.type === 'check') return `<label class="row"><input type="checkbox" name="${f.k}" ${v ? 'checked' : ''}> ${esc(f.label)}</label>`;
     if (f.type === 'textarea') return `<textarea class="in" name="${f.k}" rows="3">${esc(v)}</textarea>`;
@@ -258,86 +259,265 @@ async function loadMaster() {
   Object.assign(S, { products: p, categories: c, customers: cu, promotions: pr, suppliers: su, shift: sh[0] || null });
 }
 
+const MAIN_TABS = ['pos', 'sales', 'products', 'reports', 'stock', 'members'];
 function renderShell() {
   const pages = PAGES.filter(p => p.roles.includes(S.role));
-  $('#root').innerHTML = `<div id="app">
+  const tabs = pages.filter(p => MAIN_TABS.includes(p.id)).slice(0, 4);
+  const initials = (S.user.user_metadata?.full_name || S.user.user_metadata?.name || S.user.email || '?').trim().slice(0, 1).toUpperCase();
+  $('#root').innerHTML = `<div id="app" class="${localStorage.getItem('pos_side') === 'mini' ? 'mini' : ''}">
     <nav class="side">
-      <div class="logo"><i>🛒</i><div>Shop POS<div class="shopname">${esc(S.shop.name)}</div></div></div>
-      ${pages.map(p => `<button class="nav" data-p="${p.id}"><span class="ic">${p.ic}</span><span>${t(p.name)}</span></button>`).join('')}
+      <div class="logo"><i>🛒</i><div class="lt">Shop POS<div class="shopname">${esc(S.shop.name)}</div></div></div>
+      <div class="navs">${pages.map((p, i) => `<button class="nav" data-p="${p.id}" style="--i:${i}" title="${t(p.name)}"><span class="ic">${p.ic}</span><span class="lb">${t(p.name)}</span></button>`).join('')}</div>
       <div class="grow"></div>
-      <div class="muted" style="font-size:11px;padding:8px 12px">${esc(S.user.email)}<br>${ROLE_NAME(S.role)} · v${VERSION}</div>
+      <button class="nav install hidden" data-install><span class="ic">📲</span><span class="lb">${t('Install app')}</span></button>
+      <button class="nav" id="themeBtn"><span class="ic">${document.documentElement.dataset.theme === 'dark' ? '☀️' : '🌙'}</span><span class="lb">${LANG === 'th' ? 'โหมดสี' : 'Theme'}</span></button>
+      <button class="nav" id="miniBtn"><span class="ic">⇆</span><span class="lb">${LANG === 'th' ? 'ย่อเมนู' : 'Collapse'}</span></button>
+      <div class="me"><span class="av">${esc(initials)}</span><div class="lb"><b>${esc(S.user.user_metadata?.full_name || S.user.user_metadata?.name || S.user.email)}</b><small>${ROLE_NAME(S.role)} · v${VERSION}</small></div></div>
     </nav>
-    <div class="main"><div class="top"><h1 id="ttl"></h1><div id="tact" class="row"></div></div><div class="page" id="pg"></div></div>
+    <div class="main">
+      <header class="top"><button class="iconbtn mob" id="shopBtn" title="${t('Shops / branches')}">🏪</button>
+        <div class="tt"><h1 id="ttl"></h1><small class="mob">${esc(S.shop.name)}</small></div><div id="tact" class="row"></div></header>
+      <div class="page" id="pg"></div>
+    </div>
+    <nav class="tabbar">${tabs.map(p => `<button class="tb" data-p="${p.id}"><span class="ic">${p.ic}</span><span>${t(p.name)}</span></button>`).join('')}
+      <button class="tb" id="moreBtn"><span class="ic">☰</span><span>${LANG === 'th' ? 'เพิ่มเติม' : 'More'}</span></button></nav>
   </div>`;
-  $$('.nav').forEach(b => b.onclick = () => go(b.dataset.p));
+  $$('[data-p]').forEach(b => b.onclick = () => go(b.dataset.p));
+  $('#miniBtn').onclick = () => { $('#app').classList.toggle('mini'); localStorage.setItem('pos_side', $('#app').classList.contains('mini') ? 'mini' : ''); };
+  $('#themeBtn').onclick = () => { setTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark'); $('#themeBtn .ic').textContent = document.documentElement.dataset.theme === 'dark' ? '☀️' : '🌙'; };
+  $('#shopBtn').onclick = () => go('settings');
+  $('#moreBtn').onclick = () => {
+    const m = modal(LANG === 'th' ? 'เมนูทั้งหมด' : 'All menus', `<div class="moregrid">${pages.map((p, i) => `<button data-go="${p.id}" style="--i:${i}" class="${S.page === p.id ? 'on' : ''}"><span>${p.ic}</span>${t(p.name)}</button>`).join('')}
+      <button data-go="__install" class="install hidden" style="--i:${pages.length}"><span>📲</span>${t('Install app')}</button>
+      <button data-go="__theme" style="--i:${pages.length + 1}"><span>${document.documentElement.dataset.theme === 'dark' ? '☀️' : '🌙'}</span>${LANG === 'th' ? 'โหมดสี' : 'Theme'}</button></div>`, {sheet: true});
+    $$('[data-go]', m).forEach(b => b.onclick = () => { m.close(); const g = b.dataset.go;
+      if (g === '__install') installApp(); else if (g === '__theme') setTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark'); else go(g); });
+    updateInstallUI();
+  };
+  $$('[data-install]').forEach(b => b.onclick = installApp);
+  updateInstallUI();
 }
 
 function go(page) {
   const p = PAGES.find(x => x.id === page && x.roles.includes(S.role)) || PAGES[0];
-  S.page = p.id; location.hash = p.id;
-  $$('.nav').forEach(b => b.classList.toggle('on', b.dataset.p === p.id));
+  S.page = p.id; if (location.hash.slice(1) !== p.id) history.replaceState(null, '', '#' + p.id);
+  $$('[data-p]').forEach(b => b.classList.toggle('on', b.dataset.p === p.id));
+  $('#moreBtn')?.classList.toggle('on', !$(`.tabbar [data-p="${p.id}"]`));
   $('#ttl').textContent = t(p.name);
   $('#tact').innerHTML = '';
-  const pg = $('#pg'); pg.style.padding = p.id === 'pos' ? '0' : ''; pg.style.overflow = p.id === 'pos' ? 'hidden' : '';
-  pg.innerHTML = '';
+  const pg = $('#pg'); pg.classList.toggle('flush', p.id === 'pos');
+  pg.innerHTML = p.id === 'pos' ? '' : `<div class="skel"><i></i><i></i><i></i><i></i></div>`;
+  pg.classList.remove('enter'); void pg.offsetWidth; pg.classList.add('enter');
+  pg.scrollTop = 0;
   Promise.resolve().then(() => VIEWS[p.id](pg)).catch(fail);
+}
+
+/* theme */
+function setTheme(th) { document.documentElement.dataset.theme = th; localStorage.setItem('pos_theme', th); $('meta[name=theme-color]')?.setAttribute('content', th === 'dark' ? '#0b0d1a' : '#4f46e5'); }
+setTheme(localStorage.getItem('pos_theme') || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'));
+
+/* install as an app (Android, Windows, Mac, iPhone) */
+const isStandalone = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone;
+function updateInstallUI() { $$('.install').forEach(b => b.classList.toggle('hidden', isStandalone())); }
+async function installApp() {
+  if (window._installEvt) { window._installEvt.prompt(); const r = await window._installEvt.userChoice; if (r.outcome === 'accepted') { window._installEvt = null; toast(t('Saved'), 'ok'); } return; }
+  const ua = navigator.userAgent, th = LANG === 'th';
+  const ios = /iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
+  const safariMac = /Macintosh/.test(ua) && /Safari/.test(ua) && !/Chrome|Edg/.test(ua);
+  const steps = ios ? (th ? ['เปิดลิงก์นี้ใน Safari', 'แตะปุ่ม แชร์ ⬆️ ด้านล่าง', 'เลือก "เพิ่มไปยังหน้าจอโฮม"', 'แตะ "เพิ่ม"'] : ['Open this link in Safari', 'Tap the Share ⬆️ button', 'Choose "Add to Home Screen"', 'Tap "Add"'])
+    : safariMac ? (th ? ['ในเมนู Safari เลือก ไฟล์ (File)', 'เลือก "เพิ่มไปยัง Dock" (Add to Dock)', 'แอปจะอยู่ใน Dock และ Launchpad'] : ['In Safari open the File menu', 'Choose "Add to Dock"', 'The app appears in your Dock and Launchpad'])
+    : /Android/.test(ua) ? (th ? ['เปิดลิงก์นี้ใน Chrome', 'แตะเมนู ⋮ มุมขวาบน', 'เลือก "ติดตั้งแอป" หรือ "เพิ่มลงในหน้าจอหลัก"'] : ['Open this link in Chrome', 'Tap the ⋮ menu (top right)', 'Choose "Install app" / "Add to Home screen"'])
+    : (th ? ['เปิดลิงก์นี้ใน Chrome หรือ Edge (Windows / Mac)', 'คลิกไอคอน ติดตั้ง ⊕ ในแถบที่อยู่ (มุมขวา)', 'คลิก "ติดตั้ง" — แอปจะอยู่ใน Start menu / Launchpad'] : ['Open this link in Chrome or Edge (Windows / Mac)', 'Click the Install ⊕ icon in the address bar', 'Click "Install" — it appears in the Start menu / Launchpad']);
+  modal(t('Install app'), `<div class="install-hero"><img src="icon-192.png" alt=""><div><b>Shop POS</b><small>${esc(location.origin + location.pathname)}</small></div></div>
+    <ol class="steps">${steps.map(x => `<li>${esc(x)}</li>`).join('')}</ol>
+    <p class="muted" style="font-size:13px">${th ? 'ใช้ได้ทั้ง Android, iPhone, Windows และ Mac — อัปเดตอัตโนมัติทุกครั้งที่เปิด' : 'Works on Android, iPhone, Windows and Mac — updates automatically every time it opens.'}</p>`);
+}
+window.addEventListener('appinstalled', () => { window._installEvt = null; updateInstallUI(); });
+
+/* button ripple + press animation for every button */
+document.addEventListener('pointerdown', e => {
+  const b = e.target.closest('.btn, .nav, .tb, .tab, .moregrid button, .paym button'); if (!b || b.disabled) return;
+  const r = b.getBoundingClientRect(), d = Math.max(r.width, r.height) * 2;
+  const w = document.createElement('span'); w.className = 'ripple';
+  w.style.cssText = `width:${d}px;height:${d}px;left:${e.clientX - r.left - d / 2}px;top:${e.clientY - r.top - d / 2}px`;
+  b.appendChild(w); setTimeout(() => w.remove(), 600);
+});
+
+/* animated number (totals) */
+function countTo(el, to, fmt = v => money(v)) {
+  if (!el) return; const from = num(el.dataset.v || 0); el.dataset.v = to;
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches || from === to) { el.textContent = fmt(to); return; }
+  const t0 = performance.now(), dur = 380;
+  const step = now => { const k = Math.min(1, (now - t0) / dur), e = 1 - Math.pow(1 - k, 3); el.textContent = fmt(from + (to - from) * e); if (k < 1) requestAnimationFrame(step); };
+  requestAnimationFrame(step);
+}
+
+/* fly-to-cart animation */
+function flyToCart(card) {
+  if (!card || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const target = matchMedia('(max-width:860px)').matches ? $('#cartfab') : $('#cart .hd');
+  const img = $('.img', card); if (!target || !img) return;
+  const a = img.getBoundingClientRect(), b = target.getBoundingClientRect();
+  const g = img.cloneNode(true); g.className = 'img flyer'; g.innerHTML = '';
+  g.style.cssText += `;left:${a.left}px;top:${a.top}px;width:${a.width}px;height:${a.height}px`;
+  document.body.appendChild(g);
+  requestAnimationFrame(() => { g.style.transform = `translate(${b.left + b.width / 2 - a.left - a.width / 2}px,${b.top + b.height / 2 - a.top - a.height / 2}px) scale(.12)`; g.style.opacity = '.4'; });
+  setTimeout(() => { g.remove(); target.classList.remove('bump'); void target.offsetWidth; target.classList.add('bump'); }, 520);
 }
 
 /* ================= POS ================= */
 function catColor(id) { return S.categories.find(c => c.id === id)?.color || '#6366f1'; }
+/* display preferences (per device) */
+const VIEW_DEF = { size: 170, fit: 'cover', ratio: '1', showStock: true, overlay: false, layout: 'grid', sort: 'name', stats: true, radius: 16 };
+let VIEWP = { ...VIEW_DEF, ...JSON.parse(localStorage.getItem('pos_view') || '{}') };
+const saveView = () => { localStorage.setItem('pos_view', JSON.stringify(VIEWP)); applyView(); drawGrid(); };
+function applyView() {
+  const g = $('#pgrid'); if (!g) return;
+  g.style.setProperty('--tile', VIEWP.size + 'px'); g.style.setProperty('--fit', VIEWP.fit);
+  g.style.setProperty('--ratio', VIEWP.ratio === '1' ? '1 / 1' : VIEWP.ratio === '43' ? '4 / 3' : '3 / 4');
+  g.style.setProperty('--rad', VIEWP.radius + 'px');
+  g.className = 'pgrid ' + (VIEWP.layout === 'list' ? 'list' : '') + (VIEWP.overlay ? ' overlay' : '');
+  $('#posStats')?.classList.toggle('hidden', !VIEWP.stats);
+}
+const isImg = p => !!p.image_url;
 function productCard(p) {
-  const out = p.track_stock && p.stock <= 0;
-  const img = p.image_url ? `style="background-image:url('${esc(p.image_url)}')"` : `style="background:${catColor(p.category_id)}"`;
-  return `<div class="pcard ${out ? 'out' : ''}" data-id="${p.id}"><div class="img" ${img}>${p.image_url ? '' : esc(p.name.slice(0, 2))}</div>
-    <div class="nm">${esc(p.name)}</div><div class="pr"><b>฿${money(p.price)}</b><span class="st">${p.track_stock ? qtyf(p.stock) + ' ' + esc(p.unit) : ''}</span></div></div>`;
+  const out = p.track_stock && p.stock <= 0, low = p.track_stock && !out && p.stock <= p.low_stock;
+  const inCart = S.cart.find(l => l.product_id === p.id)?.qty || 0;
+  const bg = p.tile_color || catColor(p.category_id);
+  const img = isImg(p) ? `style="background-image:url('${esc(p.image_url)}');background-color:${esc(bg)}22"` : `style="background:linear-gradient(135deg,${esc(bg)},${esc(bg)}bb)"`;
+  return `<div class="pcard ${out ? 'out' : ''}" data-id="${p.id}">
+    <div class="img ${isImg(p) ? 'has' : ''}" ${img}>${isImg(p) ? '' : `<span>${esc([...p.name].slice(0, 2).join(''))}</span>`}
+      ${p.favorite ? '<i class="fav">★</i>' : ''}${inCart ? `<i class="incart">${qtyf(inCart)}</i>` : ''}
+      ${out ? `<i class="badge bad">${t('Out of stock')}</i>` : low ? `<i class="badge warn">${t('Low stock')}</i>` : ''}
+      <button class="more" data-more="${p.id}" title="⋯">⋯</button></div>
+    <div class="nm">${esc(p.name)}</div>
+    <div class="pr"><b>฿${money(p.price)}</b>${VIEWP.showStock && p.track_stock ? `<span class="st">${qtyf(p.stock)} ${esc(p.unit)}</span>` : ''}</div></div>`;
 }
 
 const VIEWS = {};
+let BEST = {};      // product_id -> qty sold (30 days)
+let TODAY = null;   // today's stats
+async function loadPosStats() {
+  const start = new Date(); start.setHours(0, 0, 0, 0);
+  let qb = sb.from('sales').select('total, cost_total, payment_method, cashier_id, created_at').eq('shop_id', S.shop.id).eq('status', 'paid').gte('created_at', start.toISOString());
+  const rows = await q(qb);
+  const mine = rows.filter(r => r.cashier_id === S.user.id);
+  const sum = a => a.reduce((x, r) => x + num(r.total), 0);
+  TODAY = { total: sum(rows), bills: rows.length, mine: sum(mine), mineBills: mine.length, cash: sum(rows.filter(r => r.payment_method === 'cash')),
+    profit: rows.reduce((x, r) => x + num(r.total) - num(r.cost_total), 0), last: rows.sort((a, b) => b.created_at.localeCompare(a.created_at))[0] };
+  drawStats();
+}
+async function loadBest() {
+  const since = new Date(Date.now() - 30 * 864e5).toISOString();
+  try {
+    const it = await fetchAll(() => sb.from('sale_items').select('product_id, qty, sales!inner(created_at,status)').eq('shop_id', S.shop.id).eq('sales.status', 'paid').gte('sales.created_at', since));
+    BEST = {}; it.forEach(i => { if (i.product_id) BEST[i.product_id] = (BEST[i.product_id] || 0) + num(i.qty); });
+  } catch (e) { BEST = {}; }
+}
+function drawStats() {
+  const el = $('#posStats'); if (!el || !TODAY) return;
+  const lowN = S.products.filter(p => p.active && p.track_stock && p.stock <= p.low_stock).length;
+  const tiles = [
+    ['💰', t('Today'), '฿' + money(TODAY.total)], ['🧾', t('Bills count'), TODAY.bills],
+    ['👤', LANG === 'th' ? 'ยอดของฉัน' : 'My sales', '฿' + money(TODAY.mine)],
+    ...(can('owner', 'manager') ? [['📈', t('Gross profit'), '฿' + money(TODAY.profit)]] : []),
+    ['💵', t('Cash sales'), '฿' + money(TODAY.cash)],
+    ['⚠️', t('Low stock'), lowN],
+  ];
+  el.innerHTML = tiles.map(([i, k, v], n) => `<div class="ps" style="--i:${n}"><span>${i}</span><div><small>${k}</small><b>${v}</b></div></div>`).join('') +
+    `<div class="ps clock"><span>🕒</span><div><small>${new Date().toLocaleDateString(LANG === 'th' ? 'th-TH' : 'en-GB', {weekday: 'short', day: 'numeric', month: 'short'})}</small><b id="clk">${new Date().toLocaleTimeString('th-TH', {hour: '2-digit', minute: '2-digit'})}</b></div></div>`;
+}
+setInterval(() => { const c = $('#clk'); if (c) c.textContent = new Date().toLocaleTimeString('th-TH', {hour: '2-digit', minute: '2-digit'}); }, 15000);
+
 VIEWS.pos = pg => {
   $('#tact').innerHTML = `<span class="chip ${S.shift ? 'ok' : 'warn'}">${S.shift ? t('Shift open') : t('No open shift')}</span>
-    <button class="btn sm" id="dispBtn">🖥️ ${t('Customer display')}</button>`;
+    <button class="btn sm" id="lastBtn" title="${t('Reprint')}">🧾 <span class="hide-sm">${LANG === 'th' ? 'บิลล่าสุด' : 'Last bill'}</span></button>
+    <button class="btn sm" id="dispBtn" title="${t('Customer display')}">🖥️ <span class="hide-sm">${t('Customer display')}</span></button>
+    <button class="btn sm" id="fsBtn" title="Fullscreen">⛶</button>`;
   $('#dispBtn').onclick = () => window.open('display.html', 'posdisplay', 'width=900,height=600');
+  $('#fsBtn').onclick = () => document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen?.();
+  $('#lastBtn').onclick = async () => {
+    const r = await q(sb.from('sales').select('*').eq('shop_id', S.shop.id).order('created_at', {ascending: false}).limit(1));
+    if (r[0]) billDetail(r[0], () => {}); else toast('—');
+  };
   pg.innerHTML = `<div class="pos">
     <div class="left">
-      <div class="row"><input class="in" id="psearch" placeholder="${t('Search or scan barcode…')}" style="flex:1" value="${esc(S.search)}" autocomplete="off">
-        <button class="btn" id="scanBtn">📷 ${t('Scan')}</button></div>
+      <div class="posstats" id="posStats"></div>
+      <div class="row toolbar">
+        <div class="sbox"><span>🔍</span><input class="in" id="psearch" placeholder="${t('Search or scan barcode…')}  (F2)" value="${esc(S.search)}" autocomplete="off"><button class="clr" id="sclr">×</button></div>
+        <button class="btn" id="scanBtn">📷 <span class="hide-sm">${t('Scan')}</span></button>
+        <select class="in" id="psort" style="width:auto">${[['name', LANG === 'th' ? 'เรียง: ชื่อ' : 'Sort: Name'], ['best', LANG === 'th' ? 'ขายดี' : 'Best selling'], ['price', LANG === 'th' ? 'ราคาต่ำ→สูง' : 'Price ↑'], ['price_d', LANG === 'th' ? 'ราคาสูง→ต่ำ' : 'Price ↓'], ['stock', LANG === 'th' ? 'สต็อกน้อย' : 'Low stock first'], ['new', LANG === 'th' ? 'ใหม่ล่าสุด' : 'Newest']].map(([k, l]) => `<option value="${k}" ${VIEWP.sort === k ? 'selected' : ''}>${l}</option>`).join('')}</select>
+        <button class="btn" id="viewBtn" title="${LANG === 'th' ? 'ปรับการแสดงผล' : 'Display settings'}">🎨 <span class="hide-sm">${LANG === 'th' ? 'ปรับหน้าจอ' : 'Display'}</span></button>
+      </div>
       <div class="cats" id="cats"></div>
       <div class="pgrid" id="pgrid"></div>
     </div>
     <aside class="cart" id="cart"></aside>
     <button class="btn p lg cartfab" id="cartfab"></button>
   </div>`;
-  const cats = [{id: 'all', name: t('All')}, ...S.categories];
-  $('#cats').innerHTML = cats.map(c => `<button class="tab ${S.cat === c.id ? 'on' : ''}" data-c="${c.id}">${esc(c.name)}</button>`).join('');
-  $$('#cats .tab').forEach(b => b.onclick = () => { S.cat = b.dataset.c; $$('#cats .tab').forEach(x => x.classList.toggle('on', x === b)); drawGrid(); });
+  const drawCats = () => {
+    const cats = [{id: 'all', name: '🏠 ' + t('All')}, {id: 'fav', name: '★ ' + (LANG === 'th' ? 'รายการโปรด' : 'Favorites')}, {id: 'best', name: '🔥 ' + (LANG === 'th' ? 'ขายดี' : 'Best sellers')}, ...S.categories];
+    $('#cats').innerHTML = cats.map(c => `<button class="tab ${S.cat === c.id ? 'on' : ''}" data-c="${c.id}" ${c.color ? `style="--cc:${esc(c.color)}"` : ''}>${c.color ? '<i class="dot"></i>' : ''}${esc(c.name)} <small>${countIn(c.id)}</small></button>`).join('');
+    $$('#cats .tab').forEach(b => b.onclick = () => { S.cat = b.dataset.c; drawCats(); drawGrid(); });
+  };
   const s = $('#psearch');
   s.oninput = () => { S.search = s.value; drawGrid(); };
+  $('#sclr').onclick = () => { s.value = ''; S.search = ''; drawGrid(); s.focus(); };
   s.onkeydown = e => {
     if (e.key !== 'Enter') return;
     const v = s.value.trim(); if (!v) return;
-    const hit = S.products.find(p => p.active && (p.barcode === v || p.sku === v));
+    let qty = 1, code = v; const mm = v.match(/^(\d+(?:\.\d+)?)\*(.+)$/); if (mm) { qty = num(mm[1]); code = mm[2]; } // 3*barcode
+    const hit = S.products.find(p => p.active && (p.barcode === code || p.sku === code));
     const list = filtered();
-    if (hit) addToCart(hit); else if (list.length === 1) addToCart(list[0]); else return;
+    if (hit) addToCart(hit, qty); else if (list.length === 1) addToCart(list[0], qty); else return;
     s.value = ''; S.search = ''; drawGrid();
   };
+  $('#psort').onchange = e => { VIEWP.sort = e.target.value; saveView(); };
+  $('#viewBtn').onclick = viewSettings;
   $('#scanBtn').onclick = () => scanBarcode(code => {
     const hit = S.products.find(p => p.barcode === code || p.sku === code);
     if (hit) addToCart(hit); else toast(`${t('Barcode')} ${code} ?`, 'bad');
   });
   $('#cartfab').onclick = () => $('#cart').classList.add('open');
-  drawGrid(); drawCart();
+  S._drawCats = drawCats;
+  drawCats(); applyView(); drawGrid(); drawCart();
+  loadPosStats().catch(() => {}); loadBest().then(() => { if (S.cat === 'best' || VIEWP.sort === 'best') drawGrid(); drawCats(); });
   if (matchMedia('(min-width:861px)').matches) s.focus();
 };
+function countIn(id) {
+  const a = S.products.filter(p => p.active);
+  if (id === 'all') return a.length; if (id === 'fav') return a.filter(p => p.favorite).length; if (id === 'best') return a.filter(p => BEST[p.id]).length;
+  return a.filter(p => p.category_id === id).length;
+}
 function filtered() {
   const qs = S.search.toLowerCase();
-  return S.products.filter(p => p.active && (S.cat === 'all' || p.category_id === S.cat) &&
+  let list = S.products.filter(p => p.active &&
+    (S.cat === 'all' || (S.cat === 'fav' ? p.favorite : S.cat === 'best' ? BEST[p.id] : p.category_id === S.cat)) &&
     (!qs || p.name.toLowerCase().includes(qs) || (p.barcode || '').includes(qs) || (p.sku || '').toLowerCase().includes(qs)));
+  const srt = S.cat === 'best' ? 'best' : VIEWP.sort;
+  const by = { name: (a, b) => a.name.localeCompare(b.name, 'th'), price: (a, b) => a.price - b.price, price_d: (a, b) => b.price - a.price,
+    stock: (a, b) => (a.track_stock ? a.stock : 1e9) - (b.track_stock ? b.stock : 1e9), best: (a, b) => (BEST[b.id] || 0) - (BEST[a.id] || 0),
+    new: (a, b) => (b.created_at || '').localeCompare(a.created_at || '') }[srt];
+  list.sort((a, b) => (b.favorite - a.favorite) * (srt === 'name' ? 1 : 0) || by(a, b));
+  return list;
 }
 function drawGrid() {
   const g = $('#pgrid'); if (!g) return;
   const list = filtered();
-  g.innerHTML = list.length ? list.map(productCard).join('') : `<div class="empty" style="grid-column:1/-1">${S.products.length ? '—' : (LANG === 'th' ? 'ยังไม่มีสินค้า ไปที่หน้า "สินค้า" เพื่อเพิ่ม' : 'No products yet — add some in Products')}</div>`;
-  $$('.pcard', g).forEach(c => c.onclick = () => addToCart(S.products.find(p => p.id === c.dataset.id)));
+  g.innerHTML = list.length ? list.map((p, i) => productCard(p).replace('class="pcard', `style="--i:${Math.min(i, 24)}" class="pcard`)).join('') : `<div class="empty" style="grid-column:1/-1">${S.products.length ? '—' : (LANG === 'th' ? 'ยังไม่มีสินค้า ไปที่หน้า "สินค้า" เพื่อเพิ่ม' : 'No products yet — add some in Products')}</div>`;
+  $$('.pcard', g).forEach(c => {
+    let timer, long = false;
+    const start = () => { long = false; timer = setTimeout(() => { long = true; navigator.vibrate?.(30); quickMenu(c.dataset.id); }, 550); };
+    const cancel = () => clearTimeout(timer);
+    c.addEventListener('pointerdown', e => { if (!e.target.closest('.more')) start(); });
+    ['pointerup', 'pointerleave', 'pointercancel'].forEach(ev => c.addEventListener(ev, cancel));
+    c.addEventListener('contextmenu', e => { e.preventDefault(); cancel(); quickMenu(c.dataset.id); });
+    c.onclick = e => {
+      if (e.target.closest('.more')) { e.stopPropagation(); return quickMenu(c.dataset.id); }
+      if (long) return; flyToCart(c); addToCart(S.products.find(p => p.id === c.dataset.id));
+      c.classList.remove('pop'); void c.offsetWidth; c.classList.add('pop');
+    };
+  });
 }
 function addToCart(p, qty = 1) {
   if (!p) return;
@@ -345,8 +525,124 @@ function addToCart(p, qty = 1) {
   const want = (line?.qty || 0) + qty;
   if (p.track_stock && want > p.stock) toast(`${t('Out of stock')}: ${p.name} (${qtyf(p.stock)})`, 'bad');
   if (line) line.qty = want; else S.cart.push({product_id: p.id, name: p.name, price: num(p.price), qty, discount: 0});
-  drawCart();
+  S._lastAdded = p.id; drawCart(); refreshBadges();
 }
+function refreshBadges() {
+  $$('#pgrid .pcard').forEach(c => {
+    const n = S.cart.find(l => l.product_id === c.dataset.id)?.qty || 0;
+    let b = $('.incart', c);
+    if (n && !b) { b = document.createElement('i'); b.className = 'incart'; $('.img', c).appendChild(b); }
+    if (b) { if (n) b.textContent = qtyf(n); else b.remove(); }
+  });
+}
+
+/* quick menu on a product tile (long-press / right-click / ⋯) */
+function quickMenu(id) {
+  const p = S.products.find(x => x.id === id); if (!p) return;
+  const edit = can('owner', 'manager', 'stock');
+  const m = modal(p.name, `
+    <div class="qm-head"><div class="qm-img" style="${isImg(p) ? `background-image:url('${esc(p.image_url)}')` : `background:${esc(p.tile_color || catColor(p.category_id))}`}"></div>
+      <div><div class="b" style="font-size:20px">฿${money(p.price)}</div><div class="muted">${p.track_stock ? `${t('Stock')}: ${qtyf(p.stock)} ${esc(p.unit)}` : ''}</div>
+      <div class="muted">${esc(p.barcode)}</div>${BEST[p.id] ? `<div class="chip">🔥 ${qtyf(BEST[p.id])} / 30d</div>` : ''}</div></div>
+    <div class="qm-qty"><button class="btn lg" data-q="-1">−</button><input class="in" id="qmq" type="number" step="any" value="1" inputmode="decimal"><button class="btn lg" data-q="1">+</button>
+      <button class="btn p lg" id="qmAdd">🛒 ${t('Add')}</button></div>
+    <div class="qm-grid">
+      <button class="btn" id="qmFav">${p.favorite ? '☆ ' + (LANG === 'th' ? 'เอาออกจากโปรด' : 'Unfavorite') : '★ ' + (LANG === 'th' ? 'เพิ่มในโปรด' : 'Favorite')}</button>
+      ${edit ? `<button class="btn" id="qmPic">🖼️ ${LANG === 'th' ? 'เปลี่ยนรูป' : 'Change picture'}</button>
+      <button class="btn" id="qmCam">📸 ${LANG === 'th' ? 'ถ่ายรูป' : 'Take photo'}</button>
+      <button class="btn" id="qmColor">🎨 ${LANG === 'th' ? 'สีไทล์' : 'Tile colour'}</button>
+      <button class="btn" id="qmEdit">✏️ ${t('Edit')}</button>
+      <button class="btn" id="qmStock">📦 ${t('Receive')}</button>` : ''}
+    </div>`);
+  $$('[data-q]', m).forEach(b => b.onclick = () => { const i = $('#qmq', m); i.value = Math.max(1, num(i.value) + num(b.dataset.q)); });
+  $('#qmAdd', m).onclick = () => { addToCart(p, Math.max(0.001, num($('#qmq', m).value))); m.close(); };
+  $('#qmFav', m).onclick = async () => { try { await q(sb.from('products').update({favorite: !p.favorite}).eq('id', p.id)); p.favorite = !p.favorite; m.close(); S._drawCats?.(); drawGrid(); } catch (e) { fail(e); } };
+  if (!edit) return;
+  const pick = capture => { m.close(); pickImage(capture).then(f => f && uploadProductImage(p, f)); };
+  $('#qmPic', m).onclick = () => pick(false);
+  $('#qmCam', m).onclick = () => pick(true);
+  $('#qmColor', m).onclick = () => { m.close(); colorPicker(p); };
+  $('#qmEdit', m).onclick = () => { m.close(); productForm(p, () => { S._drawCats?.(); drawGrid(); }); };
+  $('#qmStock', m).onclick = () => { m.close(); stockForm(p, 'in', () => drawGrid()); };
+}
+const SWATCHES = ['#ef4444', '#f97316', '#f59e0b', '#eab308', '#84cc16', '#22c55e', '#10b981', '#14b8a6', '#06b6d4', '#0ea5e9', '#3b82f6', '#6366f1', '#8b5cf6', '#a855f7', '#d946ef', '#ec4899', '#f43f5e', '#78716c', '#334155', '#111827'];
+function colorPicker(p) {
+  const m = modal(LANG === 'th' ? 'สีไทล์' : 'Tile colour', `<div class="swatches">${SWATCHES.map(c => `<button data-c="${c}" style="background:${c}" class="${p.tile_color === c ? 'on' : ''}"></button>`).join('')}</div>
+    <div class="row" style="margin-top:12px"><input type="color" id="cc2" value="${esc(p.tile_color || catColor(p.category_id))}" style="width:56px;height:44px;border:0;background:none"><span class="sp"></span>
+    <button class="btn" id="ccReset">${LANG === 'th' ? 'ใช้สีหมวดหมู่' : 'Use category colour'}</button></div>`);
+  const set = async c => { try { await q(sb.from('products').update({tile_color: c}).eq('id', p.id)); p.tile_color = c; m.close(); drawGrid(); } catch (e) { fail(e); } };
+  $$('[data-c]', m).forEach(b => b.onclick = () => set(b.dataset.c));
+  $('#cc2', m).onchange = e => set(e.target.value);
+  $('#ccReset', m).onclick = () => set('');
+}
+
+/* image upload: pick → resize to 800px WebP → Supabase Storage */
+function pickImage(capture) {
+  return new Promise(res => {
+    const i = document.createElement('input'); i.type = 'file'; i.accept = 'image/*'; if (capture) i.capture = 'environment';
+    i.onchange = () => res(i.files[0] || null); i.click();
+  });
+}
+async function resizeImage(file, max = 800) {
+  const bmp = await createImageBitmap(file);
+  const sc = Math.min(1, max / Math.max(bmp.width, bmp.height));
+  const cv = document.createElement('canvas'); cv.width = Math.round(bmp.width * sc); cv.height = Math.round(bmp.height * sc);
+  cv.getContext('2d').drawImage(bmp, 0, 0, cv.width, cv.height);
+  return await new Promise(r => cv.toBlob(b => r(b), 'image/webp', 0.85)) || await new Promise(r => cv.toBlob(b => r(b), 'image/jpeg', 0.85));
+}
+async function uploadImageFile(file) {
+  const blob = await resizeImage(file);
+  const ext = blob.type === 'image/webp' ? 'webp' : 'jpg';
+  const path = `${S.shop.id}/${crypto.randomUUID()}.${ext}`;
+  const { error } = await sb.storage.from('product-images').upload(path, blob, { contentType: blob.type, upsert: false });
+  if (error) throw error;
+  return sb.storage.from('product-images').getPublicUrl(path).data.publicUrl;
+}
+async function uploadProductImage(p, file) {
+  toast(LANG === 'th' ? 'กำลังอัปโหลดรูป…' : 'Uploading picture…');
+  try {
+    const url = await uploadImageFile(file);
+    await q(sb.from('products').update({image_url: url}).eq('id', p.id)); p.image_url = url;
+    toast(t('Saved'), 'ok'); drawGrid();
+  } catch (e) { fail(e); }
+}
+
+/* display settings */
+function viewSettings() {
+  const th = LANG === 'th';
+  const m = modal(th ? 'ปรับการแสดงผลหน้าขาย' : 'Sell screen display', `
+    <div class="fg"><label class="f">${th ? 'ขนาดรูป/ไทล์' : 'Picture / tile size'}: <b id="szv">${VIEWP.size}px</b></label>
+      <input type="range" id="vsz" min="100" max="320" step="10" value="${VIEWP.size}" style="width:100%">
+      <div class="row">${[[120, 'S'], [170, 'M'], [220, 'L'], [280, 'XL']].map(([v, l]) => `<button class="btn sm" data-sz="${v}">${l}</button>`).join('')}</div></div>
+    <div class="grid2">
+      <div class="fg"><label class="f">${th ? 'รูปแบบ' : 'Layout'}</label><select class="in" id="vlay"><option value="grid">${th ? 'ตาราง (ไทล์)' : 'Grid tiles'}</option><option value="list">${th ? 'รายการ' : 'List'}</option></select></div>
+      <div class="fg"><label class="f">${th ? 'สัดส่วนรูป' : 'Picture shape'}</label><select class="in" id="vrat"><option value="1">${th ? 'สี่เหลี่ยมจัตุรัส' : 'Square'} 1:1</option><option value="43">${th ? 'แนวนอน' : 'Landscape'} 4:3</option><option value="34">${th ? 'แนวตั้ง' : 'Portrait'} 3:4</option></select></div>
+      <div class="fg"><label class="f">${th ? 'การแสดงรูป' : 'Picture fit'}</label><select class="in" id="vfit"><option value="cover">${th ? 'เต็มกรอบ (ครอป)' : 'Fill (crop)'}</option><option value="contain">${th ? 'แสดงทั้งรูป' : 'Whole picture'}</option></select></div>
+      <div class="fg"><label class="f">${th ? 'ความโค้งมุม' : 'Corner radius'}: <b id="rdv">${VIEWP.radius}</b></label><input type="range" id="vrad" min="0" max="28" value="${VIEWP.radius}" style="width:100%"></div>
+    </div>
+    <label class="row fg"><input type="checkbox" id="vov" ${VIEWP.overlay ? 'checked' : ''}> ${th ? 'ชื่อและราคาทับบนรูป' : 'Name & price on top of picture'}</label>
+    <label class="row fg"><input type="checkbox" id="vst" ${VIEWP.showStock ? 'checked' : ''}> ${th ? 'แสดงจำนวนสต็อก' : 'Show stock'}</label>
+    <label class="row fg"><input type="checkbox" id="vstat" ${VIEWP.stats ? 'checked' : ''}> ${th ? 'แสดงแถบยอดขายวันนี้' : 'Show today\'s stats bar'}</label>
+    <p class="muted" style="font-size:13px">💡 ${th ? 'กดค้างที่สินค้า (หรือปุ่ม ⋯) เพื่อเปลี่ยนรูป ถ่ายรูป เปลี่ยนสี หรือเพิ่มในรายการโปรด' : 'Long-press a product (or ⋯) to change its picture, take a photo, set a colour or favorite it.'}<br>⌨️ F2 ${th ? 'ค้นหา' : 'search'} · F4 ${t('Hold')} · F9 ${t('Pay')} · 3*barcode = ${t('Qty')} 3</p>`,
+    {foot: `<button class="btn" id="vreset">${th ? 'ค่าเริ่มต้น' : 'Reset'}</button><span style="flex:1"></span><button class="btn p" data-ok>OK</button>`});
+  $('#vlay', m).value = VIEWP.layout; $('#vrat', m).value = VIEWP.ratio; $('#vfit', m).value = VIEWP.fit;
+  const upd = () => { Object.assign(VIEWP, { size: +$('#vsz', m).value, layout: $('#vlay', m).value, ratio: $('#vrat', m).value, fit: $('#vfit', m).value,
+    radius: +$('#vrad', m).value, overlay: $('#vov', m).checked, showStock: $('#vst', m).checked, stats: $('#vstat', m).checked });
+    $('#szv', m).textContent = VIEWP.size + 'px'; $('#rdv', m).textContent = VIEWP.radius; saveView(); };
+  $$('input,select', m).forEach(el => el.oninput = el.onchange = upd);
+  $$('[data-sz]', m).forEach(b => b.onclick = () => { $('#vsz', m).value = b.dataset.sz; upd(); });
+  $('#vreset', m).onclick = () => { VIEWP = { ...VIEW_DEF, sort: VIEWP.sort }; saveView(); m.close(); viewSettings(); };
+  $('[data-ok]', m).onclick = m.close;
+}
+
+/* keyboard shortcuts on the sell screen */
+document.addEventListener('keydown', e => {
+  if (S.page !== 'pos' || !$('#pgrid')) return;
+  if (e.key === 'F2') { e.preventDefault(); $('#psearch')?.focus(); }
+  if (e.key === 'F4') { e.preventDefault(); $('#holdBtn')?.click(); }
+  if (e.key === 'F9') { e.preventDefault(); if (!$('.mbg')) $('#payBtn')?.click(); }
+  if (e.key === 'Escape') { $('.mbg:last-of-type .x')?.click(); }
+});
 
 function calc() {
   const sh = S.shop;
@@ -385,7 +681,7 @@ function drawCart() {
         ${activePromos.map(p => `<option value="${p.id}" ${S.promo?.id === p.id ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}</select>
     </div>
     <div class="items">${S.cart.length ? S.cart.map((l, i) => `
-      <div class="citem"><div class="nm" data-i="${i}" style="cursor:pointer"><div>${esc(l.name)}</div>
+      <div class="citem ${l.product_id === S._lastAdded ? 'new' : ''}"><div class="nm" data-i="${i}" style="cursor:pointer"><div>${esc(l.name)}</div>
         <small>฿${money(l.price)}${l.discount ? ` · -${money(l.discount)}` : ''}</small></div>
         <div class="qty"><button data-d="${i}">−</button><span data-q="${i}" style="cursor:pointer">${qtyf(l.qty)}</span><button data-u="${i}">+</button></div>
         <b style="width:76px;text-align:right">${money(l.price * l.qty - l.discount)}</b></div>`).join('') : `<div class="empty">🛒<br>${t('Cart is empty')}</div>`}</div>
@@ -394,13 +690,14 @@ function drawCart() {
       <div class="tline"><a href="#" id="discBtn">${t('Bill discount')}</a><span>${c.discount ? '-' + money(c.discount) : '0.00'}</span></div>
       ${S.customer && num(S.customer.points) > 0 ? `<div class="tline"><a href="#" id="ptsBtn">${t('Use points')} (${qtyf(c.pointsUse)})</a><span>-${money(c.pointsDisc)}</span></div>` : ''}
       ${S.shop.vat_mode !== 'none' ? `<div class="tline muted"><span>${t('VAT')} ${num(S.shop.vat_rate)}% ${S.shop.vat_mode === 'included' ? '(incl.)' : ''}</span><span>${money(c.vat)}</span></div>` : ''}
-      <div class="tline big"><span>${t('Total')}</span><span>฿${money(c.total)}</span></div>
-      <button class="btn p lg" id="payBtn" ${S.cart.length ? '' : 'disabled'}>💳 ${t('Pay')} ฿${money(c.total)}</button>
+      <div class="tline big"><span>${t('Total')}</span><span>฿<span id="cTot" data-v="${S._lastTot || 0}">${money(S._lastTot || 0)}</span></span></div>
+      <button class="btn p lg paybtn" id="payBtn" ${S.cart.length ? '' : 'disabled'}><span>💳 ${t('Pay')}</span><b>฿${money(c.total)}</b><kbd>F9</kbd></button>
     </div>`;
-  const fab = $('#cartfab'); if (fab) fab.textContent = `🛒 ${qtyf(n)} · ฿${money(c.total)}`;
+  countTo($('#cTot'), c.total); S._lastTot = c.total; S._lastAdded = null;
+  const fab = $('#cartfab'); if (fab) { fab.innerHTML = `<span class="fc">${qtyf(n)}</span><span>${t('Cart')}</span><b>฿${money(c.total)}</b><span>›</span>`; fab.classList.toggle('empty', !n); }
   $('#cartClose').onclick = () => el.classList.remove('open');
   $$('[data-u]', el).forEach(b => b.onclick = () => { const l = S.cart[b.dataset.u]; addToCart(S.products.find(p => p.id === l.product_id) || l, 1); });
-  $$('[data-d]', el).forEach(b => b.onclick = () => { const l = S.cart[b.dataset.d]; l.qty--; if (l.qty <= 0) S.cart.splice(b.dataset.d, 1); drawCart(); });
+  $$('[data-d]', el).forEach(b => b.onclick = () => { const l = S.cart[b.dataset.d]; l.qty--; if (l.qty <= 0) S.cart.splice(b.dataset.d, 1); drawCart(); refreshBadges(); });
   $$('[data-q],[data-i]', el).forEach(b => b.onclick = () => editLine(+(b.dataset.q ?? b.dataset.i)));
   $('#clrBtn').onclick = () => { resetSale(); };
   $('#holdBtn').onclick = () => { S.held.push({at: Date.now(), cart: S.cart, customer: S.customer}); saveHeld(); resetSale(); toast(t('Hold'), 'ok'); };
@@ -435,7 +732,7 @@ function showHeld() {
     saveHeld(); m.close(); drawCart(); });
   $$('[data-x]', m).forEach(b => b.onclick = () => { S.held.splice(+b.dataset.x, 1); saveHeld(); m.close(); showHeld(); drawCart(); });
 }
-function resetSale() { S.cart = []; S.customer = null; S.promo = null; S.billDisc = 0; S.billDiscPct = false; S.pointsUse = 0; drawCart(); }
+function resetSale() { S.cart = []; S.customer = null; S.promo = null; S.billDisc = 0; S.billDiscPct = false; S.pointsUse = 0; drawCart(); refreshBadges(); }
 
 function pickMember() {
   const m = modal(t('Member'), `<div class="row" style="margin-bottom:10px"><input class="in" id="ms" placeholder="${t('Search')} ${t('Name')} / ${t('Phone')}" style="flex:1"><button class="btn p" id="mAdd">+ ${t('Add member')}</button></div><div id="ml"></div>`);
@@ -521,7 +818,7 @@ function payDialog() {
       m.close();
       bc?.postMessage({type: 'thanks', total: c.total, change: sale.change});
       const cust = S.customer;
-      resetSale(); drawGrid();
+      resetSale(); drawGrid(); loadPosStats().catch(() => {});
       showReceipt(sale, items, cust, localStorage.getItem('pos_autoprint') === '1');
     } catch (e) { fail(e); btn.disabled = false; }
   };
@@ -650,7 +947,10 @@ function productForm(p, after) {
     {k:'price', label:t('Price'), type:'number', req:true}, {k:'cost', label:t('Cost'), type:'number', def:0},
     ...(isNew ? [{k:'stock', label:t('Stock'), type:'number', def:0}] : []),
     {k:'low_stock', label:t('Low stock alert'), type:'number', def:5},
-    {k:'image_url', label:t('Image URL'), full:true},
+    {k:'image_url', label:t('Image URL'), full:true, after:`<div class="row" style="margin-top:8px"><div id="pimgPrev" class="qm-img" style="width:72px;height:72px;${p.image_url ? `background-image:url('${esc(p.image_url)}')` : ''}"></div>
+      <button type="button" class="btn sm" id="pimgUp">🖼️ ${LANG === 'th' ? 'อัปโหลดรูป' : 'Upload picture'}</button><button type="button" class="btn sm" id="pimgCam">📸 ${LANG === 'th' ? 'ถ่ายรูป' : 'Take photo'}</button><button type="button" class="btn sm" id="pimgX">×</button></div>`},
+    {k:'tile_color', label:(LANG === 'th' ? 'สีไทล์' : 'Tile colour'), type:'color', def: catColor(p.category_id)},
+    {k:'favorite', label:'★ ' + (LANG === 'th' ? 'รายการโปรด' : 'Favorite'), type:'check'},
     {k:'track_stock', label:t('Track stock'), type:'check', def:true}, {k:'active', label:t('Active'), type:'check', def:true},
   ], isNew ? {track_stock: true, active: true} : p, async o => {
     o.category_id = o.category_id || null; o.cost = num(o.cost); o.low_stock = num(o.low_stock);
@@ -666,6 +966,10 @@ function productForm(p, after) {
     S.products.sort((a, b) => a.name.localeCompare(b.name)); after?.();
   }, {extraFoot: isNew ? '' : `<button class="btn bad" id="pdel">${t('Delete')}</button>`});
   $('#pscan', m).onclick = () => scanBarcode(code => { $('[name=barcode]', m).value = code; });
+  const setImg = u => { $('[name=image_url]', m).value = u; $('#pimgPrev', m).style.backgroundImage = u ? `url('${u}')` : ''; };
+  const up = async cap => { const f = await pickImage(cap); if (!f) return; toast(LANG === 'th' ? 'กำลังอัปโหลดรูป…' : 'Uploading picture…'); try { setImg(await uploadImageFile(f)); toast(t('Saved'), 'ok'); } catch (e) { fail(e); } };
+  $('#pimgUp', m).onclick = () => up(false); $('#pimgCam', m).onclick = () => up(true); $('#pimgX', m).onclick = () => setImg('');
+  $('[name=image_url]', m).oninput = e => setImg(e.target.value.trim());
   if (!isNew) $('#pdel', m).onclick = async () => {
     if (!await confirmBox(p.name)) return;
     try { await q(sb.from('products').delete().eq('id', p.id)); S.products = S.products.filter(x => x.id !== p.id); m.close(); toast(t('Deleted')); after?.(); } catch (e) { fail(e); }
@@ -924,7 +1228,7 @@ VIEWS.settings = pg => {
           <table class="tbl" style="box-shadow:none">${S.shops.map(s => `<tr><td>${esc(s.name)}<br><small class="muted">${ROLE_NAME(s._role)}</small></td><td class="right">${s.id === sh.id ? '<span class="chip ok">●</span>' : `<button class="btn sm" data-s="${s.id}">${t('Switch')}</button>`}</td></tr>`).join('')}</table>
           <br><button class="btn" id="nb">+ ${t('New branch')}</button></div>
         <div class="card"><h3 style="margin-top:0">👤 ${t('Account')}</h3><p>${esc(S.user.email)} · ${ROLE_NAME(S.role)}</p>
-          <div class="row">${can('owner', 'manager') ? `<button class="btn" id="bk">💾 ${t('Backup data')}</button>` : ''}<button class="btn" id="ins" style="display:${window._installEvt ? '' : 'none'}">📲 ${t('Install app')}</button>${S.user.app_metadata?.provider === 'email' ? `<button class="btn" id="cpw">🔑 ${LANG === 'th' ? 'เปลี่ยนรหัสผ่าน' : 'Change password'}</button>` : ''}<button class="btn bad" id="lo">${t('Logout')}</button></div>
+          <div class="row">${can('owner', 'manager') ? `<button class="btn" id="bk">💾 ${t('Backup data')}</button>` : ''}<button class="btn install" data-install>📲 ${t('Install app')}</button>${S.user.app_metadata?.provider === 'email' ? `<button class="btn" id="cpw">🔑 ${LANG === 'th' ? 'เปลี่ยนรหัสผ่าน' : 'Change password'}</button>` : ''}<button class="btn bad" id="lo">${t('Logout')}</button></div>
           <p class="muted" style="font-size:12px">${t('Version')} ${VERSION} · <a href="https://github.com/khalil203/khalil203/tree/main/pos" target="_blank">GitHub</a></p></div>
       </div>
     </div>`;
@@ -956,7 +1260,7 @@ VIEWS.settings = pg => {
       if (o.p1 !== o.p2) throw new Error(LANG === 'th' ? 'รหัสผ่านไม่ตรงกัน' : 'Passwords do not match');
       const { error } = await sb.auth.updateUser({ password: o.p1 }); if (error) throw error;
     });
-  $('#ins').onclick = () => window._installEvt?.prompt();
+  $$('[data-install]', pg).forEach(b => b.onclick = installApp); updateInstallUI();
   if ($('#bk')) $('#bk').onclick = async () => {
     const id = S.shop.id; const out = {shop: sh, exported_at: new Date().toISOString()};
     for (const tb of ['categories', 'products', 'customers', 'suppliers', 'promotions', 'expenses', 'shifts', 'sales', 'sale_items', 'stock_moves'])
@@ -966,10 +1270,10 @@ VIEWS.settings = pg => {
 };
 
 /* ================= start ================= */
-window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); window._installEvt = e; });
+window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); window._installEvt = e; updateInstallUI(); });
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
 sb.auth.onAuthStateChange((ev) => { if (ev === 'SIGNED_OUT') renderAuth(); });
-window.addEventListener('hashchange', () => { if (S.shop && location.hash.slice(1) !== S.page) go(location.hash.slice(1)); });
+window.addEventListener('hashchange', () => { if (S.shop && $('#pg') && location.hash.slice(1) !== S.page) go(location.hash.slice(1)); });
 { const u = new URLSearchParams(location.search + '&' + location.hash.slice(1)); const er = u.get('error_description');
   if (er) { history.replaceState(null, '', location.pathname); setTimeout(() => toast(er, 'bad'), 300); } }
 boot().catch(e => { fail(e); renderAuth(); });
