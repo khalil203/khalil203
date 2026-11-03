@@ -1,6 +1,6 @@
 /* Shop POS — free, open POS + stock web app.  Data: Supabase.  Hosting: GitHub Pages. */
 'use strict';
-const VERSION = '2.0.1';
+const VERSION = '2.1.0';
 const sb = supabase.createClient(window.POS_CONFIG.url, window.POS_CONFIG.key, { auth: { flowType: 'pkce', detectSessionInUrl: true, persistSession: true } });
 
 /* ================= i18n ================= */
@@ -501,22 +501,45 @@ function filtered() {
   list.sort((a, b) => (b.favorite - a.favorite) * (srt === 'name' ? 1 : 0) || by(a, b));
   return list;
 }
+const BATCH = 40;
 function drawGrid() {
   const g = $('#pgrid'); if (!g) return;
   const list = filtered();
-  g.innerHTML = list.length ? list.map((p, i) => productCard(p).replace('class="pcard', `style="--i:${Math.min(i, 24)}" class="pcard`)).join('') : `<div class="empty" style="grid-column:1/-1">${S.products.length ? '—' : (LANG === 'th' ? 'ยังไม่มีสินค้า ไปที่หน้า "สินค้า" เพื่อเพิ่ม' : 'No products yet — add some in Products')}</div>`;
-  $$('.pcard', g).forEach(c => {
-    let timer, long = false;
-    const start = () => { long = false; timer = setTimeout(() => { long = true; navigator.vibrate?.(30); quickMenu(c.dataset.id); }, 550); };
-    const cancel = () => clearTimeout(timer);
-    c.addEventListener('pointerdown', e => { if (!e.target.closest('.more')) start(); });
-    ['pointerup', 'pointerleave', 'pointercancel'].forEach(ev => c.addEventListener(ev, cancel));
-    c.addEventListener('contextmenu', e => { e.preventDefault(); cancel(); quickMenu(c.dataset.id); });
-    c.onclick = e => {
-      if (e.target.closest('.more')) { e.stopPropagation(); return quickMenu(c.dataset.id); }
-      if (long) return; flyToCart(c); addToCart(S.products.find(p => p.id === c.dataset.id));
-      c.classList.remove('pop'); void c.offsetWidth; c.classList.add('pop');
-    };
+  g._list = list; g._shown = 0; g.scrollTop = 0;
+  g.innerHTML = list.length ? '' : `<div class="empty" style="grid-column:1/-1">${S.products.length ? '—' : (LANG === 'th' ? 'ยังไม่มีสินค้า ไปที่หน้า "สินค้า" เพื่อเพิ่ม' : 'No products yet — add some in Products')}</div>`;
+  moreTiles(g);
+  wireGrid(g);
+}
+/* render tiles in batches as the user scrolls (keeps phones fast with hundreds of products) */
+function moreTiles(g) {
+  const list = g._list || [], from = g._shown || 0; if (from >= list.length) return;
+  const to = Math.min(list.length, from + BATCH);
+  g.querySelector('.sentinel')?.remove();
+  g.insertAdjacentHTML('beforeend', list.slice(from, to).map((p, i) => productCard(p).replace('class="pcard', `style="--i:${Math.min(i, 16)}" class="pcard ${from === 0 && i < 16 ? 'anim' : ''}`)).join('') +
+    (to < list.length ? '<div class="sentinel" style="grid-column:1/-1;height:1px"></div>' : ''));
+  g._shown = to;
+  const sen = g.querySelector('.sentinel');
+  if (sen) { g._io?.disconnect(); g._io = new IntersectionObserver(es => { if (es.some(e => e.isIntersecting)) moreTiles(g); }, {root: g, rootMargin: '600px'}); g._io.observe(sen); }
+}
+/* one set of listeners for the whole grid (tap = add, long-press / ⋯ / right-click = quick menu) */
+function wireGrid(g) {
+  if (g._wired) return; g._wired = true;
+  let timer = null, long = false, sx = 0, sy = 0, card = null;
+  const cancel = () => { clearTimeout(timer); timer = null; };
+  g.addEventListener('pointerdown', e => {
+    card = e.target.closest('.pcard'); long = false; if (!card || e.target.closest('.more')) return;
+    sx = e.clientX; sy = e.clientY;
+    timer = setTimeout(() => { long = true; navigator.vibrate?.(30); quickMenu(card.dataset.id); }, 550);
+  }, {passive: true});
+  g.addEventListener('pointermove', e => { if (timer && (Math.abs(e.clientX - sx) > 8 || Math.abs(e.clientY - sy) > 8)) cancel(); }, {passive: true});
+  ['pointerup', 'pointercancel', 'scroll'].forEach(ev => g.addEventListener(ev, cancel, {passive: true}));
+  g.addEventListener('contextmenu', e => { const c = e.target.closest('.pcard'); if (!c) return; e.preventDefault(); cancel(); quickMenu(c.dataset.id); });
+  g.addEventListener('click', e => {
+    const c = e.target.closest('.pcard'); if (!c) return;
+    if (e.target.closest('.more')) { e.stopPropagation(); return quickMenu(c.dataset.id); }
+    if (long) { long = false; return; }
+    flyToCart(c); addToCart(S.products.find(p => p.id === c.dataset.id));
+    c.classList.remove('pop'); void c.offsetWidth; c.classList.add('pop');
   });
 }
 function addToCart(p, qty = 1) {
