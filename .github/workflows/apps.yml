@@ -1,4 +1,4 @@
-name: Build Shop POS apps (Android APK · Windows EXE · macOS DMG)
+name: Build Yanisa Shop apps (Android APK · Windows EXE · macOS DMG)
 
 on:
   workflow_dispatch:
@@ -67,11 +67,11 @@ jobs:
       - run: npx cap sync android
       - run: chmod +x gradlew && ./gradlew assembleDebug --no-daemon
         working-directory: apps/android/android
-      - run: cp android/app/build/outputs/apk/debug/app-debug.apk ShopPOS.apk
+      - run: cp android/app/build/outputs/apk/debug/app-debug.apk YanisaShop.apk
       - uses: actions/upload-artifact@v4
         with:
           name: android
-          path: apps/android/ShopPOS.apk
+          path: apps/android/YanisaShop.apk
 
   release:
     needs: [desktop, android]
@@ -86,12 +86,12 @@ jobs:
       - uses: softprops/action-gh-release@v2
         with:
           tag_name: app-latest
-          name: Yanisa Shop POS — แอปสำหรับ Android / Windows / Mac
+          name: Yanisa Shop — แอปสำหรับ Android / Windows / Mac
           make_latest: true
           body: |
-            แอปเปิดระบบ Yanisa Shop POS ตัวจริงจากอินเทอร์เน็ต — อัปเดตอัตโนมัติทุกครั้งที่ระบบมีเวอร์ชันใหม่ ไม่ต้องดาวน์โหลดซ้ำ
-            • Android: ShopPOS.apk (อนุญาต "ติดตั้งจากแหล่งที่ไม่รู้จัก")
-            • Windows: ShopPOS-Setup.exe (ติดตั้ง) หรือ ShopPOS-Portable.exe (ไม่ต้องติดตั้ง) — ถ้าขึ้นคำเตือน กด "More info → Run anyway"
-            • Mac: ShopPOS-mac.dmg — ครั้งแรกให้คลิกขวาที่แอป → Open
+            แอปเปิดระบบ Yanisa Shop ตัวจริงจากอินเทอร์เน็ต — อัปเดตอัตโนมัติทุกครั้งที่ระบบมีเวอร์ชันใหม่ ไม่ต้องดาวน์โหลดซ้ำ
+            • Android: YanisaShop.apk (อนุญาต "ติดตั้งจากแหล่งที่ไม่รู้จัก")
+            • Windows: YanisaShop-Setup.exe (ติดตั้ง) หรือ YanisaShop-Portable.exe (ไม่ต้องติดตั้ง) — ถ้าขึ้นคำเตือน กด "More info → Run anyway"
+            • Mac: YanisaShop-mac.dmg — ครั้งแรกให้คลิกขวาที่แอป → Open
           files: out/*
           fail_on_unmatched_files: false

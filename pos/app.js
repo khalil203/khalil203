@@ -1,6 +1,6 @@
 /* Shop POS — free, open POS + stock web app.  Data: Supabase.  Hosting: GitHub Pages. */
 'use strict';
-const VERSION = '4.0.3';
+const VERSION = '4.0.4';
 const sb = supabase.createClient(window.POS_CONFIG.url, window.POS_CONFIG.key, { auth: { flowType: 'pkce', detectSessionInUrl: true, persistSession: true } });
 
 /* ================= i18n ================= */
@@ -183,7 +183,7 @@ function renderAuth() {
   const th = LANG === 'th', last = localStorage.getItem('pos_last_user') || '';
   $('#root').innerHTML = `<div class="auth"><div class="card">
     <div class="row"><div class="brandmark">🛒</div><span style="flex:1"></span><button class="tab" id="lng" style="align-self:flex-start">${th ? 'EN' : 'ไทย'}</button></div>
-    <h2>Yanisa Shop POS</h2><p class="muted" style="margin-top:0">${th ? 'เข้าสู่ระบบด้วยชื่อผู้ใช้และรหัสผ่านที่ได้รับจากผู้ดูแลร้าน' : 'Sign in with the username and password from your shop admin'}</p>
+    <h2>Yanisa Shop</h2><p class="muted" style="margin-top:0">${th ? 'เข้าสู่ระบบด้วยชื่อผู้ใช้และรหัสผ่านที่ได้รับจากผู้ดูแลร้าน' : 'Sign in with the username and password from your shop admin'}</p>
     <form id="af">
       <div class="fg"><label class="f" for="au">${th ? 'ชื่อผู้ใช้' : 'Username'}</label><input class="in" id="au" name="user" required autocomplete="username" autocapitalize="off" spellcheck="false" value="${esc(last)}"></div>
       <div class="fg"><label class="f" for="ap">${th ? 'รหัสผ่าน' : 'Password'}</label><div class="sbox" style="padding-left:0"><input class="in" id="ap" name="pw" type="password" required autocomplete="current-password"><button type="button" class="clr" id="eye" title="show">👁</button></div></div>
@@ -279,7 +279,7 @@ function renderShell() {
   const initials = (S.user.user_metadata?.full_name || S.user.user_metadata?.name || S.user.email || '?').trim().slice(0, 1).toUpperCase();
   $('#root').innerHTML = `<div id="app" class="${localStorage.getItem('pos_side') === 'mini' ? 'mini' : ''}">
     <nav class="side">
-      <div class="logo"><i>🛒</i><div class="lt">Yanisa Shop POS<div class="shopname">${esc(S.shop.name)}</div></div></div>
+      <div class="logo"><i>🛒</i><div class="lt">Yanisa Shop<div class="shopname">${esc(S.shop.name)}</div></div></div>
       <div class="navs">${pages.map((p, i) => `<button class="nav" data-p="${p.id}" style="--i:${i}" title="${t(p.name)}"><span class="ic">${p.ic}</span><span class="lb">${t(p.name)}</span></button>`).join('')}</div>
       <div class="grow"></div>
       <button class="nav install hidden" data-install><span class="ic">📲</span><span class="lb">${t('Install app')}</span></button>
@@ -341,7 +341,7 @@ async function installApp() {
     : safariMac ? (th ? ['ในเมนู Safari เลือก ไฟล์ (File)', 'เลือก "เพิ่มไปยัง Dock" (Add to Dock)', 'แอปจะอยู่ใน Dock และ Launchpad'] : ['In Safari open the File menu', 'Choose "Add to Dock"', 'The app appears in your Dock and Launchpad'])
     : /Android/.test(ua) ? (th ? ['เปิดลิงก์นี้ใน Chrome', 'แตะเมนู ⋮ มุมขวาบน', 'เลือก "ติดตั้งแอป" หรือ "เพิ่มลงในหน้าจอหลัก"'] : ['Open this link in Chrome', 'Tap the ⋮ menu (top right)', 'Choose "Install app" / "Add to Home screen"'])
     : (th ? ['เปิดลิงก์นี้ใน Chrome หรือ Edge (Windows / Mac)', 'คลิกไอคอน ติดตั้ง ⊕ ในแถบที่อยู่ (มุมขวา)', 'คลิก "ติดตั้ง" — แอปจะอยู่ใน Start menu / Launchpad'] : ['Open this link in Chrome or Edge (Windows / Mac)', 'Click the Install ⊕ icon in the address bar', 'Click "Install" — it appears in the Start menu / Launchpad']);
-  modal(t('Install app'), `<div class="install-hero"><img src="icon-192.png" alt=""><div><b>Yanisa Shop POS</b><small>${esc(location.origin + location.pathname)}</small></div></div>
+  modal(t('Install app'), `<div class="install-hero"><img src="icon-192.png" alt=""><div><b>Yanisa Shop</b><small>${esc(location.origin + location.pathname)}</small></div></div>
     <ol class="steps">${steps.map(x => `<li>${esc(x)}</li>`).join('')}</ol>
     <p class="muted" style="font-size:13px">${th ? 'ใช้ได้ทั้ง Android, iPhone, Windows และ Mac — อัปเดตอัตโนมัติทุกครั้งที่เปิด' : 'Works on Android, iPhone, Windows and Mac — updates automatically every time it opens.'}</p>`);
 }

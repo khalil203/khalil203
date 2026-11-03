@@ -1,7 +1,7 @@
 {
   "id": "/khalil203/pos/",
-  "name": "Yanisa Shop POS — ระบบขายหน้าร้าน",
-  "short_name": "Yanisa Shop POS",
+  "name": "Yanisa Shop — ระบบขายหน้าร้าน",
+  "short_name": "Yanisa Shop",
   "description": "Free POS + stock management: sell, receipts, PromptPay, members, reports.",
   "start_url": "./#pos",
   "scope": "./",

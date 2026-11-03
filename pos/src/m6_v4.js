@@ -1,6 +1,6 @@
 /* ================= Shop POS v4 — promotions engine, data center, barcodes, personal use,
    activity log, branding, receipt image, cashier upgrades, auto-update ================= */
-const APP_VERSION = '4.0.3';
+const APP_VERSION = '4.0.4';
 Object.assign(TH, { 'Data center': 'ศูนย์ข้อมูล', 'Barcodes': 'บาร์โค้ด', 'Branches': 'สาขา' });
 PAGES.splice(PAGES.findIndex(p => p.id === 'settings'), 0,
   { id: 'barcodes', ic: '🏷', name: 'Barcodes', roles: ['owner', 'manager', 'stock'] },
@@ -516,7 +516,7 @@ function tplSheets(type, withData) {
   return [{ name: T.label, headers: T.cols.map(c => c[1]), rows: withData ? tplRows(type) : [Object.fromEntries(T.cols.map(c => [c[1], c[2]]))] }];
 }
 function guideSheet(types) {
-  const aoa = [['คู่มือแม่แบบ Yanisa Shop POS', '', ''], ['สร้างเมื่อ', dt(new Date()), S.shop.name], [''],
+  const aoa = [['คู่มือแม่แบบ Yanisa Shop', '', ''], ['สร้างเมื่อ', dt(new Date()), S.shop.name], [''],
     ['วิธีใช้', '1) กรอก/แก้ไขข้อมูลในแต่ละแผ่นงาน (ห้ามเปลี่ยนชื่อหัวคอลัมน์)  2) บันทึกเป็น .xlsx  3) ไปที่ ศูนย์ข้อมูล → นำเข้า แล้วเลือกไฟล์', ''],
     ['การจับคู่', 'สินค้า: บาร์โค้ด → SKU → ชื่อ · ลูกค้า: เบอร์โทร → ชื่อ · หมวด/ผู้จำหน่าย/โปร: ชื่อ — ถ้าตรงจะ “อัปเดต” ถ้าไม่ตรงจะ “เพิ่มใหม่”', ''], [''],
     ['แผ่นงาน', 'คอลัมน์', 'คำอธิบาย']];
@@ -919,11 +919,11 @@ function applyBrand() {
   const root = document.documentElement.style;
   if (c && /^#[0-9a-f]{6}$/i.test(c)) { root.setProperty('--brand', c); root.setProperty('--brand2', c); root.setProperty('--grad', c); }
   else ['--brand', '--brand2', '--grad'].forEach(k => root.removeProperty(k));
-  if (sh.name) { document.title = sh.name + ' · Yanisa Shop POS'; localStorage.setItem('pos_brand', JSON.stringify({ name: sh.name, logo: sh.logo_url || '', color: c || '' })); }
+  if (sh.name) { document.title = sh.name + ' · Yanisa Shop'; localStorage.setItem('pos_brand', JSON.stringify({ name: sh.name, logo: sh.logo_url || '', color: c || '' })); }
   const lg = $('.side .logo'); if (lg) {
     if (sh.logo_url) { const i = lg.querySelector('i'); if (i) i.innerHTML = `<img src="${esc(sh.logo_url)}" alt="" style="width:100%;height:100%;object-fit:contain;border-radius:inherit;background:#fff">`; }
     const lt = lg.querySelector('.lt'); if (lt && lt.firstChild?.nodeType === 3) lt.firstChild.textContent = sh.name;
-    const sn = lg.querySelector('.shopname'); if (sn) sn.textContent = sh.branch_name || (S.shops.length > 1 ? 'สาขา ' + (sh.branch_code || '') : 'Yanisa Shop POS');
+    const sn = lg.querySelector('.shopname'); if (sn) sn.textContent = sh.branch_name || (S.shops.length > 1 ? 'สาขา ' + (sh.branch_code || '') : 'Yanisa Shop');
   }
   const meta = document.querySelector('meta[name=theme-color]'); if (meta && c) meta.content = c;
 }
@@ -935,7 +935,7 @@ renderAuth = function () {
   let br = {}; try { br = JSON.parse(localStorage.getItem('pos_brand') || '{}'); } catch {}
   if (br.color) document.documentElement.style.setProperty('--brand', br.color);
   if (br.logo) { const bm = $('.auth .brandmark'); if (bm) bm.innerHTML = `<img src="${esc(br.logo)}" alt="" style="width:100%;height:100%;object-fit:contain">`; }
-  document.title = 'Yanisa Shop POS';
+  document.title = 'Yanisa Shop';
   $('.auth .card')?.insertAdjacentHTML('beforeend', `<p class="muted" style="font-size:11px;text-align:center;margin:10px 0 0">v${APP_VERSION}</p>`);
 };
 
@@ -1006,10 +1006,10 @@ VIEWS.settings = pg => {
   host.insertAdjacentHTML('beforeend', `<div class="card" style="margin-top:16px"><h3 style="margin-top:0">📲 ดาวน์โหลดแอป · อัปเดต</h3>
     <p class="muted" style="margin-top:0">แอปทุกตัวเปิดระบบเดียวกันนี้และอัปเดตอัตโนมัติ — ข้อมูลเหมือนกันทุกเครื่อง · เวอร์ชันปัจจุบัน <b>${APP_VERSION}</b></p>
     <div class="row" style="gap:8px;flex-wrap:wrap">
-      <a class="btn" href="${APP_DL}ShopPOS.apk">🤖 Android (.apk)</a>
-      <a class="btn" href="${APP_DL}ShopPOS-Setup.exe">🪟 Windows (ติดตั้ง .exe)</a>
-      <a class="btn" href="${APP_DL}ShopPOS-Portable.exe">🪟 Windows (ไม่ต้องติดตั้ง)</a>
-      <a class="btn" href="${APP_DL}ShopPOS-mac.dmg">🍎 Mac (.dmg)</a>
+      <a class="btn" href="${APP_DL}YanisaShop.apk">🤖 Android (.apk)</a>
+      <a class="btn" href="${APP_DL}YanisaShop-Setup.exe">🪟 Windows (ติดตั้ง .exe)</a>
+      <a class="btn" href="${APP_DL}YanisaShop-Portable.exe">🪟 Windows (ไม่ต้องติดตั้ง)</a>
+      <a class="btn" href="${APP_DL}YanisaShop-mac.dmg">🍎 Mac (.dmg)</a>
       <button type="button" class="btn" id="updChk">🔄 ตรวจหาอัปเดต</button></div>
     <p class="muted" style="font-size:13px">iPhone / iPad: เปิดลิงก์ใน Safari → แชร์ → “เพิ่มไปยังหน้าจอโฮม” · Android: ครั้งแรกให้อนุญาต “ติดตั้งแอปที่ไม่รู้จัก” · Windows: ถ้ามีคำเตือนกด “More info → Run anyway” · Mac: คลิกขวาที่แอป → Open</p></div>`);
   $('#updChk').onclick = () => checkUpdate(true);

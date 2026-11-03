@@ -1,4 +1,4 @@
-# Shop POS — ระบบขายหน้าร้าน + สต็อก (ฟรีทุกฟีเจอร์)
+# Yanisa Shop — ระบบขายหน้าร้าน + สต็อก
 
 Free point-of-sale + inventory web app. Runs in any browser (PC, tablet, phone) and installs like an app.
 

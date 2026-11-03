@@ -1,8 +1,8 @@
 {
   "name": "shop-pos",
-  "productName": "Yanisa Shop POS",
+  "productName": "Yanisa Shop",
   "version": "4.0.0",
-  "description": "Shop POS desktop app (Windows / macOS) — opens the live POS so it is always up to date",
+  "description": "Yanisa Shop desktop app (Windows / macOS) — opens the live POS so it is always up to date",
   "main": "main.js",
   "author": "khalil203",
   "license": "MIT",
@@ -17,7 +17,7 @@
   },
   "build": {
     "appId": "com.khalil203.shoppos",
-    "productName": "Yanisa Shop POS",
+    "productName": "Yanisa Shop",
     "directories": {
       "output": "dist",
       "buildResources": "build"
@@ -33,19 +33,19 @@
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
-      "artifactName": "ShopPOS-Setup.${ext}"
+      "artifactName": "YanisaShop-Setup.${ext}"
     },
     "portable": {
-      "artifactName": "ShopPOS-Portable.${ext}"
+      "artifactName": "YanisaShop-Portable.${ext}"
     },
     "mac": {
       "icon": "build/icon.png",
       "category": "public.app-category.business",
       "identity": null,
-      "artifactName": "ShopPOS-mac.${ext}"
+      "artifactName": "YanisaShop-mac.${ext}"
     },
     "dmg": {
-      "artifactName": "ShopPOS-mac.${ext}"
+      "artifactName": "YanisaShop-mac.${ext}"
     },
     "publish": [
       {
