@@ -345,3 +345,40 @@ kbd{font-family:inherit;font-size:11px;background:#ffffff2e;border-radius:6px;pa
   .auth::before,.auth::after{animation:none}
   .side::before{display:none}
 }
+
+/* ---------- editable product list ---------- */
+.elist{display:flex;flex-direction:column;gap:8px}
+.erow{display:grid;grid-template-columns:56px minmax(180px,1fr) 110px 110px 130px 64px 44px;gap:10px;align-items:center;background:var(--card);border-radius:14px;padding:8px 10px;box-shadow:var(--shadow);content-visibility:auto;contain-intrinsic-size:auto 72px}
+.erow.head{background:transparent;box-shadow:none;padding:0 10px;color:var(--muted);font-size:12px;font-weight:700;text-transform:uppercase}
+.erow.off{opacity:.6}
+.eimg{width:56px;height:56px;border-radius:12px;border:0;background:var(--bg2) center/cover no-repeat;cursor:pointer;display:grid;place-items:center;font-size:20px;transition:transform .15s}
+.eimg:active{transform:scale(.92)}
+.ename{min-width:0}.ename .in{font-weight:700;padding:8px 10px}.ename small{display:block;color:var(--muted);font-size:12px;margin:2px 4px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.enum small{display:none;font-size:11px;color:var(--muted);font-weight:600}
+.enum .in{padding:8px 10px;text-align:right;font-weight:700}
+.enum.stk.warn .in{border-color:var(--warn);background:var(--warnsoft)}.enum.stk.bad .in{border-color:var(--bad);background:var(--badsoft)}
+.erow .in.saving{border-color:var(--brand);opacity:.7}
+.erow .in.saved{border-color:var(--ok);background:var(--oksoft);transition:background .3s}
+.erow .in.err{border-color:var(--bad)}
+.emg{justify-content:center}
+.sentinel{height:1px}
+/* picture finder */
+.pic-now{display:flex;gap:14px;align-items:center}.pic-btns{display:flex;gap:8px;flex-wrap:wrap}
+.picgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px}
+.picgrid.small{grid-template-columns:repeat(auto-fill,minmax(60px,1fr));margin-top:10px}
+.picgrid button{aspect-ratio:1;border:2px solid var(--line);border-radius:14px;background:#fff;padding:4px;cursor:pointer;overflow:hidden;position:relative;transition:transform .15s,border-color .15s}
+.picgrid button:hover{border-color:var(--brand);transform:scale(1.03)}
+.picgrid button img{width:100%;height:100%;object-fit:contain}
+.picgrid button.busy::after{content:"⏳";position:absolute;inset:0;display:grid;place-items:center;background:#fffc;font-size:28px}
+.picgrid .sk{aspect-ratio:1;border-radius:14px;background:linear-gradient(90deg,var(--card2) 25%,var(--bg2) 50%,var(--card2) 75%);background-size:200% 100%;animation:shimmer 1.2s infinite}
+.progress{height:12px;border-radius:12px;background:var(--bg2);overflow:hidden}.progress i{display:block;height:100%;width:0;background:var(--grad);transition:width .3s}
+@media (max-width:860px){
+  .erow{grid-template-columns:60px 1fr 1fr 1fr 40px;grid-template-areas:"img name name name edit" "img price cost stock mg";row-gap:6px}
+  .erow.head{display:none}
+  .eimg{grid-area:img;width:60px;height:60px;align-self:start}
+  .ename{grid-area:name}.erow [data-edit]{grid-area:edit}
+  .enum:nth-of-type(1){grid-area:price}.enum:nth-of-type(2){grid-area:cost}.enum.stk{grid-area:stock}.emg{grid-area:mg;font-size:11px;padding:4px 6px}
+  .enum small{display:block}
+  .enum .in{padding:7px 8px;font-size:14px}
+  .picgrid{grid-template-columns:repeat(3,1fr)}
+}

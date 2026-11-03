@@ -1,6 +1,6 @@
 /* Shop POS — free, open POS + stock web app.  Data: Supabase.  Hosting: GitHub Pages. */
 'use strict';
-const VERSION = '2.1.0';
+const VERSION = '2.2.0';
 const sb = supabase.createClient(window.POS_CONFIG.url, window.POS_CONFIG.key, { auth: { flowType: 'pkce', detectSessionInUrl: true, persistSession: true } });
 
 /* ================= i18n ================= */
@@ -368,7 +368,7 @@ function flyToCart(card) {
 /* ================= POS ================= */
 function catColor(id) { return S.categories.find(c => c.id === id)?.color || '#6366f1'; }
 /* display preferences (per device) */
-const VIEW_DEF = { size: 170, fit: 'cover', ratio: '1', showStock: true, overlay: false, layout: 'grid', sort: 'name', stats: true, radius: 16 };
+const VIEW_DEF = { size: 170, fit: 'cover', ratio: '1', showStock: true, overlay: false, layout: 'grid', sort: 'name', stats: true, radius: 16, sound: true, voice: false, vol: 0.6 };
 let VIEWP = { ...VIEW_DEF, ...JSON.parse(localStorage.getItem('pos_view') || '{}') };
 const saveView = () => { localStorage.setItem('pos_view', JSON.stringify(VIEWP)); applyView(); drawGrid(); };
 function applyView() {
@@ -476,7 +476,7 @@ VIEWS.pos = pg => {
   $('#viewBtn').onclick = viewSettings;
   $('#scanBtn').onclick = () => scanBarcode(code => {
     const hit = S.products.find(p => p.barcode === code || p.sku === code);
-    if (hit) addToCart(hit); else toast(`${t('Barcode')} ${code} ?`, 'bad');
+    if (hit) { sfx('scan'); addToCart(hit); } else { sfx('error'); toast(`${t('Barcode')} ${code} ?`, 'bad'); }
   });
   $('#cartfab').onclick = () => $('#cart').classList.add('open');
   S._drawCats = drawCats;
@@ -546,7 +546,7 @@ function addToCart(p, qty = 1) {
   if (!p) return;
   const line = S.cart.find(l => l.product_id === p.id);
   const want = (line?.qty || 0) + qty;
-  if (p.track_stock && want > p.stock) toast(`${t('Out of stock')}: ${p.name} (${qtyf(p.stock)})`, 'bad');
+  if (p.track_stock && want > p.stock) { toast(`${t('Out of stock')}: ${p.name} (${qtyf(p.stock)})`, 'bad'); sfx('error'); } else sfx('add');
   if (line) line.qty = want; else S.cart.push({product_id: p.id, name: p.name, price: num(p.price), qty, discount: 0});
   S._lastAdded = p.id; drawCart(); refreshBadges();
 }
@@ -571,7 +571,7 @@ function quickMenu(id) {
       <button class="btn p lg" id="qmAdd">🛒 ${t('Add')}</button></div>
     <div class="qm-grid">
       <button class="btn" id="qmFav">${p.favorite ? '☆ ' + (LANG === 'th' ? 'เอาออกจากโปรด' : 'Unfavorite') : '★ ' + (LANG === 'th' ? 'เพิ่มในโปรด' : 'Favorite')}</button>
-      ${edit ? `<button class="btn" id="qmPic">🖼️ ${LANG === 'th' ? 'เปลี่ยนรูป' : 'Change picture'}</button>
+      ${edit ? `<button class="btn" id="qmPic">🖼️ ${LANG === 'th' ? 'รูป / ค้นหาจากเว็บ' : 'Picture / web search'}</button>
       <button class="btn" id="qmCam">📸 ${LANG === 'th' ? 'ถ่ายรูป' : 'Take photo'}</button>
       <button class="btn" id="qmColor">🎨 ${LANG === 'th' ? 'สีไทล์' : 'Tile colour'}</button>
       <button class="btn" id="qmEdit">✏️ ${t('Edit')}</button>
@@ -582,7 +582,7 @@ function quickMenu(id) {
   $('#qmFav', m).onclick = async () => { try { await q(sb.from('products').update({favorite: !p.favorite}).eq('id', p.id)); p.favorite = !p.favorite; m.close(); S._drawCats?.(); drawGrid(); } catch (e) { fail(e); } };
   if (!edit) return;
   const pick = capture => { m.close(); pickImage(capture).then(f => f && uploadProductImage(p, f)); };
-  $('#qmPic', m).onclick = () => pick(false);
+  $('#qmPic', m).onclick = () => { m.close(); pictureMenu(p); };
   $('#qmCam', m).onclick = () => pick(true);
   $('#qmColor', m).onclick = () => { m.close(); colorPicker(p); };
   $('#qmEdit', m).onclick = () => { m.close(); productForm(p, () => { S._drawCats?.(); drawGrid(); }); };
@@ -630,6 +630,126 @@ async function uploadProductImage(p, file) {
   } catch (e) { fail(e); }
 }
 
+/* ================= PICTURES: web search by exact name → PNG → storage ================= */
+async function fnCall(body) {
+  const { data: { session } } = await sb.auth.getSession();
+  return fetch(window.POS_CONFIG.url + '/functions/v1/find-image', { method: 'POST',
+    headers: { apikey: window.POS_CONFIG.key, Authorization: 'Bearer ' + session.access_token, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+}
+async function webImageSearch(q, barcode = '') {
+  const r = await fnCall({ q, barcode }); const d = await r.json();
+  if (!r.ok) throw new Error(d.error || 'search failed');
+  return d.images || [];
+}
+async function webImageBlob(url) {
+  const r = await fnCall({ fetch: url });
+  if (!r.ok) throw new Error('download failed');
+  return await r.blob();
+}
+/* convert any picture to a square-fit PNG (max 600px) */
+async function toPng(blob, max = 600) {
+  const bmp = await createImageBitmap(blob);
+  const sc = Math.min(1, max / Math.max(bmp.width, bmp.height));
+  const cv = document.createElement('canvas'); cv.width = Math.round(bmp.width * sc); cv.height = Math.round(bmp.height * sc);
+  cv.getContext('2d').drawImage(bmp, 0, 0, cv.width, cv.height);
+  return await new Promise(r => cv.toBlob(b => r(b), 'image/png'));
+}
+async function savePng(p, png) {
+  const path = `${S.shop.id}/${p.id}-${Date.now()}.png`;
+  const { error } = await sb.storage.from('product-images').upload(path, png, { contentType: 'image/png', upsert: true });
+  if (error) throw error;
+  const url = sb.storage.from('product-images').getPublicUrl(path).data.publicUrl;
+  await q(sb.from('products').update({ image_url: url }).eq('id', p.id)); p.image_url = url;
+  return url;
+}
+async function setPictureFromWeb(p, img) {
+  let blob;
+  try { blob = await webImageBlob(img.url); } catch (e) { blob = await webImageBlob(img.thumb); }
+  return savePng(p, await toPng(blob));
+}
+/* picture menu: web results for the exact product name + upload / camera / remove */
+function pictureMenu(p, after) {
+  const th = LANG === 'th';
+  const m = modal(`🖼️ ${p.name}`, `
+    <div class="pic-now"><div class="qm-img" id="pmNow" style="${p.image_url ? `background-image:url('${esc(p.image_url)}')` : ''}"></div>
+      <div class="pic-btns"><button class="btn" id="pmUp">📁 ${th ? 'อัปโหลด' : 'Upload'}</button><button class="btn" id="pmCam">📸 ${th ? 'ถ่ายรูป' : 'Camera'}</button>
+      ${p.image_url ? `<button class="btn bad" id="pmDel">🗑 ${th ? 'ลบรูป' : 'Remove'}</button>` : ''}</div></div>
+    <div class="sbox" style="margin:12px 0"><span>🔎</span><input class="in" id="pmQ" value="${esc(p.name)}"><button class="btn sm p" id="pmGo">${t('Search')}</button></div>
+    <p class="muted" style="font-size:13px;margin:0 0 8px">${th ? 'แตะรูปที่ต้องการ — ระบบจะบันทึกเป็น PNG ให้อัตโนมัติ' : 'Tap a picture — it is saved as PNG automatically'}</p>
+    <div class="picgrid" id="pmRes"></div>`, {wide: true});
+  const done = () => { m.close(); after?.(); drawGrid(); };
+  const run = async () => {
+    const res = $('#pmRes', m); res.innerHTML = Array(8).fill('<i class="sk"></i>').join('');
+    try {
+      const imgs = await webImageSearch($('#pmQ', m).value.trim(), p.barcode);
+      res.innerHTML = imgs.length ? imgs.map((x, i) => `<button data-i="${i}" title="${esc(x.title)}"><img src="${esc(x.thumb)}" loading="lazy" referrerpolicy="no-referrer" onerror="this.parentNode.remove()"></button>`).join('') : `<div class="empty" style="grid-column:1/-1">—</div>`;
+      $$('[data-i]', res).forEach(b => b.onclick = async () => {
+        b.classList.add('busy'); try { await setPictureFromWeb(p, imgs[+b.dataset.i]); sfx('ok'); toast(t('Saved'), 'ok'); done(); } catch (e) { b.classList.remove('busy'); fail(e); }
+      });
+    } catch (e) { res.innerHTML = ''; fail(e); }
+  };
+  $('#pmGo', m).onclick = run; $('#pmQ', m).onkeydown = e => { if (e.key === 'Enter') run(); };
+  const up = async cap => { const f = await pickImage(cap); if (!f) return; try { await savePng(p, await toPng(f)); toast(t('Saved'), 'ok'); done(); } catch (e) { fail(e); } };
+  $('#pmUp', m).onclick = () => up(false); $('#pmCam', m).onclick = () => up(true);
+  if ($('#pmDel', m)) $('#pmDel', m).onclick = async () => { try { await q(sb.from('products').update({ image_url: '' }).eq('id', p.id)); p.image_url = ''; done(); } catch (e) { fail(e); } };
+  run();
+}
+/* fill pictures for every product that has none */
+async function autoPictures(after) {
+  const th = LANG === 'th';
+  const todo = S.products.filter(p => !p.image_url);
+  if (!todo.length) return toast(th ? 'สินค้าทุกชิ้นมีรูปแล้ว' : 'Every product already has a picture', 'ok');
+  let stop = false, ok = 0, bad = 0, i = 0;
+  const m = modal(th ? 'ใส่รูปอัตโนมัติจากเว็บ' : 'Auto pictures from the web', `
+    <p>${th ? `ค้นหารูปจากชื่อสินค้าแบบตรงตัว แล้วบันทึกเป็น PNG — ${todo.length} รายการที่ยังไม่มีรูป` : `Searching the exact product name and saving PNG — ${todo.length} products without a picture`}</p>
+    <div class="progress"><i id="apBar"></i></div><p id="apTxt" class="muted"></p><div class="picgrid small" id="apLast"></div>`,
+    { foot: `<button class="btn bad" id="apStop">${th ? 'หยุด' : 'Stop'}</button>` });
+  $('#apStop', m).onclick = () => { stop = true; m.close(); };
+  const upd = () => { $('#apBar', m).style.width = ((ok + bad) / todo.length * 100) + '%'; $('#apTxt', m).textContent = `✅ ${ok}   ❌ ${bad}   / ${todo.length}`; };
+  const worker = async () => {
+    while (!stop && i < todo.length) {
+      const p = todo[i++];
+      try {
+        const imgs = await webImageSearch(p.name, p.barcode);
+        let saved = false;
+        for (const img of imgs.slice(0, 4)) { try { await setPictureFromWeb(p, img); saved = true; break; } catch (e) { /* try next */ } }
+        if (saved) { ok++; const box = $('#apLast', m); box?.insertAdjacentHTML('afterbegin', `<button><img src="${esc(p.image_url)}" title="${esc(p.name)}"></button>`); if (box && box.children.length > 8) box.lastChild.remove(); } else bad++;
+      } catch (e) { bad++; }
+      upd();
+    }
+  };
+  upd(); await Promise.all([worker(), worker(), worker()]);
+  if (!stop) { $('#apStop', m).textContent = 'OK'; $('#apStop', m).className = 'btn p'; sfx('pay'); }
+  after?.(); drawGrid();
+}
+
+/* ================= SOUNDS (cashier) ================= */
+let AC = null;
+function sfx(kind) {
+  if (!VIEWP.sound) return;
+  try {
+    AC ||= new (window.AudioContext || window.webkitAudioContext)(); if (AC.state === 'suspended') AC.resume();
+    const v = VIEWP.vol ?? 0.6, t0 = AC.currentTime;
+    const tone = (f, s, d, type = 'sine', g = 0.25) => { const o = AC.createOscillator(), a = AC.createGain(); o.type = type; o.frequency.value = f;
+      a.gain.setValueAtTime(0, t0 + s); a.gain.linearRampToValueAtTime(g * v, t0 + s + 0.01); a.gain.exponentialRampToValueAtTime(0.0001, t0 + s + d); o.connect(a).connect(AC.destination); o.start(t0 + s); o.stop(t0 + s + d + 0.05); };
+    if (kind === 'add') tone(1046, 0, 0.09, 'triangle');
+    else if (kind === 'scan') { tone(1568, 0, 0.12, 'square', 0.12); }
+    else if (kind === 'remove') tone(523, 0, 0.1, 'triangle');
+    else if (kind === 'error') { tone(220, 0, 0.18, 'sawtooth', 0.15); tone(180, 0.16, 0.25, 'sawtooth', 0.15); }
+    else if (kind === 'ok') { tone(880, 0, 0.1); tone(1318, 0.08, 0.18); }
+    else if (kind === 'pay') { // cash register: bell + coins
+      tone(2093, 0, 0.5, 'sine', 0.3); tone(2637, 0.06, 0.6, 'sine', 0.22); tone(3136, 0.12, 0.7, 'sine', 0.15);
+      for (let k = 0; k < 5; k++) tone(4000 + Math.random() * 2000, 0.25 + k * 0.05, 0.05, 'square', 0.04);
+    }
+  } catch (e) { /* audio not available */ }
+}
+function say(text) {
+  if (!VIEWP.voice || !('speechSynthesis' in window)) return;
+  try { speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(text); u.lang = LANG === 'th' ? 'th-TH' : 'en-US'; u.rate = 1; u.volume = VIEWP.vol ?? 0.6;
+    const vv = speechSynthesis.getVoices().find(x => x.lang.startsWith(LANG === 'th' ? 'th' : 'en')); if (vv) u.voice = vv; speechSynthesis.speak(u); } catch (e) { /* no voice */ }
+}
+const bahtWords = n => LANG === 'th' ? `${Number.isInteger(+n) ? n : (+n).toFixed(2)} บาท` : `${n} baht`;
+
 /* display settings */
 function viewSettings() {
   const th = LANG === 'th';
@@ -646,14 +766,21 @@ function viewSettings() {
     <label class="row fg"><input type="checkbox" id="vov" ${VIEWP.overlay ? 'checked' : ''}> ${th ? 'ชื่อและราคาทับบนรูป' : 'Name & price on top of picture'}</label>
     <label class="row fg"><input type="checkbox" id="vst" ${VIEWP.showStock ? 'checked' : ''}> ${th ? 'แสดงจำนวนสต็อก' : 'Show stock'}</label>
     <label class="row fg"><input type="checkbox" id="vstat" ${VIEWP.stats ? 'checked' : ''}> ${th ? 'แสดงแถบยอดขายวันนี้' : 'Show today\'s stats bar'}</label>
+    <div class="card" style="padding:12px;margin-bottom:12px"><b>🔊 ${th ? 'เสียงแคชเชียร์' : 'Cashier sounds'}</b>
+      <label class="row fg" style="margin-top:8px"><input type="checkbox" id="vsnd" ${VIEWP.sound ? 'checked' : ''}> ${th ? 'เสียงบี๊บ / เสียงลิ้นชักเก็บเงิน' : 'Beeps & cash register sound'}</label>
+      <label class="row fg"><input type="checkbox" id="vvoice" ${VIEWP.voice ? 'checked' : ''}> 🗣️ ${th ? 'พูดยอดชำระและเงินทอน' : 'Speak total and change'}</label>
+      <label class="f">${th ? 'ความดัง' : 'Volume'}</label><input type="range" id="vvol" min="0" max="1" step="0.05" value="${VIEWP.vol ?? 0.6}" style="width:100%">
+      <div class="row"><button class="btn sm" id="vtest">▶ ${th ? 'ทดสอบเสียง' : 'Test sound'}</button></div></div>
     <p class="muted" style="font-size:13px">💡 ${th ? 'กดค้างที่สินค้า (หรือปุ่ม ⋯) เพื่อเปลี่ยนรูป ถ่ายรูป เปลี่ยนสี หรือเพิ่มในรายการโปรด' : 'Long-press a product (or ⋯) to change its picture, take a photo, set a colour or favorite it.'}<br>⌨️ F2 ${th ? 'ค้นหา' : 'search'} · F4 ${t('Hold')} · F9 ${t('Pay')} · 3*barcode = ${t('Qty')} 3</p>`,
     {foot: `<button class="btn" id="vreset">${th ? 'ค่าเริ่มต้น' : 'Reset'}</button><span style="flex:1"></span><button class="btn p" data-ok>OK</button>`});
   $('#vlay', m).value = VIEWP.layout; $('#vrat', m).value = VIEWP.ratio; $('#vfit', m).value = VIEWP.fit;
   const upd = () => { Object.assign(VIEWP, { size: +$('#vsz', m).value, layout: $('#vlay', m).value, ratio: $('#vrat', m).value, fit: $('#vfit', m).value,
-    radius: +$('#vrad', m).value, overlay: $('#vov', m).checked, showStock: $('#vst', m).checked, stats: $('#vstat', m).checked });
+    radius: +$('#vrad', m).value, overlay: $('#vov', m).checked, showStock: $('#vst', m).checked, stats: $('#vstat', m).checked,
+    sound: $('#vsnd', m).checked, voice: $('#vvoice', m).checked, vol: +$('#vvol', m).value });
     $('#szv', m).textContent = VIEWP.size + 'px'; $('#rdv', m).textContent = VIEWP.radius; saveView(); };
   $$('input,select', m).forEach(el => el.oninput = el.onchange = upd);
   $$('[data-sz]', m).forEach(b => b.onclick = () => { $('#vsz', m).value = b.dataset.sz; upd(); });
+  $('#vtest', m).onclick = () => { sfx('add'); setTimeout(() => sfx('pay'), 250); say((LANG === 'th' ? 'เงินทอน ' : 'Change ') + bahtWords(410)); };
   $('#vreset', m).onclick = () => { VIEWP = { ...VIEW_DEF, sort: VIEWP.sort }; saveView(); m.close(); viewSettings(); };
   $('[data-ok]', m).onclick = m.close;
 }
@@ -720,7 +847,7 @@ function drawCart() {
   const fab = $('#cartfab'); if (fab) { fab.innerHTML = `<span class="fc">${qtyf(n)}</span><span>${t('Cart')}</span><b>฿${money(c.total)}</b><span>›</span>`; fab.classList.toggle('empty', !n); }
   $('#cartClose').onclick = () => el.classList.remove('open');
   $$('[data-u]', el).forEach(b => b.onclick = () => { const l = S.cart[b.dataset.u]; addToCart(S.products.find(p => p.id === l.product_id) || l, 1); });
-  $$('[data-d]', el).forEach(b => b.onclick = () => { const l = S.cart[b.dataset.d]; l.qty--; if (l.qty <= 0) S.cart.splice(b.dataset.d, 1); drawCart(); refreshBadges(); });
+  $$('[data-d]', el).forEach(b => b.onclick = () => { const l = S.cart[b.dataset.d]; l.qty--; sfx('remove'); if (l.qty <= 0) S.cart.splice(b.dataset.d, 1); drawCart(); refreshBadges(); });
   $$('[data-q],[data-i]', el).forEach(b => b.onclick = () => editLine(+(b.dataset.q ?? b.dataset.i)));
   $('#clrBtn').onclick = () => { resetSale(); };
   $('#holdBtn').onclick = () => { S.held.push({at: Date.now(), cart: S.cart, customer: S.customer}); saveHeld(); resetSale(); toast(t('Hold'), 'ok'); };
@@ -803,6 +930,7 @@ function payDialog() {
     <label class="row" style="margin-top:10px"><input type="checkbox" id="autoPrint" ${localStorage.getItem('pos_autoprint') === '1' ? 'checked' : ''}> 🖨️ ${t('Remember to print')}</label>`,
     {foot: `<button class="btn" data-c>${t('Cancel')}</button><button class="btn ok lg" id="cfm">✔ ${t('Confirm payment')}</button>`});
   $('[data-c]', m).onclick = m.close;
+  say((LANG === 'th' ? 'ยอดชำระ ' : 'Total ') + bahtWords(c.total));
   const body = () => {
     const pb = $('#pbody', m);
     if (method === 'cash') {
@@ -840,6 +968,7 @@ function payDialog() {
       const items = S.cart.map(l => ({...l}));
       m.close();
       bc?.postMessage({type: 'thanks', total: c.total, change: sale.change});
+      sfx('pay'); if (num(sale.change) > 0) say((LANG === 'th' ? 'เงินทอน ' : 'Change ') + bahtWords(num(sale.change))); else say(LANG === 'th' ? 'ขอบคุณค่ะ' : 'Thank you');
       const cust = S.customer;
       resetSale(); drawGrid(); loadPosStats().catch(() => {});
       showReceipt(sale, items, cust, localStorage.getItem('pos_autoprint') === '1');
@@ -937,26 +1066,73 @@ async function billDetail(sale, reload) {
 
 /* ================= PRODUCTS ================= */
 VIEWS.products = pg => {
-  $('#tact').innerHTML = `<button class="btn" id="catBtn">🗂 ${t('Categories')}</button><button class="btn" id="impBtn">⬆ ${t('Import CSV')}</button><button class="btn" id="expBtn">⬇ ${t('Export CSV')}</button><button class="btn p" id="addBtn">+ ${t('Add product')}</button>`;
-  pg.innerHTML = `<div class="row" style="margin-bottom:12px"><input class="in" id="ps" placeholder="${t('Search')}" style="max-width:300px">
-    <select class="in" id="pc" style="width:auto"><option value="">${t('All')}</option>${S.categories.map(c => `<option value="${c.id}">${esc(c.name)}</option>`).join('')}</select>
-    <label class="row"><input type="checkbox" id="pl"> ${t('Low stock')}</label></div><div id="plist" class="tblwrap"></div>`;
-  const draw = () => {
-    const v = $('#ps').value.toLowerCase(), c = $('#pc').value, low = $('#pl').checked;
-    const list = S.products.filter(p => (!v || p.name.toLowerCase().includes(v) || (p.barcode || '').includes(v) || (p.sku || '').toLowerCase().includes(v)) && (!c || p.category_id === c) && (!low || (p.track_stock && p.stock <= p.low_stock)));
-    $('#plist').innerHTML = `<table class="tbl"><tr><th></th><th>${t('Name')}</th><th>${t('Barcode')}</th><th>${t('Category')}</th><th class="right">${t('Price')}</th><th class="right">${t('Cost')}</th><th class="right">${t('Margin')}</th><th class="right">${t('Stock')}</th></tr>
-      ${list.map(p => { const mg = p.price > 0 ? (p.price - p.cost) / p.price * 100 : 0; return `<tr class="click" data-id="${p.id}">
-        <td><div style="width:36px;height:36px;border-radius:8px;background:${p.image_url ? `url('${esc(p.image_url)}') center/cover` : catColor(p.category_id)}"></div></td>
-        <td><b>${esc(p.name)}</b>${p.active ? '' : ' <span class="chip bad">off</span>'}<br><small class="muted">${esc(p.sku)}</small></td><td>${esc(p.barcode)}</td>
-        <td>${esc(S.categories.find(c => c.id === p.category_id)?.name || '')}</td><td class="right">${money(p.price)}</td><td class="right">${money(p.cost)}</td>
-        <td class="right">${mg.toFixed(0)}%</td><td class="right">${p.track_stock ? `<span class="chip ${p.stock <= 0 ? 'bad' : p.stock <= p.low_stock ? 'warn' : 'ok'}">${qtyf(p.stock)} ${esc(p.unit)}</span>` : '∞'}</td></tr>`; }).join('')}</table>
-      <p class="muted">${list.length} ${t('Items')}</p>`;
-    $$('[data-id]', pg).forEach(tr => tr.onclick = () => productForm(S.products.find(p => p.id === tr.dataset.id), draw));
+  const th = LANG === 'th';
+  $('#tact').innerHTML = `<button class="btn p" id="addBtn">+ ${t('Add product')}</button><button class="btn" id="autoPic">🪄 ${th ? 'ใส่รูปอัตโนมัติ' : 'Auto pictures'}</button><button class="btn" id="catBtn">🗂 ${t('Categories')}</button><button class="btn" id="impBtn">⬆ ${t('Import CSV')}</button><button class="btn" id="expBtn">⬇ ${t('Export CSV')}</button>`;
+  pg.innerHTML = `<div class="row" style="margin-bottom:12px">
+      <div class="sbox" style="max-width:340px"><span>🔍</span><input class="in" id="ps" placeholder="${t('Search')} / ${t('Barcode')}"></div>
+      <select class="in" id="pc" style="width:auto"><option value="">${t('All')}</option>${S.categories.map(c => `<option value="${c.id}">${esc(c.name)}</option>`).join('')}</select>
+      <select class="in" id="pf" style="width:auto"><option value="">${th ? 'ทุกสถานะ' : 'Any status'}</option><option value="low">⚠️ ${t('Low stock')}</option><option value="nopic">🖼️ ${th ? 'ยังไม่มีรูป' : 'No picture'}</option><option value="off">⛔ ${th ? 'ปิดขาย' : 'Inactive'}</option></select></div>
+    <p class="muted" style="font-size:13px;margin:-4px 0 10px">✏️ ${th ? 'แก้ราคา ต้นทุน สต็อก หรือชื่อได้ทันทีในตาราง — บันทึกอัตโนมัติ · แตะรูปเพื่อเปลี่ยน/ค้นหาจากเว็บ' : 'Edit name, price, cost or stock right in the list — saves automatically · tap a picture to change it or search the web'}</p>
+    <div class="elist" id="plist"></div><p class="muted" id="pcount"></p>`;
+  let list = [], shown = 0, io = null;
+  const rowHTML = p => { const mg = p.price > 0 ? (p.price - p.cost) / p.price * 100 : 0; return `<div class="erow ${p.active ? '' : 'off'}" data-id="${p.id}">
+      <button class="eimg" data-pic style="${p.image_url ? `background-image:url('${esc(p.image_url)}')` : `background:${esc(p.tile_color || catColor(p.category_id))}`}">${p.image_url ? '' : '<span>📷</span>'}</button>
+      <div class="ename"><input class="in" data-f="name" value="${esc(p.name)}" title="${esc(p.name)}"><small>${esc(S.categories.find(c => c.id === p.category_id)?.name || '')}${p.barcode ? ' · ' + esc(p.barcode) : ''}</small></div>
+      <label class="enum"><small>${t('Price')}</small><input class="in" data-f="price" type="number" step="any" inputmode="decimal" value="${num(p.price)}"></label>
+      <label class="enum"><small>${t('Cost')}</small><input class="in" data-f="cost" type="number" step="any" inputmode="decimal" value="${num(p.cost)}"></label>
+      <label class="enum stk ${p.track_stock ? (p.stock <= 0 ? 'bad' : p.stock <= p.low_stock ? 'warn' : '') : ''}"><small>${t('Stock')} (${esc(p.unit)})</small>${p.track_stock ? `<input class="in" data-f="stock" type="number" step="any" inputmode="decimal" value="${num(p.stock)}">` : '<input class="in" value="∞" disabled>'}</label>
+      <span class="emg chip ${mg < 15 ? 'bad' : mg < 30 ? 'warn' : 'ok'}" data-mg>${mg.toFixed(0)}%</span>
+      <button class="btn sm" data-edit title="${t('Edit')}">✏️</button></div>`; };
+  const more = () => {
+    const box = $('#plist'); const to = Math.min(list.length, shown + 50);
+    box.querySelector('.sentinel')?.remove();
+    box.insertAdjacentHTML('beforeend', list.slice(shown, to).map(rowHTML).join('') + (to < list.length ? '<div class="sentinel"></div>' : ''));
+    shown = to;
+    const sen = box.querySelector('.sentinel'); io?.disconnect();
+    if (sen) { io = new IntersectionObserver(es => { if (es.some(e => e.isIntersecting)) more(); }, {root: $('#pg'), rootMargin: '500px'}); io.observe(sen); }
   };
-  $('#ps').oninput = $('#pc').onchange = $('#pl').onchange = draw;
+  const draw = () => {
+    const v = $('#ps').value.toLowerCase(), c = $('#pc').value, f = $('#pf').value;
+    list = S.products.filter(p => (!v || p.name.toLowerCase().includes(v) || (p.barcode || '').includes(v) || (p.sku || '').toLowerCase().includes(v)) && (!c || p.category_id === c) &&
+      (!f || (f === 'low' ? p.track_stock && p.stock <= p.low_stock : f === 'nopic' ? !p.image_url : !p.active)));
+    shown = 0; $('#plist').innerHTML = list.length ? `<div class="erow head"><span></span><span>${t('Name')}</span><span>${t('Price')}</span><span>${t('Cost')}</span><span>${t('Stock')}</span><span>${t('Margin')}</span><span></span></div>` : `<div class="empty">—</div>`;
+    more();
+    const nopic = S.products.filter(p => !p.image_url).length;
+    $('#pcount').textContent = `${list.length} ${t('Items')} · 🖼️ ${th ? 'ไม่มีรูป' : 'no picture'} ${nopic}`;
+  };
+  // inline save (delegated)
+  const box = $('#plist');
+  box.addEventListener('focusin', e => { const i = e.target.closest('input[data-f]'); if (i) i.dataset.old = i.value; });
+  box.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.matches('input[data-f]')) { e.preventDefault(); e.target.blur(); } });
+  box.addEventListener('change', async e => {
+    const i = e.target.closest('input[data-f]'); if (!i) return;
+    const row = i.closest('.erow'), p = S.products.find(x => x.id === row.dataset.id), f = i.dataset.f;
+    const val = f === 'name' ? i.value.trim() : num(i.value);
+    if (f === 'name' && !val) { i.value = p.name; return; }
+    i.classList.remove('saved', 'err'); i.classList.add('saving');
+    try {
+      if (f === 'stock') {
+        await q(sb.rpc('stock_move', {p_shop: S.shop.id, p_product: p.id, p_kind: 'adjust', p_qty: val, p_cost: null, p_supplier: null, p_note: th ? 'แก้ไขในรายการสินค้า' : 'edited in product list'}));
+        p.stock = val;
+        row.querySelector('.stk').className = `enum stk ${p.stock <= 0 ? 'bad' : p.stock <= p.low_stock ? 'warn' : ''}`;
+      } else {
+        await q(sb.from('products').update({[f]: val}).eq('id', p.id)); p[f] = val;
+      }
+      const mg = p.price > 0 ? (p.price - p.cost) / p.price * 100 : 0; const mc = row.querySelector('[data-mg]');
+      mc.textContent = mg.toFixed(0) + '%'; mc.className = `emg chip ${mg < 15 ? 'bad' : mg < 30 ? 'warn' : 'ok'}`;
+      i.classList.remove('saving'); i.classList.add('saved'); sfx('ok'); setTimeout(() => i.classList.remove('saved'), 1200);
+    } catch (err) { i.classList.remove('saving'); i.classList.add('err'); i.value = i.dataset.old ?? i.value; fail(err); }
+  });
+  box.addEventListener('click', e => {
+    const row = e.target.closest('.erow:not(.head)'); if (!row) return; const p = S.products.find(x => x.id === row.dataset.id);
+    if (e.target.closest('[data-pic]')) pictureMenu(p, draw);
+    else if (e.target.closest('[data-edit]')) productForm(p, draw);
+  });
+  $('#ps').oninput = $('#pc').onchange = $('#pf').onchange = draw;
   $('#addBtn').onclick = () => productForm({}, draw);
+  $('#autoPic').onclick = () => autoPictures(draw);
   $('#catBtn').onclick = () => categoryManager(() => go('products'));
-  $('#expBtn').onclick = () => download('products.csv', toCSV(S.products.map(p => ({...p, category: S.categories.find(c => c.id === p.category_id)?.name || ''})), ['name', 'barcode', 'sku', 'category', 'price', 'cost', 'stock', 'unit', 'low_stock']));
+  $('#expBtn').onclick = () => download('products.csv', toCSV(S.products.map(p => ({...p, category: S.categories.find(c => c.id === p.category_id)?.name || ''})), ['name', 'barcode', 'sku', 'category', 'price', 'cost', 'stock', 'unit', 'low_stock', 'image_url']));
   $('#impBtn').onclick = importProducts;
   draw();
 };
@@ -971,7 +1147,7 @@ function productForm(p, after) {
     ...(isNew ? [{k:'stock', label:t('Stock'), type:'number', def:0}] : []),
     {k:'low_stock', label:t('Low stock alert'), type:'number', def:5},
     {k:'image_url', label:t('Image URL'), full:true, after:`<div class="row" style="margin-top:8px"><div id="pimgPrev" class="qm-img" style="width:72px;height:72px;${p.image_url ? `background-image:url('${esc(p.image_url)}')` : ''}"></div>
-      <button type="button" class="btn sm" id="pimgUp">🖼️ ${LANG === 'th' ? 'อัปโหลดรูป' : 'Upload picture'}</button><button type="button" class="btn sm" id="pimgCam">📸 ${LANG === 'th' ? 'ถ่ายรูป' : 'Take photo'}</button><button type="button" class="btn sm" id="pimgX">×</button></div>`},
+      <button type="button" class="btn sm" id="pimgUp">🖼️ ${LANG === 'th' ? 'อัปโหลดรูป' : 'Upload picture'}</button><button type="button" class="btn sm" id="pimgCam">📸 ${LANG === 'th' ? 'ถ่ายรูป' : 'Take photo'}</button><button type="button" class="btn sm" id="pimgWeb">🔎 ${LANG === 'th' ? 'หาจากเว็บ' : 'Web'}</button><button type="button" class="btn sm" id="pimgX">×</button></div>`},
     {k:'tile_color', label:(LANG === 'th' ? 'สีไทล์' : 'Tile colour'), type:'color', def: catColor(p.category_id)},
     {k:'favorite', label:'★ ' + (LANG === 'th' ? 'รายการโปรด' : 'Favorite'), type:'check'},
     {k:'track_stock', label:t('Track stock'), type:'check', def:true}, {k:'active', label:t('Active'), type:'check', def:true},
@@ -991,6 +1167,20 @@ function productForm(p, after) {
   $('#pscan', m).onclick = () => scanBarcode(code => { $('[name=barcode]', m).value = code; });
   const setImg = u => { $('[name=image_url]', m).value = u; $('#pimgPrev', m).style.backgroundImage = u ? `url('${u}')` : ''; };
   const up = async cap => { const f = await pickImage(cap); if (!f) return; toast(LANG === 'th' ? 'กำลังอัปโหลดรูป…' : 'Uploading picture…'); try { setImg(await uploadImageFile(f)); toast(t('Saved'), 'ok'); } catch (e) { fail(e); } };
+  $('#pimgWeb', m).onclick = async () => {
+    const name = $('[name=name]', m).value.trim(); if (!name) return toast(t('Name') + ' ?', 'bad');
+    const tmp = {id: p.id || 'new', name, barcode: $('[name=barcode]', m).value.trim()};
+    const w = modal('🔎 ' + name, `<div class="picgrid" id="fw">${Array(8).fill('<i class="sk"></i>').join('')}</div>`, {wide: true});
+    try {
+      const imgs = await webImageSearch(name, tmp.barcode);
+      $('#fw', w).innerHTML = imgs.map((x, i) => `<button data-i="${i}"><img src="${esc(x.thumb)}" loading="lazy" referrerpolicy="no-referrer" onerror="this.parentNode.remove()"></button>`).join('') || '—';
+      $$('[data-i]', w).forEach(b => b.onclick = async () => { b.classList.add('busy');
+        try { let blob; try { blob = await webImageBlob(imgs[+b.dataset.i].url); } catch (e) { blob = await webImageBlob(imgs[+b.dataset.i].thumb); }
+          const png = await toPng(blob); const path = `${S.shop.id}/${crypto.randomUUID()}.png`;
+          const { error } = await sb.storage.from('product-images').upload(path, png, { contentType: 'image/png' }); if (error) throw error;
+          setImg(sb.storage.from('product-images').getPublicUrl(path).data.publicUrl); w.close(); toast(t('Saved'), 'ok'); } catch (e) { b.classList.remove('busy'); fail(e); } });
+    } catch (e) { fail(e); }
+  };
   $('#pimgUp', m).onclick = () => up(false); $('#pimgCam', m).onclick = () => up(true); $('#pimgX', m).onclick = () => setImg('');
   $('[name=image_url]', m).oninput = e => setImg(e.target.value.trim());
   if (!isNew) $('#pdel', m).onclick = async () => {
