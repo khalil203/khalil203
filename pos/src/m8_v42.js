@@ -67,6 +67,7 @@ function commandPalette() {
     { ic: '💾', t: 'สำรองข้อมูล', k: 'backup', run: () => go('data') },
     { ic: '💰', t: 'เปิดลิ้นชักเงิน', k: 'drawer cash', run: () => openDrawer(true) },
     { ic: '📊', t: 'สรุปยอดประจำวัน / บิลรวม', k: 'daily summary z report', run: () => dailySummary() },
+    { ic: '🙋', t: 'เบิกใช้ส่วนตัว', k: 'personal use เบิก', run: () => { go('pos'); setTimeout(personalUse, 200); } },
     { ic: '🔄', t: 'ตรวจหาอัปเดต', k: 'update', run: () => checkUpdate(true) },
   ];
   document.body.insertAdjacentHTML('beforeend', `<div class="cmdk" id="cmdk"><div class="cmdk-box"><input class="in" id="cmdq" placeholder="พิมพ์คำสั่ง ชื่อหน้า หรือชื่อสินค้า…" autocomplete="off"><div id="cmdl"></div><div class="cmdk-ft">↑↓ เลือก · Enter ทำงาน · Esc ปิด · Ctrl+K เปิด</div></div></div>`);

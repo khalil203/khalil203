@@ -1423,7 +1423,7 @@ const _goC = go;
 go = function (page) { _goC(page); $('.top')?.classList.toggle('posmode', S.page === 'pos'); };
 /* ================= Shop POS v4 — promotions engine, data center, barcodes, personal use,
    activity log, branding, receipt image, cashier upgrades, auto-update ================= */
-const APP_VERSION = '4.6.0';
+const APP_VERSION = '4.6.1';
 Object.assign(TH, { 'Data center': 'ศูนย์ข้อมูล', 'Barcodes': 'บาร์โค้ด', 'Branches': 'สาขา' });
 PAGES.splice(PAGES.findIndex(p => p.id === 'settings'), 0,
   { id: 'barcodes', ic: '🏷', name: 'Barcodes', roles: ['owner', 'manager', 'stock'] },
@@ -2777,6 +2777,7 @@ function commandPalette() {
     { ic: '💾', t: 'สำรองข้อมูล', k: 'backup', run: () => go('data') },
     { ic: '💰', t: 'เปิดลิ้นชักเงิน', k: 'drawer cash', run: () => openDrawer(true) },
     { ic: '📊', t: 'สรุปยอดประจำวัน / บิลรวม', k: 'daily summary z report', run: () => dailySummary() },
+    { ic: '🙋', t: 'เบิกใช้ส่วนตัว', k: 'personal use เบิก', run: () => { go('pos'); setTimeout(personalUse, 200); } },
     { ic: '🔄', t: 'ตรวจหาอัปเดต', k: 'update', run: () => checkUpdate(true) },
   ];
   document.body.insertAdjacentHTML('beforeend', `<div class="cmdk" id="cmdk"><div class="cmdk-box"><input class="in" id="cmdq" placeholder="พิมพ์คำสั่ง ชื่อหน้า หรือชื่อสินค้า…" autocomplete="off"><div id="cmdl"></div><div class="cmdk-ft">↑↓ เลือก · Enter ทำงาน · Esc ปิด · Ctrl+K เปิด</div></div></div>`);
@@ -3585,6 +3586,21 @@ VIEWS.stock = pg => {
 };
 /* products page: scanning an existing barcode opens its stock card instead of the editor (edit is one tap away) */
 Object.assign(AUDIT_L, { stock_adjust: 'ตรวจนับ/ปรับยอดสต็อก' });
+/* ================= v4.6.1 — cashier tools bar on the sell screen (personal use, daily summary, quick sale, held bills) ================= */
+const _posView461 = VIEWS.pos;
+VIEWS.pos = pg => {
+  _posView461(pg);
+  ['#puBtn', '#custBtn'].forEach(s => $(s)?.remove()); $('#dsBtn')?.remove();
+  const left = pg.querySelector('.pos .left'); if (!left || $('#cashbar')) return;
+  const stats = $('#posStats', left);
+  (stats || left.firstElementChild).insertAdjacentHTML('afterend', `<div class="cashbar" id="cashbar">
+    <button data-c="pu"><span>🙋</span>เบิกใช้ส่วนตัว</button><button data-c="ds"><span>📊</span>สรุปยอดวันนี้</button>
+    <button data-c="quick"><span>➕</span>ขายด่วน</button><button data-c="held"><span>📂</span>บิลที่พัก <b id="cbHeld">${S.held.length || ''}</b></button>
+    <button data-c="last"><span>🧾</span>บิลล่าสุด</button></div>`);
+  $$('#cashbar [data-c]').forEach(b => b.onclick = () => ({ pu: personalUse, ds: () => dailySummary(), quick: customItem, held: showHeld, last: () => $('#lastBtn')?.click() })[b.dataset.c]());
+};
+const _drawCart461 = drawCart;
+drawCart = function () { _drawCart461(); const h = $('#cbHeld'); if (h) h.textContent = S.held.length || ''; };
 /* ================= start ================= */
 updateNet();
 boot().then(() => { updateNet(); syncQueue(); }).catch(e => { fail(e); renderAuth(); });
