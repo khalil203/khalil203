@@ -1208,9 +1208,9 @@ productForm = function (p, after) {
   const m = formModal(isNew ? 'เพิ่มสินค้า' : 'แก้ไขสินค้า', [
     { k: 'name', label: 'ชื่อสินค้า (ไทย)', req: true, full: true }, { k: 'name_en', label: 'ชื่อสินค้า (อังกฤษ)' }, { k: 'brand', label: 'ยี่ห้อ' },
     { k: 'barcode', label: 'บาร์โค้ด', after: `<button type="button" class="btn sm" id="pscan" style="margin-top:6px">📷 สแกน</button>` }, { k: 'sku', label: 'รหัสสินค้า (SKU)' },
-    { k: 'category_id', label: 'หมวดหมู่', type: 'select', opts: [['', '—'], ...S.categories.map(c => [c.id, c.name])] },
+    { k: 'category_id', label: 'หมวดหมู่', type: 'select', opts: [['', '—'], ...S.categories.map(c => [c.id, (c.icon ? c.icon + ' ' : '') + c.name])], after: '<button type="button" class="btn sm lnk" id="pcatm">⚙️ จัดการหมวดหมู่</button>' },
     { k: 'supplier_id', label: 'ผู้จำหน่ายหลัก', type: 'select', opts: [['', '—'], ...S.suppliers.map(s => [s.id, s.name])] },
-    { k: 'unit', label: 'หน่วยนับหลัก', type: 'select', opts: [...new Set([p.unit || 'ชิ้น', ...UNITS])].map(u => [u, u]) },
+    { k: 'unit', label: 'หน่วยนับหลัก', type: 'select', opts: [...new Set([p.unit || UNITS[0] || 'ชิ้น', ...UNITS])].map(u => [u, u]), after: '<button type="button" class="btn sm lnk" id="punitm">⚙️ จัดการหน่วยนับ</button>' },
     ...(canPrice ? [{ k: 'price', label: 'ราคาขายปลีก', type: 'number', req: true }, { k: 'promo_price', label: 'ราคาโปรโมชั่น (0 = ไม่ใช้)', type: 'number', def: 0 },
       { k: 'wholesale_price', label: 'ราคาขายส่ง', type: 'number', def: 0 }] : []),
     ...(canDo('view_profit') ? [{ k: 'cost', label: 'ราคาทุน', type: 'number', def: 0 }] : []),
@@ -1423,7 +1423,7 @@ const _goC = go;
 go = function (page) { _goC(page); $('.top')?.classList.toggle('posmode', S.page === 'pos'); };
 /* ================= Shop POS v4 — promotions engine, data center, barcodes, personal use,
    activity log, branding, receipt image, cashier upgrades, auto-update ================= */
-const APP_VERSION = '4.7.1';
+const APP_VERSION = '4.8.0';
 Object.assign(TH, { 'Data center': 'ศูนย์ข้อมูล', 'Barcodes': 'บาร์โค้ด', 'Branches': 'สาขา' });
 PAGES.splice(PAGES.findIndex(p => p.id === 'settings'), 0,
   { id: 'barcodes', ic: '🏷', name: 'Barcodes', roles: ['owner', 'manager', 'stock'] },
@@ -1462,7 +1462,7 @@ const safeName = s => String(s).replace(/[^\w.\-]+/g, '_');
 
 /* ===================================================================== PROMOTIONS ENGINE */
 const DAYS_TH = ['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'];
-const PKIND = { percent: 'ลด %', amount: 'ลดบาท / ชิ้น', fixed_price: 'ราคาพิเศษ / ชิ้น', bxgy: 'ซื้อ X แถม Y', bundle: 'ราคาชุด (X ชิ้น = ฿)' };
+const PKIND = { percent: 'ลด %', amount: 'ลดบาท / ชิ้น', fixed_price: 'ราคาพิเศษ / ชิ้น', bxgy: 'ซื้อ X แถม Y', bundle: 'ซื้อ X ชิ้น ราคาพิเศษ ฿ (เช่น 3 ชิ้น 100)' };
 const PSCOPE = { product: 'เฉพาะสินค้าที่เลือก', category: 'ทั้งหมวดหมู่', bill: 'ทั้งบิล' };
 const arr = v => Array.isArray(v) ? v : [];
 function promoLive(p, now = new Date()) {
@@ -1490,17 +1490,30 @@ function promoLineDisc(pr, qty, price) {
   return 0;
 }
 const promoLabel = pr => pr.kind === 'percent' ? `ลด ${num(pr.value)}%` : pr.kind === 'amount' ? `ลด ฿${money(pr.value)}` : pr.kind === 'fixed_price' ? `เหลือ ฿${money(pr.value)}`
-  : pr.kind === 'bxgy' ? `ซื้อ ${num(pr.buy_qty) || 1} แถม ${num(pr.get_qty) || 1}` : pr.kind === 'bundle' ? `${num(pr.buy_qty) || 2} ชิ้น ฿${money(pr.value)}` : '';
+  : pr.kind === 'bxgy' ? `ซื้อ ${num(pr.buy_qty) || 1} แถม ${num(pr.get_qty) || 1}` : pr.kind === 'bundle' ? `ซื้อ ${num(pr.buy_qty) || 2} ชิ้น ฿${money(pr.value)}${pr.mix ? ' (คละได้)' : ''}` : '';
 function itemPromosFor(prod) { return S.promotions.filter(p => (p.scope || 'bill') !== 'bill' && promoLive(p) && promoHits(p, prod)); }
 function applyItemPromos() {
   S.cart.forEach(l => {
     l._pd = 0; l._pn = '';
     const prod = S.products.find(x => x.id === l.product_id); if (!prod || l.noPromo) return;
     for (const pr of itemPromosFor(prod)) {
+      if (pr.kind === 'bundle' && pr.mix) continue;
       const d = r2(Math.min(promoLineDisc(pr, l.qty, l.price), l.price * l.qty - num(l.discount)));
       if (d > l._pd) { l._pd = d; l._pn = pr.name; }
     }
   });
+  // mix & match: "buy X (any items in this promo) for ฿Y" — counted across all matching cart lines
+  for (const pr of S.promotions.filter(p => p.kind === 'bundle' && p.mix && (p.scope || 'bill') !== 'bill' && promoLive(p))) {
+    const X = num(pr.buy_qty) || 2, Y = num(pr.value);
+    const lines = S.cart.filter(l => !l.noPromo && promoHits(pr, S.products.find(x => x.id === l.product_id)));
+    const units = []; lines.forEach(l => { for (let i = 0; i < Math.floor(num(l.qty)); i++) units.push(l); });
+    const sets = Math.floor(units.length / X); if (!sets) continue;
+    units.sort((a, b) => num(b.price) - num(a.price));
+    const used = units.slice(0, sets * X), full = used.reduce((a, l) => a + num(l.price), 0), disc = full - sets * Y;
+    if (disc <= 0) continue;
+    const per = new Map(); used.forEach(l => per.set(l, (per.get(l) || 0) + num(l.price)));
+    per.forEach((amt, l) => { const d = r2(Math.min(disc * amt / full, l.price * l.qty - num(l.discount))); if (d > l._pd) { l._pd = d; l._pn = pr.name; } });
+  }
 }
 calc = function () {
   applyItemPromos();
@@ -1696,12 +1709,14 @@ function promoForm(p, after) {
   const o = p ? { ...p } : { name: '', scope: 'product', kind: 'percent', value: 10, buy_qty: 1, get_qty: 1, min_total: 0, members_only: false, active: true, auto: false, days: [], product_ids: [], category_ids: [], time_from: '', time_to: '', starts_on: '', ends_on: '', note: '' };
   const sel = new Set(arr(o.product_ids)), cats = new Set(arr(o.category_ids)), days = new Set(arr(o.days).map(Number));
   const m = modal(p ? 'แก้ไขโปรโมชั่น' : 'สร้างโปรโมชั่น', `<form id="pf">
+    <div class="ptpl"><span class="muted">เริ่มเร็ว:</span><button type="button" data-tp="b3">🛒 ซื้อ 3 ราคา 100</button><button type="button" data-tp="b3mix">🧺 คละ 3 ชิ้น 100</button><button type="button" data-tp="bxgy">🎁 ซื้อ 2 แถม 1</button><button type="button" data-tp="pct">％ ลด 10%</button><button type="button" data-tp="fix">🏷️ ราคาพิเศษ/ชิ้น</button></div>
     <div class="fg"><label class="f">ชื่อโปรโมชั่น *</label><input class="in" name="name" required value="${esc(o.name)}" placeholder="เช่น ซื้อ 2 แถม 1 น้ำดื่ม"></div>
     <div class="grid2"><div class="fg"><label class="f">ใช้กับ</label><select class="in" name="scope">${Object.entries(PSCOPE).map(([k, l]) => `<option value="${k}" ${o.scope === k ? 'selected' : ''}>${l}</option>`).join('')}</select></div>
       <div class="fg"><label class="f">รูปแบบ</label><select class="in" name="kind"></select></div></div>
     <div class="grid2"><div class="fg" id="fv"><label class="f" id="lv">ค่า</label><input class="in" name="value" type="number" step="any" value="${num(o.value)}"></div>
       <div class="fg" id="fb"><label class="f" id="lb">ซื้อ (ชิ้น)</label><input class="in" name="buy_qty" type="number" step="1" min="1" value="${num(o.buy_qty) || 1}"></div>
       <div class="fg" id="fg"><label class="f">แถม (ชิ้น)</label><input class="in" name="get_qty" type="number" step="1" min="1" value="${num(o.get_qty) || 1}"></div>
+      <label class="row fg" id="fmix" style="grid-column:1/-1"><input type="checkbox" name="mix" ${o.mix ? 'checked' : ''}> 🧺 คละสินค้าได้ — นับรวมทุกสินค้าในโปรนี้ (เช่น น้ำ A 1 + น้ำ B 2 = 3 ชิ้น ได้ราคา 100)</label>
       <div class="fg" id="fm"><label class="f">ยอดซื้อขั้นต่ำ (บาท)</label><input class="in" name="min_total" type="number" step="any" value="${num(o.min_total)}"></div></div>
     <div id="pick"></div>
     <div class="fg"><label class="f">วันที่ใช้ได้ (ไม่เลือก = ทุกวัน)</label><div class="pills" id="pd">${DAYS_TH.map((d, i) => `<button type="button" data-d="${i}" class="${days.has(i) ? 'on' : ''}">${d}</button>`).join('')}</div></div>
@@ -1737,30 +1752,45 @@ function promoForm(p, after) {
     $('#fb', m).style.display = ['bxgy', 'bundle'].includes(k) ? '' : 'none';
     $('#fg', m).style.display = k === 'bxgy' ? '' : 'none';
     $('#fv', m).style.display = k === 'bxgy' ? 'none' : '';
+    $('#fmix', m).style.display = k === 'bundle' && sc !== 'bill' ? '' : 'none';
     $('#fm', m).style.display = sc === 'bill' ? '' : 'none';
     $('#fa', m).style.display = sc === 'bill' ? '' : 'none';
-    $('#lv', m).textContent = { percent: 'ส่วนลด (%)', amount: 'ลด (บาท)', fixed_price: 'ราคาพิเศษ / ชิ้น (บาท)', bundle: 'ราคาชุด (บาท)' }[k] || 'ค่า';
-    $('#lb', m).textContent = k === 'bundle' ? 'จำนวนชิ้นต่อชุด' : 'ซื้อ (ชิ้น)';
-    const t0 = { kind: k, value: num(f.value.value), buy_qty: num(f.buy_qty.value), get_qty: num(f.get_qty.value) };
+    $('#lv', m).textContent = { percent: 'ส่วนลด (%)', amount: 'ลด (บาท)', fixed_price: 'ราคาพิเศษ / ชิ้น (บาท)', bundle: 'ราคาพิเศษรวม (บาท) — เช่น 100' }[k] || 'ค่า';
+    $('#lb', m).textContent = k === 'bundle' ? 'ซื้อครบ (ชิ้น) — เช่น 3' : 'ซื้อ (ชิ้น)';
+    const t0 = { kind: k, value: num(f.value.value), buy_qty: num(f.buy_qty.value), get_qty: num(f.get_qty.value), mix: f.mix.checked };
     const ex = sc === 'bill' ? '' : (() => { const p0 = S.products.find(p => sel.has(p.id)) || S.products.find(p => cats.has(p.category_id)); if (!p0) return '';
       const q0 = k === 'bxgy' ? (t0.buy_qty || 1) + (t0.get_qty || 1) : k === 'bundle' ? (t0.buy_qty || 2) : 1;
       const d = promoLineDisc(t0, q0, num(p0.promo_price) > 0 ? p0.promo_price : p0.price);
       return `<br>ตัวอย่าง: ${esc(p0.name)} × ${q0} = ฿${money(q0 * (num(p0.promo_price) > 0 ? p0.promo_price : p0.price))} → ลด ฿${money(d)} จ่าย <b>฿${money(q0 * (num(p0.promo_price) > 0 ? p0.promo_price : p0.price) - d)}</b>`; })();
-    $('#pprev', m).innerHTML = `<b>สรุป:</b> ${esc(promoLabel(t0))} · ${esc(PSCOPE[sc])}${ex}`;
+    const avg = k === 'bundle' && t0.buy_qty ? `<br>เฉลี่ยชิ้นละ ฿${money(t0.value / t0.buy_qty)} · ซื้อ ${t0.buy_qty * 2} ชิ้น = ฿${money(t0.value * 2)} · ชิ้นที่ไม่ครบชุดคิดราคาปกติ` : '';
+    $('#pprev', m).innerHTML = `<b>สรุป:</b> ${esc(promoLabel(t0))} · ${esc(PSCOPE[sc])}${ex}${avg}`;
   };
   f.scope.onchange = () => { fillKinds(); drawPick(); preview(); };
   f.oninput = preview;
   $$('#pd [data-d]', m).forEach(b => b.onclick = () => { const d = +b.dataset.d; days.has(d) ? days.delete(d) : days.add(d); b.classList.toggle('on'); });
   fillKinds(); drawPick(); preview();
+  $$('[data-tp]', m).forEach(b => b.onclick = () => {
+    const tp = { b3: ['bundle', 100, 3, 1, false, 'ซื้อ 3 ชิ้น 100'], b3mix: ['bundle', 100, 3, 1, true, 'คละ 3 ชิ้น 100'], bxgy: ['bxgy', 0, 2, 1, false, 'ซื้อ 2 แถม 1'], pct: ['percent', 10, 1, 1, false, 'ลด 10%'], fix: ['fixed_price', 0, 1, 1, false, 'ราคาพิเศษ'] }[b.dataset.tp];
+    if (f.scope.value === 'bill') { f.scope.value = 'product'; fillKinds(); drawPick(); }
+    f.kind.value = tp[0]; if (tp[1]) f.value.value = tp[1]; f.buy_qty.value = tp[2]; f.get_qty.value = tp[3]; f.mix.checked = tp[4];
+    if (!f.name.value.trim() || f.dataset.auto) { f.name.value = (f.dataset.pre || '') + tp[5]; f.dataset.auto = tp[0]; }
+    $$('[data-tp]', m).forEach(x => x.classList.toggle('on', x === b)); preview(); f.value.focus();
+  });
+  f.name.addEventListener('input', () => { delete f.dataset.auto; });
+  f.addEventListener('input', e => { if (!f.dataset.auto || e.target === f.name || !['value', 'buy_qty', 'get_qty', 'mix'].includes(e.target.name)) return;
+    const k = f.kind.value, v = num(f.value.value), b = num(f.buy_qty.value), g = num(f.get_qty.value);
+    const nm = k === 'bundle' ? `${f.mix.checked ? 'คละ' : 'ซื้อ'} ${b} ชิ้น ${money(v).replace(/\.00$/, '')}` : k === 'bxgy' ? `ซื้อ ${b} แถม ${g}` : k === 'percent' ? `ลด ${v}%` : k === 'fixed_price' ? `ราคาพิเศษ ${v}` : '';
+    if (nm) f.name.value = (f.dataset.pre || '') + nm; });
   $('[data-c]', m).onclick = m.close;
   $('#psv', m).onclick = async () => {
     const sc = f.scope.value, row = { shop_id: S.shop.id, name: f.name.value.trim(), scope: sc, kind: f.kind.value, value: num(f.value.value), buy_qty: num(f.buy_qty.value), get_qty: num(f.get_qty.value),
       min_total: sc === 'bill' ? num(f.min_total.value) : 0, product_ids: sc === 'product' ? [...sel] : [], category_ids: sc === 'category' ? [...cats] : [], days: [...days].sort(),
       time_from: f.time_from.value, time_to: f.time_to.value, starts_on: f.starts_on.value || null, ends_on: f.ends_on.value || null,
-      members_only: f.members_only.checked, auto: sc === 'bill' && f.auto.checked, active: f.active.checked, note: f.note.value.trim() };
+      mix: f.kind.value === 'bundle' && sc !== 'bill' && f.mix.checked, members_only: f.members_only.checked, auto: sc === 'bill' && f.auto.checked, active: f.active.checked, note: f.note.value.trim() };
     if (!row.name) return toast('กรุณาตั้งชื่อโปรโมชั่น', 'bad');
     if (sc === 'product' && !sel.size) return toast('กรุณาเลือกสินค้าอย่างน้อย 1 รายการ', 'bad');
     if (sc === 'category' && !cats.size) return toast('กรุณาเลือกหมวดหมู่', 'bad');
+    if (row.kind === 'bundle' && (row.buy_qty < 2 || row.value <= 0)) return toast('ใส่จำนวนชิ้น (2 ขึ้นไป) และราคาพิเศษ เช่น ซื้อ 3 ชิ้น ราคา 100', 'bad');
     if (row.kind === 'percent' && (row.value <= 0 || row.value > 100)) return toast('ส่วนลด % ต้องอยู่ระหว่าง 1–100', 'bad');
     try {
       const r = p ? await q(sb.from('promotions').update(row).eq('id', p.id).select().single()) : await q(sb.from('promotions').insert(row).select().single());
@@ -2778,6 +2808,9 @@ function commandPalette() {
     { ic: '💰', t: 'เปิดลิ้นชักเงิน', k: 'drawer cash', run: () => openDrawer(true) },
     { ic: '📊', t: 'สรุปยอดประจำวัน / บิลรวม', k: 'daily summary z report', run: () => dailySummary() },
     { ic: '🙋', t: 'เบิกใช้ส่วนตัว', k: 'personal use เบิก', run: () => { go('pos'); setTimeout(personalUse, 200); } },
+    { ic: '🗂️', t: 'จัดการหมวดหมู่', k: 'category หมวด', run: () => categoryManager() },
+    { ic: '📏', t: 'จัดการหน่วยนับ', k: 'unit หน่วย', run: () => unitManager() },
+    { ic: '🛒', t: 'สร้างโปร ซื้อ X ราคา ฿ (เช่น 3 ชิ้น 100)', k: 'promo bundle ซื้อ ราคาพิเศษ', run: () => { go('promotions'); setTimeout(() => { promoForm(null, () => go('promotions')); setTimeout(() => $$('.mbg').pop()?.querySelector('[data-tp=b3]')?.click(), 50); }, 300); } },
     { ic: '🔊', t: 'ตั้งค่าเสียง', k: 'sound เสียง voice', run: () => soundSettings() },
     { ic: '🏬', t: 'สลับสาขา', k: 'branch switch สาขา', run: () => { const b = $('#brsw'); b ? branchMenu(b) : go('branches'); } },
     { ic: '🔄', t: 'ตรวจหาอัปเดต', k: 'update', run: () => checkUpdate(true) },
@@ -4025,6 +4058,185 @@ viewSettings = function () {
   _viewSettings47();
   const t = $('#vtest'); if (t && !$('#vsadv')) t.insertAdjacentHTML('afterend', '<button class="btn sm p" id="vsadv" type="button">🎚️ ตั้งค่าเสียงแบบละเอียด</button>');
   if ($('#vsadv')) $('#vsadv').onclick = () => { $$('.mbg').pop()?.querySelector('[data-ok]')?.click(); soundSettings(); };
+};
+/* ================= v4.8 — units manager, category manager, quick "buy X for ฿Y" promotion ================= */
+
+const UNITS_DEF = [...UNITS];
+const syncUnits = () => { const u = Array.isArray(S.shop?.units) && S.shop.units.length ? S.shop.units : UNITS_DEF; UNITS.splice(0, UNITS.length, ...u); };
+const _renderShell48 = renderShell;
+renderShell = function () { _renderShell48(); syncUnits(); };
+const unitUse = u => S.products.filter(p => p.unit === u || arr(p.units).some(x => x.unit === u)).length;
+
+/* ---------- units ---------- */
+function unitManager(after) {
+  syncUnits();
+  const edit = canDo('edit_products');
+  let rows = UNITS.map(u => ({ name: u, orig: u }));
+  const m = modal('📏 หน่วยนับ', `
+    <p class="muted" style="margin-top:0;font-size:13px">หน่วยที่ใช้เลือกในหน้าเพิ่ม/แก้ไขสินค้า และหน่วยขายแบบแพ็ก/ลัง — เปลี่ยนชื่อหน่วยแล้วสินค้าที่ใช้หน่วยนั้นจะเปลี่ยนตามอัตโนมัติ</p>
+    ${edit ? `<div class="um-add"><input class="in" id="unew" placeholder="เพิ่มหน่วยใหม่ เช่น แพ็ก 6, ลัง, ถาด, หวี, กำ…"><button type="button" class="btn p" id="uadd">＋ เพิ่ม</button></div>
+      <div class="pills um-sug" id="usug"></div>` : ''}
+    <div class="um-list" id="ulist"></div>`,
+    { foot: `${edit ? '<button type="button" class="btn" id="usort">ก-ฮ เรียงตามชื่อ</button><button type="button" class="btn" id="udef">ค่าเริ่มต้น</button>' : ''}<span style="flex:1"></span><button type="button" class="btn" data-c>ปิด</button>${edit ? '<button type="button" class="btn p" id="usave">💾 บันทึก</button>' : ''}` });
+  const SUG = ['ชิ้น', 'อัน', 'ขวด', 'กระป๋อง', 'แพ็ก', 'กล่อง', 'ลัง', 'ถุง', 'ซอง', 'ห่อ', 'โหล', 'กิโลกรัม', 'ขีด', 'กรัม', 'ลิตร', 'มิลลิลิตร', 'แก้ว', 'จาน', 'ชาม', 'ถ้วย', 'ชุด', 'คู่', 'ม้วน', 'แผ่น', 'ถาด', 'หวี', 'ลูก', 'ผล', 'ตัว', 'ไม้', 'กำ', 'มัด', 'แท่ง', 'หลอด', 'เม็ด'];
+  const draw = () => {
+    $('#ulist', m).innerHTML = rows.map((r, i) => { const n = unitUse(r.orig || r.name); return `<div class="um-row" data-i="${i}">
+      <span class="um-n">${i + 1}</span><input class="in" data-un value="${esc(r.name)}" ${edit ? '' : 'disabled'}>
+      <small class="muted um-c">${n ? `${n} สินค้า` : 'ยังไม่ใช้'}</small>
+      ${edit ? `<button type="button" class="btn sm" data-up ${i ? '' : 'disabled'}>↑</button><button type="button" class="btn sm" data-dn ${i < rows.length - 1 ? '' : 'disabled'}>↓</button><button type="button" class="btn sm bad" data-del>✕</button>` : ''}</div>`; }).join('') || '<p class="muted">ยังไม่มีหน่วย</p>';
+    if ($('#usug', m)) $('#usug', m).innerHTML = SUG.filter(s => !rows.some(r => r.name === s)).slice(0, 14).map(s => `<button type="button" data-sg="${esc(s)}">＋ ${esc(s)}</button>`).join('');
+    $$('.um-row', m).forEach(el => { const i = +el.dataset.i;
+      $('[data-un]', el).oninput = e => { rows[i].name = e.target.value; };
+      if (!edit) return;
+      $('[data-up]', el).onclick = () => { [rows[i - 1], rows[i]] = [rows[i], rows[i - 1]]; draw(); };
+      $('[data-dn]', el).onclick = () => { [rows[i + 1], rows[i]] = [rows[i], rows[i + 1]]; draw(); };
+      $('[data-del]', el).onclick = async () => { const n = unitUse(rows[i].orig || rows[i].name);
+        if (n && !(await confirmBox(`หน่วย “${rows[i].name}” ใช้อยู่ ${n} สินค้า — ลบออกจากรายการ? (สินค้าเดิมยังใช้หน่วยนี้ได้)`))) return;
+        rows.splice(i, 1); draw(); };
+    });
+    $$('[data-sg]', m).forEach(b => b.onclick = () => { rows.push({ name: b.dataset.sg }); draw(); });
+  };
+  const add = () => { const v = $('#unew', m).value.trim(); if (!v) return; if (rows.some(r => r.name === v)) return toast('มีหน่วยนี้แล้ว', 'bad'); rows.push({ name: v }); $('#unew', m).value = ''; draw(); $('#unew', m).focus(); };
+  if (edit) {
+    $('#uadd', m).onclick = add; $('#unew', m).onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); add(); } };
+    $('#usort', m).onclick = () => { rows.sort((a, b) => a.name.localeCompare(b.name, 'th')); draw(); };
+    $('#udef', m).onclick = () => { rows = UNITS_DEF.map(u => ({ name: u, orig: rows.find(r => r.orig === u)?.orig })); draw(); };
+    $('#usave', m).onclick = async () => {
+      const list = rows.map(r => r.name.trim()).filter(Boolean);
+      if (new Set(list).size !== list.length) return toast('มีชื่อหน่วยซ้ำกัน', 'bad');
+      try {
+        for (const r of rows) {
+          const nn = r.name.trim(); if (!r.orig || !nn || r.orig === nn) continue;
+          const hit = S.products.filter(p => p.unit === r.orig);
+          if (hit.length) { await q(sb.from('products').update({ unit: nn }).eq('shop_id', S.shop.id).eq('unit', r.orig)); hit.forEach(p => p.unit = nn); }
+          for (const p of S.products.filter(p => arr(p.units).some(x => x.unit === r.orig))) {
+            const units = p.units.map(x => x.unit === r.orig ? { ...x, unit: nn } : x);
+            await q(sb.from('products').update({ units }).eq('id', p.id)); p.units = units;
+          }
+        }
+        Object.assign(S.shop, await q(sb.from('shops').update({ units: list }).eq('id', S.shop.id).select().single()));
+        syncUnits(); logAct('settings', 'shop', 'หน่วยนับ', { units: list }); toast('บันทึกหน่วยนับแล้ว', 'ok'); m.close(); after?.();
+      } catch (e) { fail(e); }
+    };
+  }
+  $('[data-c]', m).onclick = () => { m.close(); };
+  draw();
+}
+
+/* ---------- categories ---------- */
+const CAT_COLORS = ['#ef4444', '#f97316', '#f59e0b', '#84cc16', '#22c55e', '#14b8a6', '#06b6d4', '#3b82f6', '#6366f1', '#8b5cf6', '#d946ef', '#ec4899', '#78716c', '#64748b'];
+const CAT_ICONS = ['🥩', '🐷', '🍗', '🐟', '🦐', '🥚', '🥬', '🍎', '🍌', '🍉', '🍚', '🍜', '🍞', '🧀', '🥫', '🧂', '🌶️', '🥤', '🧃', '🍺', '☕', '🧊', '🍬', '🍪', '🍦', '🧴', '🧻', '🧼', '🚬', '💊', '🔋', '🛒', '📦', '⭐'];
+categoryManager = function (after) {
+  const edit = canDo('edit_products');
+  let newIcon = '', newColor = CAT_COLORS[S.categories.length % CAT_COLORS.length];
+  const m = modal('🗂️ หมวดหมู่สินค้า', `
+    ${edit ? `<div class="cm-add"><button type="button" class="cm-ic" id="cnic" title="เลือกไอคอน">＋</button><input class="in" id="cnn" placeholder="ชื่อหมวดใหม่ เช่น หมูสด, เครื่องดื่ม, ผักผลไม้…"><input type="color" id="cnc" value="${newColor}" title="สี"><button type="button" class="btn p" id="cna">＋ เพิ่ม</button></div>` : ''}
+    <div class="cm-list" id="cml"></div>`, { wide: true, foot: `${edit ? '<button type="button" class="btn" id="cmsort">ก-ฮ เรียงตามชื่อ</button>' : ''}<span style="flex:1"></span><button type="button" class="btn p" data-c>เสร็จ</button>` });
+  const cnt = id => S.products.filter(p => p.category_id === id).length;
+  const save = async (c, o) => { try { Object.assign(c, await q(sb.from('categories').update(o).eq('id', c.id).select().single())); } catch (e) { fail(e); } };
+  const iconPick = (anchor, cb) => {
+    $('.cm-pop')?.remove();
+    const r = anchor.getBoundingClientRect();
+    m.insertAdjacentHTML('beforeend', `<div class="cm-pop" style="top:${r.bottom + 4}px;left:${Math.max(8, Math.min(r.left, innerWidth - 290))}px">${CAT_ICONS.map(i => `<button type="button" data-ic="${i}">${i}</button>`).join('')}<button type="button" data-ic="" title="ไม่ใช้ไอคอน">✕</button>
+      <input class="in" placeholder="หรือพิมพ์อีโมจิ" maxlength="4"></div>`);
+    const pop = $('.cm-pop', m);
+    $$('[data-ic]', pop).forEach(b => b.onclick = () => { cb(b.dataset.ic); pop.remove(); });
+    $('input', pop).onchange = e => { cb(e.target.value.trim()); pop.remove(); };
+    setTimeout(() => document.addEventListener('click', function off(ev) { if (!pop.contains(ev.target)) { pop.remove(); document.removeEventListener('click', off, true); } }, true), 0);
+  };
+  const draw = () => {
+    const list = [...S.categories].sort((a, b) => num(a.sort) - num(b.sort) || a.name.localeCompare(b.name, 'th'));
+    $('#cml', m).innerHTML = list.map((c, i) => `<div class="cm-row" data-id="${c.id}" style="--cc:${esc(c.color || '#6366f1')}">
+      <button type="button" class="cm-ic" data-ic2 ${edit ? '' : 'disabled'}>${esc(c.icon || '') || '<span style="opacity:.4">＋</span>'}</button>
+      <input class="in" data-nm value="${esc(c.name)}" ${edit ? '' : 'disabled'}>
+      <input type="color" data-cl value="${esc(c.color || '#6366f1')}" ${edit ? '' : 'disabled'}>
+      <button type="button" class="btn sm cm-cnt" data-see title="ดูสินค้าในหมวด">${cnt(c.id)} สินค้า</button>
+      ${edit ? `<button type="button" class="btn sm" data-up ${i ? '' : 'disabled'}>↑</button><button type="button" class="btn sm" data-dn ${i < list.length - 1 ? '' : 'disabled'}>↓</button><button type="button" class="btn sm bad" data-del>✕</button>` : ''}</div>`).join('')
+      || '<div class="brempty">ยังไม่มีหมวดหมู่ — เพิ่มด้านบนได้เลย</div>';
+    $$('.cm-row', m).forEach(el => {
+      const c = S.categories.find(x => x.id === el.dataset.id), i = list.indexOf(c);
+      $('[data-see]', el).onclick = () => { m.close(); go('products'); setTimeout(() => { const s = $('#pc'); if (s) { s.value = c.id; s.dispatchEvent(new Event('change')); s.dispatchEvent(new Event('input')); } }, 400); };
+      if (!edit) return;
+      $('[data-nm]', el).onchange = e => { const v = e.target.value.trim(); if (!v) return draw(); if (S.categories.some(x => x !== c && x.name === v)) { toast('มีชื่อหมวดนี้แล้ว', 'bad'); return draw(); } save(c, { name: v }); };
+      $('[data-cl]', el).onchange = e => { el.style.setProperty('--cc', e.target.value); save(c, { color: e.target.value }); };
+      $('[data-ic2]', el).onclick = ev => { ev.stopPropagation(); iconPick(ev.currentTarget, async v => { await save(c, { icon: v || null }); draw(); }); };
+      const move = async d => { const o = list[i + d]; if (!o) return; list.splice(i, 1); list.splice(i + d, 0, c);
+        await Promise.all(list.map((x, k) => num(x.sort) === k ? null : save(x, { sort: k }))); draw(); };
+      $('[data-up]', el).onclick = () => move(-1); $('[data-dn]', el).onclick = () => move(1);
+      $('[data-del]', el).onclick = async () => {
+        const n = cnt(c.id);
+        if (!(await confirmBox(n ? `ลบหมวด “${c.name}”? สินค้า ${n} รายการจะเป็น “ไม่มีหมวด”` : `ลบหมวด “${c.name}”?`))) return;
+        try { if (n) await q(sb.from('products').update({ category_id: null }).eq('shop_id', S.shop.id).eq('category_id', c.id));
+          await q(sb.from('categories').delete().eq('id', c.id));
+          S.products.forEach(p => { if (p.category_id === c.id) p.category_id = null; }); S.categories = S.categories.filter(x => x !== c); draw(); toast('ลบแล้ว', 'ok'); } catch (e) { fail(e); }
+      };
+    });
+  };
+  if (edit) {
+    $('#cnic', m).onclick = ev => { ev.stopPropagation(); iconPick(ev.currentTarget, v => { newIcon = v; $('#cnic', m).textContent = v || '＋'; }); };
+    const add = async () => {
+      const name = $('#cnn', m).value.trim(); if (!name) return $('#cnn', m).focus();
+      if (S.categories.some(x => x.name === name)) return toast('มีชื่อหมวดนี้แล้ว', 'bad');
+      try { S.categories.push(await q(sb.from('categories').insert({ shop_id: S.shop.id, name, color: $('#cnc', m).value, icon: newIcon || null, sort: S.categories.length }).select().single()));
+        $('#cnn', m).value = ''; newIcon = ''; $('#cnic', m).textContent = '＋'; $('#cnc', m).value = CAT_COLORS[S.categories.length % CAT_COLORS.length]; draw(); toast('เพิ่มหมวดแล้ว', 'ok'); } catch (e) { fail(e); }
+    };
+    $('#cna', m).onclick = add; $('#cnn', m).onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); add(); } };
+    $('#cmsort', m).onclick = async () => { const l = [...S.categories].sort((a, b) => a.name.localeCompare(b.name, 'th')); await Promise.all(l.map((x, k) => save(x, { sort: k }))); draw(); };
+  }
+  const oc = m.close; m.close = () => { oc(); after?.(); }; $('.x', m).onclick = m.close; $('[data-c]', m).onclick = m.close;
+  draw();
+};
+
+/* product form: manage buttons refresh the selects in place */
+const _productForm48 = productForm;
+productForm = function (p, after) {
+  _productForm48(p, after);
+  const m = $$('.mbg').pop(); if (!m) return;
+  const cs = $('[name=category_id]', m), us = $('[name=unit]', m);
+  $('#pcatm', m)?.addEventListener('click', () => categoryManager(() => {
+    const v = cs.value; cs.innerHTML = `<option value="">—</option>` + [...S.categories].sort((a, b) => num(a.sort) - num(b.sort)).map(c => `<option value="${c.id}">${esc((c.icon ? c.icon + ' ' : '') + c.name)}</option>`).join(''); cs.value = v; }));
+  $('#punitm', m)?.addEventListener('click', () => unitManager(() => {
+    const v = us.value; us.innerHTML = [...new Set([v, ...UNITS])].filter(Boolean).map(u => `<option>${esc(u)}</option>`).join(''); us.value = UNITS.includes(v) ? v : v; }));
+};
+
+/* products page: units button + quick promo on each card */
+const _products48 = VIEWS.products;
+VIEWS.products = pg => {
+  _products48(pg);
+  const cb = $('#catBtn'); if (cb) { cb.innerHTML = '🗂️ หมวดหมู่'; cb.onclick = () => categoryManager(() => go('products')); }
+  if (cb && !$('#unitBtn')) cb.insertAdjacentHTML('afterend', '<button class="btn" id="unitBtn">📏 หน่วยนับ</button>');
+  if ($('#unitBtn')) $('#unitBtn').onclick = () => unitManager(() => go('products'));
+  if (!canDo('promotions')) return;
+  const g = $('#pmg', pg); if (!g) return;
+  const deco = () => $$('.pm .pm-acts', g).forEach(a => { if (!$('[data-act=promo]', a)) a.insertAdjacentHTML('afterbegin', '<button data-act="promo" title="ตั้งโปร ซื้อ X ราคา ฿">🏷️</button>'); });
+  new MutationObserver(deco).observe(g, { childList: true }); deco();
+  g.addEventListener('click', e => { const b = e.target.closest('[data-act=promo]'); if (!b) return; e.stopPropagation(); e.preventDefault();
+    const p = S.products.find(x => x.id === b.closest('.pm').dataset.id); if (p) quickPromo(p, () => go('products')); }, true);
+};
+
+/* open the promotion form preset to "buy 3 for ฿…" for one product */
+function quickPromo(p, after) {
+  promoForm(null, after);
+  const m = $$('.mbg').pop(); if (!m) return;
+  const f = $('#pf', m); f.scope.value = 'product'; f.scope.dispatchEvent(new Event('change'));
+  const ps = $('#ps', m); ps.value = p.barcode || p.name; ps.dispatchEvent(new Event('input'));
+  const cbx = $(`[data-pid="${p.id}"]`, m); if (cbx && !cbx.checked) { cbx.checked = true; cbx.dispatchEvent(new Event('change')); }
+  f.dataset.pre = p.name + ' '; f.name.value = '';
+  $('[data-tp=b3]', m)?.click();
+  f.value.value = Math.max(1, Math.floor(num(p.price) * 3 * 0.9)); f.value.dispatchEvent(new Event('input', { bubbles: true })); f.value.select();
+}
+
+/* settings: shortcuts */
+const _settings48 = VIEWS.settings;
+VIEWS.settings = pg => {
+  _settings48(pg);
+  const host = $('#stf')?.parentElement || pg;
+  host.insertAdjacentHTML('beforeend', `<div class="card" style="margin-top:16px"><h3 style="margin-top:0">🗂️ หมวดหมู่ · 📏 หน่วยนับ · 🏷️ โปรโมชั่น</h3>
+    <p class="muted" style="font-size:13px;margin-top:0">หมวดหมู่ ${S.categories.length} หมวด · หน่วยนับ ${UNITS.length} หน่วย · โปรโมชั่น ${S.promotions.length} รายการ</p>
+    <div class="row" style="gap:8px;flex-wrap:wrap"><button type="button" class="btn" id="s_cat">🗂️ จัดการหมวดหมู่</button><button type="button" class="btn" id="s_unit">📏 จัดการหน่วยนับ</button><button type="button" class="btn" id="s_pro">🏷️ สร้างโปร “ซื้อ X ราคา ฿”</button></div></div>`);
+  $('#s_cat').onclick = () => categoryManager();
+  $('#s_unit').onclick = () => unitManager();
+  $('#s_pro').onclick = () => { go('promotions'); setTimeout(() => { promoForm(null, () => go('promotions')); setTimeout(() => $$('.mbg').pop()?.querySelector('[data-tp=b3]')?.click(), 50); }, 300); };
 };
 /* ================= start ================= */
 updateNet();

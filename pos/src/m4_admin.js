@@ -322,9 +322,9 @@ productForm = function (p, after) {
   const m = formModal(isNew ? 'เพิ่มสินค้า' : 'แก้ไขสินค้า', [
     { k: 'name', label: 'ชื่อสินค้า (ไทย)', req: true, full: true }, { k: 'name_en', label: 'ชื่อสินค้า (อังกฤษ)' }, { k: 'brand', label: 'ยี่ห้อ' },
     { k: 'barcode', label: 'บาร์โค้ด', after: `<button type="button" class="btn sm" id="pscan" style="margin-top:6px">📷 สแกน</button>` }, { k: 'sku', label: 'รหัสสินค้า (SKU)' },
-    { k: 'category_id', label: 'หมวดหมู่', type: 'select', opts: [['', '—'], ...S.categories.map(c => [c.id, c.name])] },
+    { k: 'category_id', label: 'หมวดหมู่', type: 'select', opts: [['', '—'], ...S.categories.map(c => [c.id, (c.icon ? c.icon + ' ' : '') + c.name])], after: '<button type="button" class="btn sm lnk" id="pcatm">⚙️ จัดการหมวดหมู่</button>' },
     { k: 'supplier_id', label: 'ผู้จำหน่ายหลัก', type: 'select', opts: [['', '—'], ...S.suppliers.map(s => [s.id, s.name])] },
-    { k: 'unit', label: 'หน่วยนับหลัก', type: 'select', opts: [...new Set([p.unit || 'ชิ้น', ...UNITS])].map(u => [u, u]) },
+    { k: 'unit', label: 'หน่วยนับหลัก', type: 'select', opts: [...new Set([p.unit || UNITS[0] || 'ชิ้น', ...UNITS])].map(u => [u, u]), after: '<button type="button" class="btn sm lnk" id="punitm">⚙️ จัดการหน่วยนับ</button>' },
     ...(canPrice ? [{ k: 'price', label: 'ราคาขายปลีก', type: 'number', req: true }, { k: 'promo_price', label: 'ราคาโปรโมชั่น (0 = ไม่ใช้)', type: 'number', def: 0 },
       { k: 'wholesale_price', label: 'ราคาขายส่ง', type: 'number', def: 0 }] : []),
     ...(canDo('view_profit') ? [{ k: 'cost', label: 'ราคาทุน', type: 'number', def: 0 }] : []),

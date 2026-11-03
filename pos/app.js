@@ -1,6 +1,6 @@
 /* Shop POS — free, open POS + stock web app.  Data: Supabase.  Hosting: GitHub Pages. */
 'use strict';
-const VERSION = '4.7.1';
+const VERSION = '4.8.0';
 const sb = supabase.createClient(window.POS_CONFIG.url, window.POS_CONFIG.key, { auth: { flowType: 'pkce', detectSessionInUrl: true, persistSession: true } });
 
 /* ================= i18n ================= */
@@ -471,7 +471,7 @@ VIEWS.pos = pg => {
   </div>`;
   const drawCats = () => {
     const cats = [{id: 'all', name: '🏠 ' + t('All')}, {id: 'fav', name: '★ ' + (LANG === 'th' ? 'รายการโปรด' : 'Favorites')}, {id: 'best', name: '🔥 ' + (LANG === 'th' ? 'ขายดี' : 'Best sellers')}, {id: 'recent', name: '🕘 ' + (LANG === 'th' ? 'ขายล่าสุด' : 'Recently sold')}, ...S.categories];
-    $('#cats').innerHTML = cats.map(c => `<button class="tab ${S.cat === c.id ? 'on' : ''}" data-c="${c.id}" ${c.color ? `style="--cc:${esc(c.color)}"` : ''}>${c.color ? '<i class="dot"></i>' : ''}${esc(c.name)} <small>${countIn(c.id)}</small></button>`).join('');
+    $('#cats').innerHTML = cats.map(c => `<button class="tab ${S.cat === c.id ? 'on' : ''}" data-c="${c.id}" ${c.color ? `style="--cc:${esc(c.color)}"` : ''}>${c.icon ? esc(c.icon) + ' ' : c.color ? '<i class="dot"></i>' : ''}${esc(c.name)} <small>${countIn(c.id)}</small></button>`).join('');
     $$('#cats .tab').forEach(b => b.onclick = () => { S.cat = b.dataset.c; drawCats(); drawGrid(); });
   };
   const s = $('#psearch');
@@ -1087,7 +1087,7 @@ VIEWS.products = pg => {
   $('#tact').innerHTML = `<button class="btn p" id="addBtn">+ ${t('Add product')}</button><button class="btn" id="autoPic">🪄 ${th ? 'ใส่รูปอัตโนมัติ' : 'Auto pictures'}</button><button class="btn" id="catBtn">🗂 ${t('Categories')}</button><button class="btn" id="impBtn">⬆ ${t('Import CSV')}</button><button class="btn" id="expBtn">⬇ ${t('Export CSV')}</button>`;
   pg.innerHTML = `<div class="row" style="margin-bottom:12px">
       <div class="sbox" style="max-width:340px"><span>🔍</span><input class="in" id="ps" placeholder="${t('Search')} / ${t('Barcode')}"></div>
-      <select class="in" id="pc" style="width:auto"><option value="">${t('All')}</option>${S.categories.map(c => `<option value="${c.id}">${esc(c.name)}</option>`).join('')}</select>
+      <select class="in" id="pc" style="width:auto"><option value="">${t('All')}</option>${S.categories.map(c => `<option value="${c.id}">${esc((c.icon ? c.icon + ' ' : '') + c.name)}</option>`).join('')}</select>
       <select class="in" id="pf" style="width:auto"><option value="">${th ? 'ทุกสถานะ' : 'Any status'}</option><option value="low">⚠️ ${t('Low stock')}</option><option value="nopic">🖼️ ${th ? 'ยังไม่มีรูป' : 'No picture'}</option><option value="off">⛔ ${th ? 'ปิดขาย' : 'Inactive'}</option></select></div>
     <p class="muted" style="font-size:13px;margin:-4px 0 10px">✏️ ${th ? 'แก้ราคา ต้นทุน สต็อก หรือชื่อได้ทันทีในตาราง — บันทึกอัตโนมัติ · แตะรูปเพื่อเปลี่ยน/ค้นหาจากเว็บ' : 'Edit name, price, cost or stock right in the list — saves automatically · tap a picture to change it or search the web'}</p>
     <div class="elist" id="plist"></div><p class="muted" id="pcount"></p>`;

@@ -1,6 +1,6 @@
 /* ================= Shop POS v4 — promotions engine, data center, barcodes, personal use,
    activity log, branding, receipt image, cashier upgrades, auto-update ================= */
-const APP_VERSION = '4.7.1';
+const APP_VERSION = '4.8.0';
 Object.assign(TH, { 'Data center': 'ศูนย์ข้อมูล', 'Barcodes': 'บาร์โค้ด', 'Branches': 'สาขา' });
 PAGES.splice(PAGES.findIndex(p => p.id === 'settings'), 0,
   { id: 'barcodes', ic: '🏷', name: 'Barcodes', roles: ['owner', 'manager', 'stock'] },
@@ -39,7 +39,7 @@ const safeName = s => String(s).replace(/[^\w.\-]+/g, '_');
 
 /* ===================================================================== PROMOTIONS ENGINE */
 const DAYS_TH = ['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'];
-const PKIND = { percent: 'ลด %', amount: 'ลดบาท / ชิ้น', fixed_price: 'ราคาพิเศษ / ชิ้น', bxgy: 'ซื้อ X แถม Y', bundle: 'ราคาชุด (X ชิ้น = ฿)' };
+const PKIND = { percent: 'ลด %', amount: 'ลดบาท / ชิ้น', fixed_price: 'ราคาพิเศษ / ชิ้น', bxgy: 'ซื้อ X แถม Y', bundle: 'ซื้อ X ชิ้น ราคาพิเศษ ฿ (เช่น 3 ชิ้น 100)' };
 const PSCOPE = { product: 'เฉพาะสินค้าที่เลือก', category: 'ทั้งหมวดหมู่', bill: 'ทั้งบิล' };
 const arr = v => Array.isArray(v) ? v : [];
 function promoLive(p, now = new Date()) {
@@ -67,17 +67,30 @@ function promoLineDisc(pr, qty, price) {
   return 0;
 }
 const promoLabel = pr => pr.kind === 'percent' ? `ลด ${num(pr.value)}%` : pr.kind === 'amount' ? `ลด ฿${money(pr.value)}` : pr.kind === 'fixed_price' ? `เหลือ ฿${money(pr.value)}`
-  : pr.kind === 'bxgy' ? `ซื้อ ${num(pr.buy_qty) || 1} แถม ${num(pr.get_qty) || 1}` : pr.kind === 'bundle' ? `${num(pr.buy_qty) || 2} ชิ้น ฿${money(pr.value)}` : '';
+  : pr.kind === 'bxgy' ? `ซื้อ ${num(pr.buy_qty) || 1} แถม ${num(pr.get_qty) || 1}` : pr.kind === 'bundle' ? `ซื้อ ${num(pr.buy_qty) || 2} ชิ้น ฿${money(pr.value)}${pr.mix ? ' (คละได้)' : ''}` : '';
 function itemPromosFor(prod) { return S.promotions.filter(p => (p.scope || 'bill') !== 'bill' && promoLive(p) && promoHits(p, prod)); }
 function applyItemPromos() {
   S.cart.forEach(l => {
     l._pd = 0; l._pn = '';
     const prod = S.products.find(x => x.id === l.product_id); if (!prod || l.noPromo) return;
     for (const pr of itemPromosFor(prod)) {
+      if (pr.kind === 'bundle' && pr.mix) continue;
       const d = r2(Math.min(promoLineDisc(pr, l.qty, l.price), l.price * l.qty - num(l.discount)));
       if (d > l._pd) { l._pd = d; l._pn = pr.name; }
     }
   });
+  // mix & match: "buy X (any items in this promo) for ฿Y" — counted across all matching cart lines
+  for (const pr of S.promotions.filter(p => p.kind === 'bundle' && p.mix && (p.scope || 'bill') !== 'bill' && promoLive(p))) {
+    const X = num(pr.buy_qty) || 2, Y = num(pr.value);
+    const lines = S.cart.filter(l => !l.noPromo && promoHits(pr, S.products.find(x => x.id === l.product_id)));
+    const units = []; lines.forEach(l => { for (let i = 0; i < Math.floor(num(l.qty)); i++) units.push(l); });
+    const sets = Math.floor(units.length / X); if (!sets) continue;
+    units.sort((a, b) => num(b.price) - num(a.price));
+    const used = units.slice(0, sets * X), full = used.reduce((a, l) => a + num(l.price), 0), disc = full - sets * Y;
+    if (disc <= 0) continue;
+    const per = new Map(); used.forEach(l => per.set(l, (per.get(l) || 0) + num(l.price)));
+    per.forEach((amt, l) => { const d = r2(Math.min(disc * amt / full, l.price * l.qty - num(l.discount))); if (d > l._pd) { l._pd = d; l._pn = pr.name; } });
+  }
 }
 calc = function () {
   applyItemPromos();
@@ -273,12 +286,14 @@ function promoForm(p, after) {
   const o = p ? { ...p } : { name: '', scope: 'product', kind: 'percent', value: 10, buy_qty: 1, get_qty: 1, min_total: 0, members_only: false, active: true, auto: false, days: [], product_ids: [], category_ids: [], time_from: '', time_to: '', starts_on: '', ends_on: '', note: '' };
   const sel = new Set(arr(o.product_ids)), cats = new Set(arr(o.category_ids)), days = new Set(arr(o.days).map(Number));
   const m = modal(p ? 'แก้ไขโปรโมชั่น' : 'สร้างโปรโมชั่น', `<form id="pf">
+    <div class="ptpl"><span class="muted">เริ่มเร็ว:</span><button type="button" data-tp="b3">🛒 ซื้อ 3 ราคา 100</button><button type="button" data-tp="b3mix">🧺 คละ 3 ชิ้น 100</button><button type="button" data-tp="bxgy">🎁 ซื้อ 2 แถม 1</button><button type="button" data-tp="pct">％ ลด 10%</button><button type="button" data-tp="fix">🏷️ ราคาพิเศษ/ชิ้น</button></div>
     <div class="fg"><label class="f">ชื่อโปรโมชั่น *</label><input class="in" name="name" required value="${esc(o.name)}" placeholder="เช่น ซื้อ 2 แถม 1 น้ำดื่ม"></div>
     <div class="grid2"><div class="fg"><label class="f">ใช้กับ</label><select class="in" name="scope">${Object.entries(PSCOPE).map(([k, l]) => `<option value="${k}" ${o.scope === k ? 'selected' : ''}>${l}</option>`).join('')}</select></div>
       <div class="fg"><label class="f">รูปแบบ</label><select class="in" name="kind"></select></div></div>
     <div class="grid2"><div class="fg" id="fv"><label class="f" id="lv">ค่า</label><input class="in" name="value" type="number" step="any" value="${num(o.value)}"></div>
       <div class="fg" id="fb"><label class="f" id="lb">ซื้อ (ชิ้น)</label><input class="in" name="buy_qty" type="number" step="1" min="1" value="${num(o.buy_qty) || 1}"></div>
       <div class="fg" id="fg"><label class="f">แถม (ชิ้น)</label><input class="in" name="get_qty" type="number" step="1" min="1" value="${num(o.get_qty) || 1}"></div>
+      <label class="row fg" id="fmix" style="grid-column:1/-1"><input type="checkbox" name="mix" ${o.mix ? 'checked' : ''}> 🧺 คละสินค้าได้ — นับรวมทุกสินค้าในโปรนี้ (เช่น น้ำ A 1 + น้ำ B 2 = 3 ชิ้น ได้ราคา 100)</label>
       <div class="fg" id="fm"><label class="f">ยอดซื้อขั้นต่ำ (บาท)</label><input class="in" name="min_total" type="number" step="any" value="${num(o.min_total)}"></div></div>
     <div id="pick"></div>
     <div class="fg"><label class="f">วันที่ใช้ได้ (ไม่เลือก = ทุกวัน)</label><div class="pills" id="pd">${DAYS_TH.map((d, i) => `<button type="button" data-d="${i}" class="${days.has(i) ? 'on' : ''}">${d}</button>`).join('')}</div></div>
@@ -314,30 +329,45 @@ function promoForm(p, after) {
     $('#fb', m).style.display = ['bxgy', 'bundle'].includes(k) ? '' : 'none';
     $('#fg', m).style.display = k === 'bxgy' ? '' : 'none';
     $('#fv', m).style.display = k === 'bxgy' ? 'none' : '';
+    $('#fmix', m).style.display = k === 'bundle' && sc !== 'bill' ? '' : 'none';
     $('#fm', m).style.display = sc === 'bill' ? '' : 'none';
     $('#fa', m).style.display = sc === 'bill' ? '' : 'none';
-    $('#lv', m).textContent = { percent: 'ส่วนลด (%)', amount: 'ลด (บาท)', fixed_price: 'ราคาพิเศษ / ชิ้น (บาท)', bundle: 'ราคาชุด (บาท)' }[k] || 'ค่า';
-    $('#lb', m).textContent = k === 'bundle' ? 'จำนวนชิ้นต่อชุด' : 'ซื้อ (ชิ้น)';
-    const t0 = { kind: k, value: num(f.value.value), buy_qty: num(f.buy_qty.value), get_qty: num(f.get_qty.value) };
+    $('#lv', m).textContent = { percent: 'ส่วนลด (%)', amount: 'ลด (บาท)', fixed_price: 'ราคาพิเศษ / ชิ้น (บาท)', bundle: 'ราคาพิเศษรวม (บาท) — เช่น 100' }[k] || 'ค่า';
+    $('#lb', m).textContent = k === 'bundle' ? 'ซื้อครบ (ชิ้น) — เช่น 3' : 'ซื้อ (ชิ้น)';
+    const t0 = { kind: k, value: num(f.value.value), buy_qty: num(f.buy_qty.value), get_qty: num(f.get_qty.value), mix: f.mix.checked };
     const ex = sc === 'bill' ? '' : (() => { const p0 = S.products.find(p => sel.has(p.id)) || S.products.find(p => cats.has(p.category_id)); if (!p0) return '';
       const q0 = k === 'bxgy' ? (t0.buy_qty || 1) + (t0.get_qty || 1) : k === 'bundle' ? (t0.buy_qty || 2) : 1;
       const d = promoLineDisc(t0, q0, num(p0.promo_price) > 0 ? p0.promo_price : p0.price);
       return `<br>ตัวอย่าง: ${esc(p0.name)} × ${q0} = ฿${money(q0 * (num(p0.promo_price) > 0 ? p0.promo_price : p0.price))} → ลด ฿${money(d)} จ่าย <b>฿${money(q0 * (num(p0.promo_price) > 0 ? p0.promo_price : p0.price) - d)}</b>`; })();
-    $('#pprev', m).innerHTML = `<b>สรุป:</b> ${esc(promoLabel(t0))} · ${esc(PSCOPE[sc])}${ex}`;
+    const avg = k === 'bundle' && t0.buy_qty ? `<br>เฉลี่ยชิ้นละ ฿${money(t0.value / t0.buy_qty)} · ซื้อ ${t0.buy_qty * 2} ชิ้น = ฿${money(t0.value * 2)} · ชิ้นที่ไม่ครบชุดคิดราคาปกติ` : '';
+    $('#pprev', m).innerHTML = `<b>สรุป:</b> ${esc(promoLabel(t0))} · ${esc(PSCOPE[sc])}${ex}${avg}`;
   };
   f.scope.onchange = () => { fillKinds(); drawPick(); preview(); };
   f.oninput = preview;
   $$('#pd [data-d]', m).forEach(b => b.onclick = () => { const d = +b.dataset.d; days.has(d) ? days.delete(d) : days.add(d); b.classList.toggle('on'); });
   fillKinds(); drawPick(); preview();
+  $$('[data-tp]', m).forEach(b => b.onclick = () => {
+    const tp = { b3: ['bundle', 100, 3, 1, false, 'ซื้อ 3 ชิ้น 100'], b3mix: ['bundle', 100, 3, 1, true, 'คละ 3 ชิ้น 100'], bxgy: ['bxgy', 0, 2, 1, false, 'ซื้อ 2 แถม 1'], pct: ['percent', 10, 1, 1, false, 'ลด 10%'], fix: ['fixed_price', 0, 1, 1, false, 'ราคาพิเศษ'] }[b.dataset.tp];
+    if (f.scope.value === 'bill') { f.scope.value = 'product'; fillKinds(); drawPick(); }
+    f.kind.value = tp[0]; if (tp[1]) f.value.value = tp[1]; f.buy_qty.value = tp[2]; f.get_qty.value = tp[3]; f.mix.checked = tp[4];
+    if (!f.name.value.trim() || f.dataset.auto) { f.name.value = (f.dataset.pre || '') + tp[5]; f.dataset.auto = tp[0]; }
+    $$('[data-tp]', m).forEach(x => x.classList.toggle('on', x === b)); preview(); f.value.focus();
+  });
+  f.name.addEventListener('input', () => { delete f.dataset.auto; });
+  f.addEventListener('input', e => { if (!f.dataset.auto || e.target === f.name || !['value', 'buy_qty', 'get_qty', 'mix'].includes(e.target.name)) return;
+    const k = f.kind.value, v = num(f.value.value), b = num(f.buy_qty.value), g = num(f.get_qty.value);
+    const nm = k === 'bundle' ? `${f.mix.checked ? 'คละ' : 'ซื้อ'} ${b} ชิ้น ${money(v).replace(/\.00$/, '')}` : k === 'bxgy' ? `ซื้อ ${b} แถม ${g}` : k === 'percent' ? `ลด ${v}%` : k === 'fixed_price' ? `ราคาพิเศษ ${v}` : '';
+    if (nm) f.name.value = (f.dataset.pre || '') + nm; });
   $('[data-c]', m).onclick = m.close;
   $('#psv', m).onclick = async () => {
     const sc = f.scope.value, row = { shop_id: S.shop.id, name: f.name.value.trim(), scope: sc, kind: f.kind.value, value: num(f.value.value), buy_qty: num(f.buy_qty.value), get_qty: num(f.get_qty.value),
       min_total: sc === 'bill' ? num(f.min_total.value) : 0, product_ids: sc === 'product' ? [...sel] : [], category_ids: sc === 'category' ? [...cats] : [], days: [...days].sort(),
       time_from: f.time_from.value, time_to: f.time_to.value, starts_on: f.starts_on.value || null, ends_on: f.ends_on.value || null,
-      members_only: f.members_only.checked, auto: sc === 'bill' && f.auto.checked, active: f.active.checked, note: f.note.value.trim() };
+      mix: f.kind.value === 'bundle' && sc !== 'bill' && f.mix.checked, members_only: f.members_only.checked, auto: sc === 'bill' && f.auto.checked, active: f.active.checked, note: f.note.value.trim() };
     if (!row.name) return toast('กรุณาตั้งชื่อโปรโมชั่น', 'bad');
     if (sc === 'product' && !sel.size) return toast('กรุณาเลือกสินค้าอย่างน้อย 1 รายการ', 'bad');
     if (sc === 'category' && !cats.size) return toast('กรุณาเลือกหมวดหมู่', 'bad');
+    if (row.kind === 'bundle' && (row.buy_qty < 2 || row.value <= 0)) return toast('ใส่จำนวนชิ้น (2 ขึ้นไป) และราคาพิเศษ เช่น ซื้อ 3 ชิ้น ราคา 100', 'bad');
     if (row.kind === 'percent' && (row.value <= 0 || row.value > 100)) return toast('ส่วนลด % ต้องอยู่ระหว่าง 1–100', 'bad');
     try {
       const r = p ? await q(sb.from('promotions').update(row).eq('id', p.id).select().single()) : await q(sb.from('promotions').insert(row).select().single());
