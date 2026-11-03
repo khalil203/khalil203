@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="th"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Customer display</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;700;800&display=swap">
+<style>
+body{margin:0;font-family:"Noto Sans Thai",sans-serif;background:linear-gradient(135deg,#11142a,#2a1f5c);color:#fff;height:100vh;display:flex}
+.l{flex:1;padding:30px;overflow:auto}.r{width:42%;display:flex;flex-direction:column;justify-content:center;align-items:center;padding:30px;background:#ffffff10}
+h1{margin:0 0 20px;font-size:28px}.it{display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid #ffffff22;font-size:20px}
+.tot{font-size:64px;font-weight:800}.k{opacity:.7;font-size:20px}.qr{background:#fff;padding:12px;border-radius:16px}.qr svg{width:280px;height:280px}
+</style></head><body>
+<div class="l"><h1 id="shop">Welcome / ยินดีต้อนรับ</h1><div id="items"></div></div>
+<div class="r" id="right"><div class="k">ยอดชำระ / Total</div><div class="tot" id="tot">฿0.00</div><div class="k" id="cust"></div></div>
+<script>
+const m=n=>Number(n||0).toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2});
+const e=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const R=document.getElementById('right');
+const base=()=>{R.innerHTML='<div class="k">ยอดชำระ / Total</div><div class="tot" id="tot">฿0.00</div><div class="k" id="cust"></div>'};
+new BroadcastChannel('pos-display').onmessage=({data:d})=>{
+  if(d.type==='cart'){ if(!document.getElementById('tot'))base();
+    document.getElementById('shop').textContent=d.shop;
+    document.getElementById('items').innerHTML=d.cart.map(l=>`<div class="it"><span>${e(l.name)} × ${l.qty}</span><b>${m(l.price*l.qty-(l.discount||0))}</b></div>`).join('');
+    document.getElementById('tot').textContent='฿'+m(d.calc.total);
+    document.getElementById('cust').textContent=d.customer?('⭐ '+d.customer):''; }
+  if(d.type==='qr'){R.innerHTML=`<div class="k">สแกนจ่าย PromptPay</div><div class="qr">${d.svg}</div><div class="tot" style="font-size:44px">฿${m(d.total)}</div>`;}
+  if(d.type==='thanks'){R.innerHTML=`<div class="tot" style="font-size:44px">ขอบคุณค่ะ 🙏</div><div class="k">Thank you</div>${d.change>0?`<div class="k" style="margin-top:20px">เงินทอน / Change</div><div class="tot">฿${m(d.change)}</div>`:''}`;
+    document.getElementById('items').innerHTML='';setTimeout(base,8000);}
+};
+</script></body></html>
