@@ -336,7 +336,7 @@ productForm = function (p, after) {
     { k: '_units', label: 'หน่วยขายเพิ่มเติม (เช่น แพ็ก 6 = 6 ชิ้น)', full: true, type: 'hidden', after: '<div id="uBox"></div><button type="button" class="btn sm" id="uAdd">➕ เพิ่มหน่วย</button>' },
     { k: 'tile_color', label: 'สีไทล์', type: 'color', def: catColor(p.category_id) }, { k: 'favorite', label: '★ รายการโปรด', type: 'check' },
     { k: 'track_stock', label: 'ตัดสต็อกเมื่อขาย', type: 'check', def: true }, { k: 'active', label: 'เปิดขาย', type: 'check', def: true },
-  ], isNew ? { track_stock: true, active: true, unit: 'ชิ้น' } : p, async o => {
+  ], isNew ? { track_stock: true, active: true, unit: 'ชิ้น', ...p } : p, async o => {
     delete o._units; o.units = units.filter(u => u.unit && num(u.factor) > 0).map(u => ({ unit: u.unit, factor: num(u.factor), price: num(u.price) }));
     ['category_id', 'supplier_id', 'expiry_date'].forEach(k => { o[k] = o[k] || null; });
     ['cost', 'low_stock', 'max_stock', 'promo_price', 'wholesale_price'].forEach(k => { if (k in o) o[k] = num(o[k]); });

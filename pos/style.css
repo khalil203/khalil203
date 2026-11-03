@@ -597,3 +597,36 @@ code{font-family:ui-monospace,monospace;font-size:13px;background:var(--bg);padd
 .dtile.hero small,.dtile.hero span{color:#ffffffcc}
 .dtile:nth-child(2){animation-delay:.05s}.dtile:nth-child(3){animation-delay:.1s}.dtile:nth-child(4){animation-delay:.15s}.dtile:nth-child(5){animation-delay:.2s}
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;scroll-behavior:auto!important}}
+/* ================= v4.3 ================= */
+.av.logo,#shopBtn.logo{background:#fff!important;padding:0;overflow:hidden;border:1px solid var(--line)}
+.av.logo img,#shopBtn.logo img{width:100%;height:100%;object-fit:contain;display:block}
+.ub-code{display:flex;flex-direction:column;align-items:center;gap:4px;margin:4px 0 6px}.ub-code svg{width:44px;height:44px;color:var(--brand)}.ub-code b{font-size:22px;letter-spacing:.08em;font-family:ui-monospace,monospace}
+.ub-grid{display:grid;gap:10px;margin-top:12px}
+.ub{display:grid;grid-template-columns:44px 1fr;grid-template-rows:auto auto;column-gap:10px;align-items:center;text-align:left;padding:14px 16px;border-radius:16px;border:1.5px solid var(--line);background:var(--card);cursor:pointer;color:var(--ink);transition:.15s}
+.ub span{grid-row:1/3;font-size:28px;text-align:center}.ub b{font-size:16px}.ub small{color:var(--muted)}
+.ub:hover{border-color:var(--brand);transform:translateY(-1px)}.ub.p{border-color:var(--brand);background:var(--brandsoft)}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--card)}
+.seg button{padding:9px 14px;border:0;background:transparent;cursor:pointer;font-weight:600;color:var(--ink)}.seg button.on{background:var(--brand);color:#fff}
+.pmgrid{--pm:220px;display:grid;grid-template-columns:repeat(auto-fill,minmax(min(var(--pm),100%),1fr));gap:14px;padding-bottom:40px}
+.pm{display:flex;flex-direction:column;border-radius:18px;background:var(--card);border:1px solid var(--line);overflow:hidden;cursor:pointer;transition:transform .15s,box-shadow .2s;text-align:left;color:var(--ink);padding:0;font:inherit}
+.pm:hover{transform:translateY(-3px);box-shadow:0 12px 28px #0f172a1a}
+.pm.off{opacity:.55}
+.pm-img{position:relative;aspect-ratio:1/1;background-size:cover;background-position:center;display:grid;place-items:center}
+.pm-img>span{color:#fff;font-weight:800;font-size:calc(var(--pm) * .2);text-shadow:0 2px 8px #0003}
+.pm-fav{position:absolute;top:8px;left:8px;background:#fff;color:#f59e0b;border-radius:50%;width:28px;height:28px;display:grid;place-items:center;font-style:normal;box-shadow:0 2px 6px #0002}
+.pm-promo{position:absolute;left:8px;bottom:8px;background:#e5384f;color:#fff;border-radius:8px;padding:3px 8px;font-size:12px;font-style:normal;font-weight:700;max-width:calc(100% - 16px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pm-off{position:absolute;top:8px;right:8px;background:#0f172a;color:#fff;border-radius:8px;padding:2px 8px;font-size:12px;font-style:normal}
+.pm-acts{position:absolute;right:8px;bottom:8px;display:flex;gap:6px;opacity:0;transform:translateY(6px);transition:.18s}
+.pm:hover .pm-acts,.pm:focus-within .pm-acts{opacity:1;transform:none}
+@media (pointer:coarse){.pm-acts{opacity:1;transform:none}}
+.pm-acts button{width:38px;height:38px;border-radius:12px;border:0;background:#ffffffee;box-shadow:0 3px 10px #0003;font-size:17px;cursor:pointer}
+.pm-body{padding:10px 12px 12px;display:flex;flex-direction:column;gap:5px}
+.pm-name{font-size:clamp(14px,calc(var(--pm) * .068),20px);line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:2.6em}
+.pm-row{display:flex;align-items:center;gap:6px}.pm-row .sp{flex:1}
+.pm-price{font-weight:800;font-size:clamp(15px,calc(var(--pm) * .08),24px);color:var(--brand)}
+.pm-meta{display:flex;gap:6px;align-items:center;flex-wrap:wrap;font-size:12px;color:var(--muted)}
+.pm-add{align-items:center;justify-content:center;border:2px dashed var(--line);background:var(--card2);min-height:200px;gap:4px}
+.pm-add span{font-size:46px;color:var(--brand);line-height:1}.pm-add small{color:var(--muted)}
+.pm-add:hover{border-color:var(--brand)}
+@media (max-width:860px){.pmgrid{--pm:160px;gap:10px}}
+@media (max-width:860px){.sbox:has(#ps){flex:1 1 100%!important;max-width:none!important}#pzs{flex:1 1 100%}}
