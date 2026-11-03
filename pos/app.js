@@ -1,7 +1,7 @@
 /* Shop POS — free, open POS + stock web app.  Data: Supabase.  Hosting: GitHub Pages. */
 'use strict';
-const VERSION = '1.0.0';
-const sb = supabase.createClient(window.POS_CONFIG.url, window.POS_CONFIG.key);
+const VERSION = '1.1.0';
+const sb = supabase.createClient(window.POS_CONFIG.url, window.POS_CONFIG.key, { auth: { flowType: 'pkce', detectSessionInUrl: true, persistSession: true } });
 
 /* ================= i18n ================= */
 const TH = {
@@ -166,34 +166,21 @@ function formModal(title, fields, values = {}, onSave, {extraFoot = ''} = {}) {
 }
 
 /* ================= AUTH ================= */
-function renderAuth(mode = 'login') {
+const GOOGLE_SVG = '<svg width="20" height="20" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="m6.3 14.7 6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-8l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg>';
+function renderAuth() {
   $('#root').innerHTML = `<div class="auth"><div class="card">
-    <div class="brandmark">🛒</div>
+    <div class="row"><div class="brandmark">🛒</div><span style="flex:1"></span><button class="tab" id="lng" style="align-self:flex-start">${LANG === 'th' ? 'EN' : 'ไทย'}</button></div>
     <h2>Shop POS</h2><p class="muted" style="margin-top:0">${LANG === 'th' ? 'ระบบขายหน้าร้าน + สต็อก ฟรีทุกฟีเจอร์' : 'Free POS + stock, every feature unlocked'}</p>
-    <div class="tabs"><button class="tab ${mode === 'login' ? 'on' : ''}" data-m="login">${t('Login')}</button><button class="tab ${mode === 'reg' ? 'on' : ''}" data-m="reg">${t('Register')}</button>
-    <span style="flex:1"></span><button class="tab" id="lng">${LANG === 'th' ? 'EN' : 'ไทย'}</button></div>
-    <form id="af">
-      ${mode === 'reg' ? `<div class="fg"><label class="f">${t('Your name')}</label><input class="in" name="name" required></div>` : ''}
-      <div class="fg"><label class="f">${t('Email')}</label><input class="in" name="email" type="email" required autocomplete="email"></div>
-      <div class="fg"><label class="f">${t('Password')}</label><input class="in" name="pw" type="password" minlength="6" required autocomplete="${mode === 'reg' ? 'new-password' : 'current-password'}"></div>
-      <button class="btn p lg" style="width:100%">${mode === 'reg' ? t('Register') : t('Login')}</button>
-    </form></div></div>`;
-  $$('[data-m]').forEach(b => b.onclick = () => renderAuth(b.dataset.m));
-  $('#lng').onclick = () => { LANG = LANG === 'th' ? 'en' : 'th'; localStorage.setItem('pos_lang', LANG); renderAuth(mode); };
-  $('#af').onsubmit = async e => {
-    e.preventDefault(); const f = e.target; const btn = $('button.p', f); btn.disabled = true;
-    try {
-      if (mode === 'reg') {
-        const { data, error } = await sb.auth.signUp({ email: f.email.value.trim(), password: f.pw.value,
-          options: { data: { name: f.name.value.trim() }, emailRedirectTo: location.href.split('#')[0] } });
-        if (error) throw error;
-        if (!data.session) { toast(t('Check your email to confirm, then login.'), 'ok'); renderAuth('login'); return; }
-      } else {
-        const { error } = await sb.auth.signInWithPassword({ email: f.email.value.trim(), password: f.pw.value });
-        if (error) throw error;
-      }
-      await boot();
-    } catch (err) { fail(err); btn.disabled = false; }
+    <button class="btn lg" id="gbtn" style="width:100%;background:#fff;border:1px solid var(--line);margin-top:10px">${GOOGLE_SVG} ${LANG === 'th' ? 'เข้าสู่ระบบด้วย Google' : 'Continue with Google'}</button>
+    <p class="muted" style="font-size:13px;text-align:center;margin-bottom:0">${LANG === 'th' ? 'พนักงานใช้บัญชี Google ของอีเมลที่ได้รับเชิญ' : 'Staff sign in with the Google account of their invited email'}</p>
+  </div></div>`;
+  $('#lng').onclick = () => { LANG = LANG === 'th' ? 'en' : 'th'; localStorage.setItem('pos_lang', LANG); renderAuth(); };
+  $('#gbtn').onclick = async () => {
+    $('#gbtn').disabled = true;
+    const { error } = await sb.auth.signInWithOAuth({ provider: 'google',
+      options: { redirectTo: location.origin + location.pathname, queryParams: { prompt: 'select_account' } } });
+    if (error) { $('#gbtn').disabled = false; fail(/not enabled|unsupported provider/i.test(error.message)
+      ? (LANG === 'th' ? 'ยังไม่ได้เปิด Google Login ใน Supabase' : 'Google login is not enabled in Supabase yet') : error); }
   };
 }
 
@@ -226,6 +213,7 @@ async function boot() {
   const { data: { session } } = await sb.auth.getSession();
   if (!session) return renderAuth();
   S.user = session.user;
+  if (location.search.includes('code=')) history.replaceState(null, '', location.pathname + location.hash);
   try { await sb.rpc('accept_invites'); } catch (e) { /* ignore */ }
   const mems = await q(sb.from('shop_members').select('role, shop:shops(*)').eq('user_id', S.user.id));
   S.shops = mems.filter(m => m.shop).map(m => ({ ...m.shop, _role: m.role }));
@@ -880,7 +868,7 @@ VIEWS.shifts = async pg => {
       <td class="right">${money(r.opening_cash)}</td><td class="right">${r.closed_at ? money(r.expected_cash) : ''}</td><td class="right">${r.closed_at ? money(r.closing_cash) : ''}</td>
       <td class="right b" style="color:${d < 0 ? 'var(--bad)' : 'var(--ok)'}">${d === null ? '' : money(d)}</td></tr>`; }).join('')}</table></div>`;
   if ($('#opn')) $('#opn').onclick = () => formModal(t('Open shift'), [{k:'opening_cash', label:t('Opening cash'), type:'number', req:true, def:0}], {}, async o => {
-    S.shift = await q(sb.from('shifts').insert({shop_id: S.shop.id, user_id: S.user.id, user_name: S.user.user_metadata?.name || S.user.email, opening_cash: num(o.opening_cash)}).select().single());
+    S.shift = await q(sb.from('shifts').insert({shop_id: S.shop.id, user_id: S.user.id, user_name: S.user.user_metadata?.full_name || S.user.user_metadata?.name || S.user.email, opening_cash: num(o.opening_cash)}).select().single());
     go('shifts'); });
   if ($('#cls')) $('#cls').onclick = () => formModal(t('Close shift'), [{k:'closing_cash', label:t('Counted cash'), type:'number', req:true}, {k:'note', label:t('Note')}], {}, async o => {
     await q(sb.from('shifts').update({closed_at: new Date().toISOString(), closing_cash: num(o.closing_cash), expected_cash: num(mine.opening_cash) + cashNow, note: o.note}).eq('id', mine.id));
@@ -957,4 +945,6 @@ window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); window
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
 sb.auth.onAuthStateChange((ev) => { if (ev === 'SIGNED_OUT') renderAuth(); });
 window.addEventListener('hashchange', () => { if (S.shop && location.hash.slice(1) !== S.page) go(location.hash.slice(1)); });
+{ const u = new URLSearchParams(location.search + '&' + location.hash.slice(1)); const er = u.get('error_description');
+  if (er) { history.replaceState(null, '', location.pathname); setTimeout(() => toast(er, 'bad'), 300); } }
 boot().catch(e => { fail(e); renderAuth(); });
