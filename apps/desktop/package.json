@@ -18,12 +18,46 @@
   "build": {
     "appId": "com.khalil203.shoppos",
     "productName": "Shop POS",
-    "directories": { "output": "dist", "buildResources": "build" },
-    "files": ["main.js", "package.json"],
-    "win": { "icon": "build/icon.png" },
-    "nsis": { "oneClick": false, "allowToChangeInstallationDirectory": true, "createDesktopShortcut": true, "artifactName": "ShopPOS-Setup.${ext}" },
-    "portable": { "artifactName": "ShopPOS-Portable.${ext}" },
-    "mac": { "icon": "build/icon.png", "category": "public.app-category.business", "identity": null, "artifactName": "ShopPOS-mac.${ext}" },
-    "dmg": { "artifactName": "ShopPOS-mac.${ext}" }
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "main.js",
+      "package.json"
+    ],
+    "win": {
+      "icon": "build/icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "artifactName": "ShopPOS-Setup.${ext}"
+    },
+    "portable": {
+      "artifactName": "ShopPOS-Portable.${ext}"
+    },
+    "mac": {
+      "icon": "build/icon.png",
+      "category": "public.app-category.business",
+      "identity": null,
+      "artifactName": "ShopPOS-mac.${ext}"
+    },
+    "dmg": {
+      "artifactName": "ShopPOS-mac.${ext}"
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "khalil203",
+        "repo": "khalil203",
+        "releaseType": "release"
+      }
+    ]
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/khalil203/khalil203.git"
   }
 }
