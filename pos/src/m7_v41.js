@@ -73,9 +73,39 @@ async function barcodeImg(code) {
   if (BC_CACHE.has(code)) return BC_CACHE.get(code);
   await loadJsBarcode();
   const c = document.createElement('canvas');
-  const opt = { height: 120, width: 3, displayValue: false, margin: 4 };
+  const opt = { height: 80, width: 2, displayValue: false, margin: 2 };
   try { JsBarcode(c, code, { ...opt, format: validEAN(code) ? 'EAN13' : 'CODE128' }); } catch { JsBarcode(c, code, { ...opt, format: 'CODE128' }); }
-  const url = c.toDataURL('image/png'); BC_CACHE.set(code, url); return url;
+  const blob = await new Promise(r => c.toBlob(r, 'image/png'));
+  const url = URL.createObjectURL(blob); BC_CACHE.set(code, url); return url;
+}
+const waitImgs = root => Promise.all([...root.querySelectorAll('img')].map(i => i.decode ? i.decode().catch(() => {}) : null));
+/* render many labels fast: one light iframe (html2canvas copies only it), 24 labels per pass, then cut each label out */
+async function renderLabelImages(items, o, onProg) {
+  const z = LBL_SIZES[o.size], scale = z.w > 90 ? 2.2 : 3, perRow = 6;
+  const fr = document.createElement('iframe'); fr.style.cssText = 'position:fixed;left:-30000px;top:0;width:3000px;height:2000px;border:0';
+  document.body.appendChild(fr);
+  const d = fr.contentDocument; d.open();
+  d.write(`<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&family=Prompt:wght@500;600;700;800;900&display=swap">
+    <style>body{margin:0;background:${o.tpl === 'dark' ? '#0f172a' : '#fff'}}${lblCSS(o).replace(/@page\{[^}]*\}/, '')}#g{display:flex;flex-wrap:wrap;width:${(perRow * z.w).toFixed(2)}mm}#g .lb{page-break-after:auto!important;break-after:auto!important}</style></head><body><div id="g"></div></body></html>`);
+  d.close();
+  await Promise.race([d.fonts?.ready, new Promise(r => setTimeout(r, 2500))]);
+  const out = [], g = d.getElementById('g'), per = perRow * 4;
+  try {
+    for (let i = 0; i < items.length; i += per) {
+      const chunk = items.slice(i, i + per); g.innerHTML = chunk.map(it => it.html).join('');
+      await waitImgs(g);
+      const cv = await html2canvas(g, { scale, backgroundColor: o.tpl === 'dark' ? '#0f172a' : '#ffffff', logging: false, useCORS: true });
+      const gr = g.getBoundingClientRect();
+      [...g.querySelectorAll('.lb')].forEach((el, j) => {
+        const r = el.getBoundingClientRect(), w = Math.round(r.width * scale), h = Math.round(r.height * scale);
+        const c = document.createElement('canvas'); c.width = w; c.height = h;
+        c.getContext('2d').drawImage(cv, Math.round((r.left - gr.left) * scale), Math.round((r.top - gr.top) * scale), w, h, 0, 0, w, h);
+        out.push({ url: c.toDataURL('image/jpeg', 0.9), k: chunk[j].k, id: 'L' + out.length });
+      });
+      onProg?.(Math.min(items.length, i + per), items.length); await yieldUI();
+    }
+  } finally { fr.remove(); }
+  return out;
 }
 function qrImg(text) {
   if (!QR_CACHE.has(text)) QR_CACHE.set(text, 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(qrSvg(text)));
@@ -191,18 +221,7 @@ printLabels = async function (items) {
     const items = await plan(); if (!items) return null;
     await Promise.all([loadH2C(), JSPDF_P ||= loadScript('https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js')]);
     const z = LBL_SIZES[o.size], { jsPDF } = window.jspdf;
-    const host = document.createElement('div'); host.style.cssText = 'position:fixed;left:-20000px;top:0;background:#fff';
-    host.innerHTML = `<style>${lblCSS(o).replace(/@page\{[^}]*\}/, '')}</style><div id="lhost"></div>`; document.body.appendChild(host);
-    const imgs = [];
-    try {
-      for (const [i, it] of items.entries()) {
-        if (!it.k) continue;
-        $('#lhost', host).innerHTML = it.html; const el = $('#lhost .lb', host);
-        const cv = await html2canvas(el, { scale: z.w > 90 ? 2.5 : 4, backgroundColor: o.tpl === 'dark' ? '#0f172a' : '#ffffff', logging: false });
-        imgs.push({ url: cv.toDataURL('image/jpeg', 0.92), k: it.k, id: 'L' + imgs.length });
-        progress(`กำลังสร้าง PDF ${i + 1}/${items.length}`, .3 + (i + 1) / items.length * .6); await yieldUI();
-      }
-    } finally { host.remove(); }
+    const imgs = await renderLabelImages(items.filter(it => it.k), o, (a, b) => progress(`กำลังสร้าง PDF ${a}/${b}`, .3 + a / b * .6));
     const pdf = z.a4 ? new jsPDF({ unit: 'mm', format: 'a4' }) : new jsPDF({ unit: 'mm', format: [z.w, z.h], orientation: z.w > z.h ? 'l' : 'p' });
     const { mx, my, cols, gap, rows } = a4Layout(z);
     let slot = 0, first = true;
@@ -227,7 +246,7 @@ printLabels = async function (items) {
   $('#lgo', m).onclick = async () => {
     if (isNativeApp()) return downloadPDF();
     if (busy) return; setBusy(true);
-    try { const h = await build(); progress('', null); if (h) { printReceipt(h); logAct('labels_print', 'product', `${targets().length} สินค้า`, { template: o.tpl, size: o.size, labels: count() }); } }
+    try { const h = await build(); if (h) { progress('กำลังเตรียมพิมพ์…', .95); $('#print').innerHTML = h; await waitImgs($('#print')); progress('', null); window.print(); logAct('labels_print', 'product', `${targets().length} สินค้า`, { template: o.tpl, size: o.size, labels: count() }); } }
     catch (e) { progress('', null); fail(e); } finally { setBusy(false); }
   };
   $('#lpdf', m).onclick = downloadPDF;
