@@ -12,21 +12,24 @@
     "errorPath": "offline.html"
   },
   "android": {
-    "backgroundColor": "#f3f4fa",
+    "backgroundColor": "#0b2b5e",
     "appendUserAgent": "ShopPOSApp"
   },
   "plugins": {
     "SplashScreen": {
-      "launchShowDuration": 1500,
+      "launchShowDuration": 2500,
       "launchAutoHide": true,
-      "backgroundColor": "#ffffff",
-      "showSpinner": false
+      "backgroundColor": "#0b2b5e",
+      "showSpinner": false,
+      "androidScaleType": "CENTER_CROP",
+      "splashFullScreen": false,
+      "splashImmersive": false
     },
     "Keyboard": {
       "resize": "body"
     },
     "StatusBar": {
-      "backgroundColor": "#ffffff",
+      "backgroundColor": "#eef4ff",
       "style": "LIGHT",
       "overlaysWebView": false
     }

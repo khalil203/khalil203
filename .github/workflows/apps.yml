@@ -57,16 +57,17 @@ jobs:
           java-version: '17'
       - run: npm install --no-audit --no-fund
       - run: npx cap add android
-      - name: Camera permission + app icon
+      - name: Camera permission + app icon + splash
         run: |
           M=android/app/src/main/AndroidManifest.xml
           grep -q 'android.permission.CAMERA' $M || sed -i 's#<uses-permission android:name="android.permission.INTERNET" />#&\n    <uses-permission android:name="android.permission.CAMERA" />#' $M
           grep -q 'TTS_SERVICE' $M || sed -i 's#<application#<queries>\n        <intent>\n            <action android:name="android.intent.action.TTS_SERVICE" />\n        </intent>\n    </queries>\n\n    <application#' $M
           grep -n -A4 '<queries>' $M | head -6
-          rm -rf android/app/src/main/res/mipmap-anydpi-v26
-          for d in android/app/src/main/res/mipmap-*dpi; do
-            cp icon.png "$d/ic_launcher.png"; cp icon.png "$d/ic_launcher_round.png"; cp icon.png "$d/ic_launcher_foreground.png"
-          done
+          # adaptive launcher icon (round logo fills the mask, no white plate) + legacy icons
+          cp -r res/* android/app/src/main/res/
+          ls android/app/src/main/res/mipmap-anydpi-v26 || true
+          # branded splash screen
+          for f in $(find android/app/src/main/res -name splash.png); do cp splash.png "$f"; done
       - name: Version
         run: |
           G=android/app/build.gradle

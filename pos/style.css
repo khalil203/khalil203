@@ -1013,3 +1013,82 @@ html.v5 .pos .toolbar .zpre{flex-wrap:nowrap}
 .ch-t{white-space:nowrap;min-width:0}.ch-t span{overflow:hidden;text-overflow:ellipsis}
 html.v5 .cart .hd.ch{gap:6px}html.v5 .cart .hd.ch .btn{padding:0 10px;height:36px;white-space:nowrap}
 html.v5 .zpre button{white-space:nowrap}
+
+/* ===== v5.0.1 — transparent logos, tidy sell screen, tablet layout, loading screen ===== */
+.av.logo,#shopBtn.logo{background:transparent!important;border:0!important;box-shadow:none!important}
+.av.logo img,#shopBtn.logo img{object-fit:contain;filter:drop-shadow(0 2px 6px rgba(0,0,0,.18))}
+html.v5 .profile .av{box-shadow:none}
+.sb-brand img{background:transparent;box-shadow:none;filter:drop-shadow(0 8px 18px rgba(0,0,0,.4))}
+html.v5 .side .me .av{background:transparent}
+html.v5 button.brsw img,.brmenu button img,.brc>img,.sb-branch img,.pf-it img{background:transparent;object-fit:contain}
+.brc>img{box-shadow:none;filter:drop-shadow(0 3px 8px rgba(0,0,0,.18))}
+
+/* control row: categories + view button */
+.catrow{display:flex;align-items:center;gap:10px;min-width:0;flex:none}
+.catrow .cats{flex:1;min-width:0}
+.pv-ctl{flex:none;display:flex;gap:8px}
+.pv-btn{height:52px;display:flex;align-items:center;gap:6px;padding:0 16px;border-radius:16px;border:1px solid var(--line);background:#fff;box-shadow:var(--shadow);font:inherit;font-weight:700;cursor:pointer;color:#1e293b;white-space:nowrap}
+.pv-btn:hover{border-color:var(--brand);color:var(--brand)}
+html[data-theme=dark] .pv-btn{background:var(--card);color:var(--ink)}
+@media (min-width:861px){.pos .toolbar.tb-slim{display:none}}
+.pos .toolbar.tb-slim{flex-wrap:nowrap}
+#tact .in-menu{display:none!important}
+.pop5{position:fixed;z-index:9000;min-width:240px;max-width:calc(100vw - 16px);padding:10px;border-radius:18px;background:var(--card,#fff);border:1px solid var(--line);box-shadow:0 20px 50px rgba(15,40,90,.22);animation:pfin .15s ease}
+.pv-pop{width:360px}
+.pv-h{font-weight:800;font-size:15px;margin:2px 4px 8px}
+.pv-l{display:block;font-size:12px;font-weight:700;color:var(--muted);margin:10px 4px 6px}
+.pv-slot select{width:100%!important}.pv-slot .zctl{width:100%;display:flex}.pv-slot .zctl input{flex:1}.pv-slot .zpre{display:flex!important;flex-wrap:wrap;gap:6px;margin-top:8px}
+.pv-more{width:100%;margin-top:12px;justify-content:center}
+.act-pop button{display:flex;align-items:center;gap:10px;width:100%;padding:11px 12px;border:0;border-radius:12px;background:none;font:inherit;font-weight:600;cursor:pointer;color:inherit;text-align:left}
+.act-pop button:hover{background:var(--brandsoft)}.act-pop button span{width:24px;text-align:center;font-size:18px}
+html.v5 .top.posmode #tact #moreAct{font-size:22px;font-weight:900}
+
+/* tablets (landscape & portrait 861–1366px) */
+@media (min-width:861px) and (max-width:1366px){
+  #app.mini .side{width:84px}
+  .sb-head{padding:14px 8px 6px}
+  #app.mini .sb-brand b,#app.mini .sb-branch span,#app.mini .sb-branch em{display:none}
+  #app.mini .sb-branch{width:52px;height:46px;margin:0 auto;padding:0;justify-content:center}
+  #app.mini .side .navs{padding:6px 12px}#app.mini .side .nav{justify-content:center;padding:11px 0}
+  #app.mini .side .me{justify-content:center;padding:8px;margin:8px}#app.mini .sb-out{display:none}
+  html.v5 .cart{width:340px;margin:10px 10px 10px 0}
+  html.v5 .pos .left{padding:12px 12px 0;gap:10px}
+  html.v5 .top{padding-left:12px;padding-right:12px;gap:8px}
+  html.v5 .gsearch{height:48px}html.v5 .bellbtn{width:44px;height:44px}html.v5 .profile .av{width:42px;height:42px}
+  html.v5 .posstats{grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;overflow:visible}
+  .kpi{min-height:0;padding:10px;gap:8px;border-radius:16px}.kpi .kic{width:40px;height:40px;border-radius:12px}.kpi .kic svg{width:22px;height:22px}
+  .kpi b{font-size:18px}.kpi small{font-size:12px}.kpi em{font-size:11px}.kpi .spk,.kpi .kbox{display:none}
+  html.v5 .cats{padding:4px;gap:6px}html.v5 .cats .tab{height:42px;padding:0 12px;font-size:14px}
+  .pv-btn{height:50px;padding:0 12px}.pv-btn span{display:none}
+  .cashbar.dock{gap:8px;padding:8px;margin-bottom:10px}.cashbar.dock button{height:50px;padding:0 12px;font-size:14px}.cashbar.dock button span{font-size:20px}.cashbar.dock button.pri span svg{width:26px;height:26px}
+  html.v5 .cart .hd.ch{padding:10px 12px}.ch-t{font-size:16px}
+  html.v5 .cart .citem{grid-template-columns:50px 1fr auto;padding:10px 12px}.cthumb{width:50px;height:50px}
+  html.v5 .cart .ft .tline.big span:last-child{font-size:26px}html.v5 #payBtn{height:58px;font-size:17px}
+}
+@media (min-width:861px) and (max-width:1100px){
+  .kpi .kic{display:none}.kpi{padding:10px 12px}
+  html.v5 .cart{width:310px}
+  .cashbar.dock button{font-size:13px}
+}
+
+/* loading screen */
+#boot{position:fixed;inset:0;z-index:99999;display:grid;place-items:center;background:radial-gradient(900px 600px at 50% 20%,#1b4fa8 0,transparent 70%),linear-gradient(180deg,#0b2b5e,#06183a);color:#fff;transition:opacity .4s ease,visibility .4s}
+#boot.out{opacity:0;visibility:hidden}
+#boot .bt{display:flex;flex-direction:column;align-items:center;gap:14px;text-align:center;padding:24px}
+#boot .bt-logo{position:relative;width:132px;height:132px;display:grid;place-items:center}
+#boot .bt-logo img{width:112px;height:112px;object-fit:contain;filter:drop-shadow(0 12px 30px rgba(0,0,0,.45));animation:btpop .7s cubic-bezier(.3,1.5,.5,1) both}
+#boot .bt-logo::before{content:'';position:absolute;inset:0;border-radius:50%;border:3px solid #ffffff22;border-top-color:#5aa2ff;border-right-color:#5aa2ff;animation:btspin 1s linear infinite}
+#boot b{font:700 26px/1.1 "Prompt",system-ui,sans-serif;letter-spacing:.3px}#boot b span{display:block;font-size:15px;font-weight:500;opacity:.75;letter-spacing:4px;margin-top:4px}
+#boot .bt-bar{width:200px;height:5px;border-radius:5px;background:#ffffff1f;overflow:hidden;margin-top:6px}
+#boot .bt-bar i{display:block;height:100%;width:40%;border-radius:5px;background:linear-gradient(90deg,#5aa2ff,#9cc8ff);animation:btbar 1.2s ease-in-out infinite}
+#boot .bt-msg{font-size:13px;opacity:.7;min-height:18px}
+@keyframes btspin{to{transform:rotate(360deg)}}@keyframes btbar{0%{transform:translateX(-100%)}100%{transform:translateX(260%)}}@keyframes btpop{from{transform:scale(.6);opacity:0}}
+/* login in the new look */
+html.v5 .auth{background:radial-gradient(900px 600px at 50% 10%,#1b4fa8 0,transparent 70%),linear-gradient(180deg,#0b2b5e,#06183a)}
+html.v5 .auth::before,html.v5 .auth::after{background:#3b82f6;opacity:.25}
+html.v5 .auth .card{border-radius:26px;border:1px solid #ffffff33;box-shadow:0 30px 80px rgba(0,0,0,.35)}
+html.v5 .auth .authlogo{background:transparent!important;box-shadow:none!important;filter:drop-shadow(0 10px 22px rgba(0,0,0,.25))}
+html.v5 .auth .btn.p{height:54px;border-radius:16px;font-size:17px}
+@media (min-width:861px) and (max-width:1100px){.ch-t span{display:none}html.v5 .cart .ft .tline.big span:first-child{font-size:20px}html.v5 .cart .ft .tline.big span:last-child{font-size:24px}}
+html.v5 .cart .ft .tline.big{align-items:center;gap:8px}html.v5 .cart .ft .tline.big span:first-child{white-space:nowrap}
+.pos .toolbar.tb-slim .sbox{flex:1;min-width:0}
