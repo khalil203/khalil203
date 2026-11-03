@@ -1423,7 +1423,7 @@ const _goC = go;
 go = function (page) { _goC(page); $('.top')?.classList.toggle('posmode', S.page === 'pos'); };
 /* ================= Shop POS v4 — promotions engine, data center, barcodes, personal use,
    activity log, branding, receipt image, cashier upgrades, auto-update ================= */
-const APP_VERSION = '4.5.0';
+const APP_VERSION = '4.5.1';
 Object.assign(TH, { 'Data center': 'ศูนย์ข้อมูล', 'Barcodes': 'บาร์โค้ด', 'Branches': 'สาขา' });
 PAGES.splice(PAGES.findIndex(p => p.id === 'settings'), 0,
   { id: 'barcodes', ic: '🏷', name: 'Barcodes', roles: ['owner', 'manager', 'stock'] },
@@ -3475,7 +3475,7 @@ async function dailySummary(day = ymd(new Date())) {
     body.innerHTML = `<div class="dstrip" style="margin-top:10px">${tile('ยอดขายสุทธิ', baht(D.net), `${D.ok.length} บิล · ${qtyf(D.qty)} ชิ้น`, 'hero')}${tile('💵 เงินสด', baht(D.cash - D.cashRef), D.cashRef ? `คืนเงินสด ${money(D.cashRef)}` : '')}
         ${tile('📱 โอน / สแกน', baht(D.nonCash - ncRef), Object.entries(D.by).filter(([k]) => k !== 'cash').map(([k, o]) => `${payName(k)} ${money(o.amount)}`).join(' · '))}${D.refund ? tile('↩️ คืนเงิน', baht(D.refund)) : ''}${D.persValue ? tile('🙋 ใช้เอง (ทุน)', baht(D.persValue), `${D.pers.length} รายการ`) : ''}</div>
       <div class="grid2" style="align-items:start">
-        <div class="card"><b>สรุปรายการขาย (${D.list.length} รายการ)</b><div class="tblwrap" style="max-height:46vh;overflow:auto;margin-top:6px"><table class="tbl"><tr><th>สินค้า</th><th class="right">จำนวน</th><th class="right">ยอด</th></tr>
+        <div class="card"><b>สรุปรายการขาย (${D.list.length} รายการ)</b><div class="tblwrap dswrap" style="margin-top:6px"><table class="tbl dstbl"><tr><th>สินค้า</th><th class="right">จำนวน</th><th class="right">ยอด</th></tr>
           ${D.list.map(o => `<tr><td>${esc(o.name)}</td><td class="right">${qtyf(o.qty)} ${esc(o.unit || '')}</td><td class="right b">${money(o.amount)}</td></tr>`).join('') || '<tr><td colspan="3" class="muted">ยังไม่มีการขาย</td></tr>'}</table></div></div>
         <div><div class="card" style="margin-bottom:12px"><b>ช่องทางชำระเงิน</b><table class="rtable" style="margin-top:6px">${Object.entries(D.by).map(([k, o]) => `<tr><td>${payIcon(k)} ${payName(k)}</td><td class="right muted">${o.n} รายการ</td><td class="right b">${money(o.amount)}</td></tr>`).join('') || '<tr><td class="muted">—</td></tr>'}
             ${D.cashIn || D.cashOut ? `<tr><td>นำเงินเข้า / ออกลิ้นชัก</td><td></td><td class="right">+${money(D.cashIn)} / −${money(D.cashOut)}</td></tr><tr><td><b>เงินสดที่ควรอยู่ในลิ้นชัก</b></td><td></td><td class="right b">${money(D.cash - D.cashRef + D.cashIn - D.cashOut)}</td></tr>` : ''}</table>
