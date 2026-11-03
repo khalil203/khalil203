@@ -1,6 +1,6 @@
 /* ================= Shop POS v4 — promotions engine, data center, barcodes, personal use,
    activity log, branding, receipt image, cashier upgrades, auto-update ================= */
-const APP_VERSION = '4.0.5';
+const APP_VERSION = '4.1.0';
 Object.assign(TH, { 'Data center': 'ศูนย์ข้อมูล', 'Barcodes': 'บาร์โค้ด', 'Branches': 'สาขา' });
 PAGES.splice(PAGES.findIndex(p => p.id === 'settings'), 0,
   { id: 'barcodes', ic: '🏷', name: 'Barcodes', roles: ['owner', 'manager', 'stock'] },
@@ -188,15 +188,17 @@ VIEWS.pos = pg => {
   const vb = $('#viewBtn'); if (!vb || $('#zctl')) return;
   vb.insertAdjacentHTML('afterend', `<div class="zctl" id="zctl" title="ขนาดรูปสินค้า">
       <button type="button" data-z="-20" aria-label="เล็กลง">−</button>
-      <input type="range" id="zr" min="110" max="360" step="10" value="${VIEWP.size}" aria-label="ขนาดรูปสินค้า">
+      <input type="range" id="zr" min="100" max="560" step="10" value="${VIEWP.size}" aria-label="ขนาดรูปสินค้า">
       <button type="button" data-z="20" aria-label="ใหญ่ขึ้น">+</button>
       <button type="button" id="zlay" title="ตาราง / รายการ">${VIEWP.layout === 'list' ? '▦' : '☰'}</button></div>
-    <button class="btn" id="custBtn" title="สินค้านอกระบบ">➕ <span class="hide-sm">ขายด่วน</span></button>`);
-  const setSize = v => { VIEWP.size = Math.max(110, Math.min(360, v)); $('#zr').value = VIEWP.size; localStorage.setItem('pos_view', JSON.stringify(VIEWP)); applyView(); };
+    <button class="btn" id="custBtn" title="สินค้านอกระบบ">➕ <span class="hide-sm">ขายด่วน</span></button>
+    <div class="zpre" id="zpre">${[[110, 'S'], [160, 'M'], [220, 'L'], [300, 'XL'], [400, 'XXL'], [520, 'จัมโบ้']].map(([v, l]) => `<button type="button" data-zs="${v}" class="${VIEWP.size === v ? 'on' : ''}">${l}</button>`).join('')}</div>`);
+  const setSize = v => { VIEWP.size = Math.max(100, Math.min(560, v)); $$('#zpre [data-zs]').forEach(b => b.classList.toggle('on', +b.dataset.zs === VIEWP.size)); $('#zr').value = VIEWP.size; localStorage.setItem('pos_view', JSON.stringify(VIEWP)); applyView(); };
   $('#zr').oninput = e => setSize(+e.target.value);
   $$('#zctl [data-z]').forEach(b => b.onclick = () => setSize(VIEWP.size + +b.dataset.z));
   $('#zlay').onclick = () => { VIEWP.layout = VIEWP.layout === 'list' ? 'grid' : 'list'; saveView(); $('#zlay').textContent = VIEWP.layout === 'list' ? '▦' : '☰'; };
   $('#custBtn').onclick = customItem;
+  $$('#zpre [data-zs]').forEach(b => b.onclick = () => setSize(+b.dataset.zs));
 };
 drawPreview = function () {
   const box = $('#rprev'); if (!box) return;
@@ -409,10 +411,11 @@ async function printLabels(items) {
   };
 }
 VIEWS.barcodes = pg => {
-  let tab = 'none', v = '';
+  let tab = 'all', v = '', cat = '';
   const chosen = new Set();
-  $('#tact').innerHTML = `<button class="btn" id="bgen">⚙️ สร้างบาร์โค้ดให้สินค้าที่ไม่มี</button><button class="btn" id="bprint">🖨️ พิมพ์ฉลาก</button><button class="btn" id="bxl">📗 Excel</button>`;
-  const list = () => S.products.filter(p => p.active !== false).filter(p => tab === 'all' || (tab === 'has' ? p.barcode : tab === 'none' ? !p.barcode : tab === 'bad' ? p.barcode && /^\d{13}$/.test(p.barcode) && !validEAN(p.barcode) : tab === 'dup' ? p.barcode && S.products.filter(x => x.barcode === p.barcode).length > 1 : true))
+  const isPromo = p => num(p.promo_price) > 0 || itemPromosFor(p).length > 0;
+  $('#tact').innerHTML = `<button class="btn p" id="bprint">🖨️ พิมพ์ / สร้างฉลาก</button><button class="btn" id="bgen">⚙️ สร้างบาร์โค้ดให้สินค้าที่ไม่มี</button><button class="btn" id="bimp">⬆ นำเข้า</button><button class="btn" id="bxl">📗 ส่งออก Excel</button><input type="file" id="bfile" accept=".xlsx,.xls,.csv" hidden>`;
+  const list = () => S.products.filter(p => p.active !== false).filter(p => !cat || p.category_id === cat).filter(p => tab === 'all' || (tab === 'promo' ? isPromo(p) : tab === 'nopromo' ? !isPromo(p) : tab === 'has' ? p.barcode : tab === 'none' ? !p.barcode : tab === 'bad' ? p.barcode && /^\d{13}$/.test(p.barcode) && !validEAN(p.barcode) : tab === 'dup' ? p.barcode && S.products.filter(x => x.barcode === p.barcode).length > 1 : true))
     .filter(p => !v || p.name.toLowerCase().includes(v) || (p.barcode || '').includes(v) || (p.sku || '').toLowerCase().includes(v)).sort((a, b) => a.name.localeCompare(b.name, 'th'));
   const draw = () => {
     const act = S.products.filter(p => p.active !== false), has = act.filter(p => p.barcode).length;
@@ -420,15 +423,16 @@ VIEWS.barcodes = pg => {
     const rows = list();
     pg.innerHTML = `<div class="stats"><div class="stat"><div class="k">สินค้าทั้งหมด</div><div class="v">${act.length}</div></div><div class="stat"><div class="k">มีบาร์โค้ด</div><div class="v" style="color:var(--ok)">${has}</div></div>
       <div class="stat"><div class="k">ไม่มีบาร์โค้ด</div><div class="v" style="color:var(--warn)">${act.length - has}</div></div><div class="stat"><div class="k">บาร์โค้ดซ้ำ</div><div class="v" style="color:var(--bad)">${dup}</div></div></div>
-      <div class="row" style="margin-bottom:10px"><div class="pills" id="bt">${[['none', 'ไม่มีบาร์โค้ด'], ['has', 'มีบาร์โค้ด'], ['dup', 'ซ้ำ'], ['bad', 'เลขตรวจสอบผิด'], ['all', 'ทั้งหมด']].map(([k, l]) => `<button data-t="${k}" class="${tab === k ? 'on' : ''}">${l}</button>`).join('')}</div>
-        <div class="sbox" style="max-width:280px"><span>🔍</span><input class="in" id="bq" value="${esc(v)}" placeholder="ชื่อ / บาร์โค้ด / SKU"></div><span class="muted">เลือกแล้ว ${chosen.size}</span></div>
+      <div class="row" style="margin-bottom:10px"><div class="pills" id="bt">${[['all', 'ทั้งหมด'], ['promo', '🏷️ มีโปรโมชั่น'], ['nopromo', 'ราคาปกติ'], ['has', 'มีบาร์โค้ด'], ['none', 'ไม่มีบาร์โค้ด'], ['dup', 'ซ้ำ'], ['bad', 'เลขตรวจสอบผิด']].map(([k, l]) => `<button data-t="${k}" class="${tab === k ? 'on' : ''}">${l}</button>`).join('')}</div>
+        <div class="sbox" style="max-width:280px"><span>🔍</span><input class="in" id="bq" value="${esc(v)}" placeholder="ชื่อ / บาร์โค้ด / SKU"></div><select class="in" id="bcat" style="width:auto"><option value="">ทุกหมวดหมู่</option>${S.categories.map(c => `<option value="${c.id}" ${cat === c.id ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</select><span class="muted">เลือกแล้ว ${chosen.size} · ถ้าไม่เลือก จะพิมพ์ทุกรายการในแท็บนี้</span></div>
       <div class="tblwrap"><table class="tbl"><tr><th><input type="checkbox" id="ball"></th><th>สินค้า</th><th>บาร์โค้ด</th><th>SKU</th><th class="right">ราคา</th><th class="right">คงเหลือ</th><th></th></tr>
-      ${rows.slice(0, 400).map(p => `<tr><td><input type="checkbox" data-c="${p.id}" ${chosen.has(p.id) ? 'checked' : ''}></td><td><b>${esc(p.name)}</b></td>
+      ${rows.slice(0, 400).map(p => `<tr><td><input type="checkbox" data-c="${p.id}" ${chosen.has(p.id) ? 'checked' : ''}></td><td><b>${esc(p.name)}</b>${isPromo(p) ? ' <span class="chip bad">🏷️ โปร</span>' : ''}</td>
         <td>${p.barcode ? `<code>${esc(p.barcode)}</code>${/^\d{13}$/.test(p.barcode) && !validEAN(p.barcode) ? ' <span class="chip bad">เลขตรวจผิด</span>' : ''}` : '<span class="chip warn">ไม่มี</span>'}</td><td>${esc(p.sku || '')}</td>
         <td class="right">${money(p.price)}</td><td class="right">${p.track_stock ? qtyf(p.stock) : '—'}</td>
         <td class="right" style="white-space:nowrap"><button class="btn sm" data-ed="${p.id}">✏️</button> <button class="btn sm" data-sc="${p.id}">📷</button> ${p.barcode ? '' : `<button class="btn sm" data-g="${p.id}">สร้าง</button>`}</td></tr>`).join('')}</table></div>
       <p class="muted">${rows.length} รายการ${rows.length > 400 ? ' (แสดง 400 แรก)' : ''}</p>`;
     $$('#bt [data-t]', pg).forEach(b => b.onclick = () => { tab = b.dataset.t; draw(); });
+    $('#bcat', pg).onchange = e => { cat = e.target.value; draw(); };
     $('#bq', pg).oninput = e => { v = e.target.value.toLowerCase(); const pos = e.target.selectionStart; draw(); const n = $('#bq', pg); n.focus(); n.setSelectionRange(pos, pos); };
     $('#ball', pg).onchange = e => { rows.forEach(p => e.target.checked ? chosen.add(p.id) : chosen.delete(p.id)); draw(); };
     $$('[data-c]', pg).forEach(c => c.onchange = () => { c.checked ? chosen.add(c.dataset.c) : chosen.delete(c.dataset.c); });
@@ -449,8 +453,11 @@ VIEWS.barcodes = pg => {
       logAct('barcode_generate', 'product', `${targets.length} รายการ`, { count: targets.length });
       toast(`สร้างบาร์โค้ด ${targets.length} รายการแล้ว`, 'ok'); targets.forEach(p => chosen.add(p.id)); tab = 'has'; draw(); } catch (e) { fail(e); draw(); }
   };
-  $('#bprint').onclick = () => { const it = S.products.filter(p => chosen.has(p.id)); if (!it.length) return toast('เลือกสินค้าที่ต้องการพิมพ์ฉลากก่อน', 'bad'); printLabels(it); };
-  $('#bxl').onclick = () => xlsxDownload('barcodes', [{ name: 'บาร์โค้ด', rows: list().map(p => ({ 'ชื่อสินค้า': p.name, 'บาร์โค้ด': p.barcode || '', 'SKU': p.sku || '', 'หมวดหมู่': S.categories.find(c => c.id === p.category_id)?.name || '', 'ราคา': num(p.price), 'คงเหลือ': num(p.stock), 'สถานะ': p.barcode ? 'มี' : 'ไม่มี' })) }]);
+  $('#bprint').onclick = () => { const it = chosen.size ? S.products.filter(p => chosen.has(p.id)) : list(); if (!it.length) return toast('ไม่มีสินค้าในรายการ', 'bad'); printLabels(it); };
+  $('#bimp').onclick = () => $('#bfile').click();
+  $('#bfile').onchange = e => { const f = e.target.files[0]; e.target.value = ''; if (f) importDialog(f); };
+  $('#bxl').onclick = () => { toast('แก้บาร์โค้ดในไฟล์ Excel แล้วกด “นำเข้า” เพื่ออัปเดตได้', 'ok'); return xlsxDownload('barcodes', [{ name: 'สินค้า', headers: ['ชื่อสินค้า', 'บาร์โค้ด', 'SKU', 'หมวดหมู่', 'ราคาขาย', 'ราคาโปร', 'ราคาส่ง', 'คงเหลือ', 'โปรโมชั่น'],
+    rows: list().map(p => ({ 'ชื่อสินค้า': p.name, 'บาร์โค้ด': p.barcode || '', 'SKU': p.sku || '', 'หมวดหมู่': catName(p.category_id), 'ราคาขาย': num(p.price), 'ราคาโปร': num(p.promo_price) || '', 'ราคาส่ง': num(p.wholesale_price) || '', 'คงเหลือ': num(p.stock), 'โปรโมชั่น': itemPromosFor(p).map(x => x.name + ' (' + promoLabel(x) + ')').join(', ') })) }]); };
   draw();
 };
 
@@ -965,22 +972,30 @@ VIEWS.settings = pg => {
   };
 };
 
-/* ===================================================================== AUTO UPDATE */
+/* ===================================================================== AUTO UPDATE (silent) */
+const canAutoReload = () => !(S.cart && S.cart.length) && !document.querySelector('.mbg') && !document.activeElement?.matches?.('input,textarea,select');
+let UPD = null;
+async function applyUpdate(ver) {
+  try { const regs = await navigator.serviceWorker?.getRegistrations?.() || []; await Promise.all(regs.map(x => x.update().catch(() => {})));
+    if (window.caches) for (const k of await caches.keys()) await caches.delete(k); } catch {}
+  sessionStorage.setItem('pos_updated_to', ver); location.reload();
+}
 async function checkUpdate(manual) {
   try {
     const r = await fetch('version.json?t=' + Date.now(), { cache: 'no-store' }); if (!r.ok) return;
     const v = await r.json();
     if (v.version && v.version !== APP_VERSION) {
-      if ($('#updbar')) return;
-      document.body.insertAdjacentHTML('beforeend', `<div id="updbar" class="updbar"><span>✨ มีเวอร์ชันใหม่ ${esc(v.version)}${v.notes ? ' — ' + esc(v.notes) : ''}</span><button class="btn sm p" id="updgo">อัปเดตเลย</button><button class="x" id="updx">×</button></div>`);
-      $('#updgo').onclick = async () => { const regs = await navigator.serviceWorker?.getRegistrations?.() || []; await Promise.all(regs.map(x => x.update().catch(() => {})));
-        if (window.caches) for (const k of await caches.keys()) await caches.delete(k); location.reload(); };
-      $('#updx').onclick = () => $('#updbar').remove();
+      UPD = v.version;
+      if (canAutoReload() || manual) return applyUpdate(v.version);
+      if (!$('#updchip')) document.body.insertAdjacentHTML('beforeend', `<div id="updchip" class="updchip">✨ เวอร์ชันใหม่ ${esc(v.version)} — จะอัปเดตเองหลังจบบิลนี้</div>`);
     } else if (manual) toast('ใช้เวอร์ชันล่าสุดแล้ว (' + APP_VERSION + ')', 'ok');
   } catch {}
 }
-setTimeout(checkUpdate, 8000); setInterval(checkUpdate, 15 * 60 * 1000);
+setInterval(() => { if (UPD && canAutoReload()) applyUpdate(UPD); }, 4000);
+setTimeout(() => checkUpdate(), 2500); setInterval(() => checkUpdate(), 5 * 60 * 1000);
 document.addEventListener('visibilitychange', () => { if (!document.hidden) checkUpdate(); });
+window.addEventListener('online', () => checkUpdate());
+{ const u = sessionStorage.getItem('pos_updated_to'); if (u) { sessionStorage.removeItem('pos_updated_to'); setTimeout(() => toast(`อัปเดตเป็นเวอร์ชัน ${u} แล้ว ✨`, 'ok'), 1500); } }
 
 /* ===================================================================== NATIVE APP (Android Capacitor / desktop) */
 const isNativeApp = () => !!window.Capacitor?.isNativePlatform?.();

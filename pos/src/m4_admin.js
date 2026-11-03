@@ -10,7 +10,7 @@ VIEWS.reports = pg => {
   let rep = 'sales', A, B, cur = null;
   pg.innerHTML = `<div class="pills" id="rk" style="margin-bottom:12px">${REPORTS.filter(r => canDo('view_profit') || !['profit'].includes(r[0])).map(([k, l]) => `<button data-k="${k}" class="${k === rep ? 'on' : ''}">${l}</button>`).join('')}</div>
     <div id="rr"></div><div class="row" style="margin-bottom:12px"><div class="sbox" style="max-width:280px"><span>🔍</span><input class="in" id="rq" placeholder="ค้นหาในรายงาน"></div><span class="sp"></span>
-    <button class="btn" id="rcsv">⬇ CSV</button><button class="btn" id="rxl">📗 Excel</button><button class="btn" id="rpr">🖨️ พิมพ์ / PDF</button></div><div id="rb"></div>`;
+    <button class="btn" id="rcsv">⬇ CSV</button><button class="btn" id="rxl">📗 Excel</button><button class="btn" id="rpr">🖨️ พิมพ์ / PDF</button></div><div id="rbody"></div>`;
   $$('#rk button').forEach(b => b.onclick = () => { rep = b.dataset.k; $$('#rk button').forEach(x => x.classList.toggle('on', x === b)); run(); });
   let sortK = null, sortD = -1;
   const show = () => {
@@ -20,16 +20,16 @@ VIEWS.reports = pg => {
     const tot = {}; cur.cols.forEach(([k, , t]) => { if (t === 'm' || t === 'n') tot[k] = rows.reduce((a, r) => a + num(r[k]), 0); });
     const fmt = (t, v) => t === 'm' ? money(v) : t === 'n' ? qtyf(v) : t === 'p' ? num(v).toFixed(1) + '%' : t === 'd' ? (v ? dOnly(v) : '') : t === 'dt' ? (v ? dt(v) : '') : esc(v ?? '');
     const page = rows.slice(0, 500);
-    $('#rb').innerHTML = `${cur.summary ? `<div class="stats">${cur.summary.map(([k, v]) => `<div class="stat"><div class="k">${k}</div><div class="v">${v}</div></div>`).join('')}</div>` : ''}
+    $('#rbody').innerHTML = `${cur.summary ? `<div class="stats">${cur.summary.map(([k, v]) => `<div class="stat"><div class="k">${k}</div><div class="v">${v}</div></div>`).join('')}</div>` : ''}
       ${cur.note ? `<p class="muted" style="font-size:13px">${cur.note}</p>` : ''}
       <div class="tblwrap" id="rtbl"><table class="tbl"><tr>${cur.cols.map(([k, l, t]) => `<th class="${['m', 'n', 'p'].includes(t) ? 'right' : ''}" data-s="${k}" style="cursor:pointer">${l}${sortK === k ? (sortD > 0 ? ' ▲' : ' ▼') : ''}</th>`).join('')}</tr>
       ${page.map(r => `<tr>${cur.cols.map(([k, , t]) => `<td class="${['m', 'n', 'p'].includes(t) ? 'right' : ''}">${fmt(t, r[k])}</td>`).join('')}</tr>`).join('')}
       ${Object.keys(tot).length ? `<tr>${cur.cols.map(([k, , t], i) => `<td class="${['m', 'n'].includes(t) ? 'right' : ''} b">${i === 0 ? 'รวม' : k in tot ? fmt(t, tot[k]) : ''}</td>`).join('')}</tr>` : ''}</table></div>
       <p class="muted">${rows.length} รายการ${rows.length > 500 ? ' (แสดง 500 แรก — ส่งออกเพื่อดูทั้งหมด)' : ''}</p>`;
-    $$('[data-s]', $('#rb')).forEach(th => th.onclick = () => { sortD = sortK === th.dataset.s ? -sortD : -1; sortK = th.dataset.s; show(); });
+    $$('[data-s]', $('#rbody')).forEach(th => th.onclick = () => { sortD = sortK === th.dataset.s ? -sortD : -1; sortK = th.dataset.s; show(); });
     cur._rows = rows;
   };
-  const run = async () => { $('#rb').innerHTML = '<div class="skel"><i></i><i></i></div>'; try { sortK = null; cur = await REPORT_FN[rep](A, B); show(); } catch (e) { fail(e); $('#rb').innerHTML = ''; } };
+  const run = async () => { $('#rbody').innerHTML = '<div class="skel"><i></i><i></i></div>'; try { sortK = null; cur = await REPORT_FN[rep](A, B); show(); } catch (e) { fail(e); $('#rbody').innerHTML = ''; } };
   $('#rq').oninput = show;
   const fname = () => `report_${rep}_${ymd(A)}_${ymd(B)}`;
   $('#rcsv').onclick = () => cur && download(fname() + '.csv', toCSV(cur._rows.map(r => Object.fromEntries(cur.cols.map(([k, l]) => [l, r[k]]))), cur.cols.map(c => c[1])));
