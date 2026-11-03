@@ -384,3 +384,16 @@ create policy items_sel on public.sale_items for select to authenticated using (
 create policy moves_sel on public.stock_moves for select to authenticated using (is_member(shop_id));
 
 -- every function checks shop membership/role with auth.uid(), so anonymous calls do nothing.
+
+-- ============ CLOSED REGISTRATION ============
+-- Public email/password sign-up is blocked; only Google sign-ups (and accounts made by the admin in SQL) are allowed.
+create or replace function app_private.block_email_signup() returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+  if current_user = 'supabase_auth_admin' and coalesce(new.raw_app_meta_data->>'provider', 'email') = 'email' then
+    raise exception 'Email registration is disabled. Please sign in with Google.';
+  end if;
+  return new;
+end $$;
+create trigger trg_block_email_signup before insert on auth.users
+for each row execute function app_private.block_email_signup();

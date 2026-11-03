@@ -1,6 +1,6 @@
 /* Shop POS — free, open POS + stock web app.  Data: Supabase.  Hosting: GitHub Pages. */
 'use strict';
-const VERSION = '1.1.0';
+const VERSION = '1.2.0';
 const sb = supabase.createClient(window.POS_CONFIG.url, window.POS_CONFIG.key, { auth: { flowType: 'pkce', detectSessionInUrl: true, persistSession: true } });
 
 /* ================= i18n ================= */
@@ -172,8 +172,22 @@ function renderAuth() {
     <div class="row"><div class="brandmark">🛒</div><span style="flex:1"></span><button class="tab" id="lng" style="align-self:flex-start">${LANG === 'th' ? 'EN' : 'ไทย'}</button></div>
     <h2>Shop POS</h2><p class="muted" style="margin-top:0">${LANG === 'th' ? 'ระบบขายหน้าร้าน + สต็อก ฟรีทุกฟีเจอร์' : 'Free POS + stock, every feature unlocked'}</p>
     <button class="btn lg" id="gbtn" style="width:100%;background:#fff;border:1px solid var(--line);margin-top:10px">${GOOGLE_SVG} ${LANG === 'th' ? 'เข้าสู่ระบบด้วย Google' : 'Continue with Google'}</button>
-    <p class="muted" style="font-size:13px;text-align:center;margin-bottom:0">${LANG === 'th' ? 'พนักงานใช้บัญชี Google ของอีเมลที่ได้รับเชิญ' : 'Staff sign in with the Google account of their invited email'}</p>
+    <p class="muted" style="font-size:13px;text-align:center">${LANG === 'th' ? 'พนักงานใช้บัญชี Google ของอีเมลที่ได้รับเชิญ' : 'Staff sign in with the Google account of their invited email'}</p>
+    <div class="row" style="margin:14px 0"><hr style="flex:1;border:0;border-top:1px solid var(--line)"><span class="muted" style="font-size:13px">${LANG === 'th' ? 'หรือ ผู้ดูแลระบบ' : 'or admin login'}</span><hr style="flex:1;border:0;border-top:1px solid var(--line)"></div>
+    <form id="af">
+      <div class="fg"><label class="f">${LANG === 'th' ? 'ชื่อผู้ใช้' : 'Username'}</label><input class="in" name="user" required autocomplete="username" autocapitalize="off" placeholder="admin"></div>
+      <div class="fg"><label class="f">${t('Password')}</label><input class="in" name="pw" type="password" required autocomplete="current-password"></div>
+      <button class="btn p lg" style="width:100%">${t('Login')}</button>
+    </form>
   </div></div>`;
+  $('#af').onsubmit = async e => {
+    e.preventDefault(); const f = e.target; const btn = $('button.p', f); btn.disabled = true;
+    const u = f.user.value.trim().toLowerCase();
+    const email = u.includes('@') ? u : `${u}@shoppos.test`;
+    const { error } = await sb.auth.signInWithPassword({ email, password: f.pw.value });
+    if (error) { btn.disabled = false; return toast(LANG === 'th' ? 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง' : 'Wrong username or password', 'bad'); }
+    boot().catch(fail);
+  };
   $('#lng').onclick = () => { LANG = LANG === 'th' ? 'en' : 'th'; localStorage.setItem('pos_lang', LANG); renderAuth(); };
   $('#gbtn').onclick = async () => {
     $('#gbtn').disabled = true;
@@ -910,7 +924,7 @@ VIEWS.settings = pg => {
           <table class="tbl" style="box-shadow:none">${S.shops.map(s => `<tr><td>${esc(s.name)}<br><small class="muted">${ROLE_NAME(s._role)}</small></td><td class="right">${s.id === sh.id ? '<span class="chip ok">●</span>' : `<button class="btn sm" data-s="${s.id}">${t('Switch')}</button>`}</td></tr>`).join('')}</table>
           <br><button class="btn" id="nb">+ ${t('New branch')}</button></div>
         <div class="card"><h3 style="margin-top:0">👤 ${t('Account')}</h3><p>${esc(S.user.email)} · ${ROLE_NAME(S.role)}</p>
-          <div class="row">${can('owner', 'manager') ? `<button class="btn" id="bk">💾 ${t('Backup data')}</button>` : ''}<button class="btn" id="ins" style="display:${window._installEvt ? '' : 'none'}">📲 ${t('Install app')}</button><button class="btn bad" id="lo">${t('Logout')}</button></div>
+          <div class="row">${can('owner', 'manager') ? `<button class="btn" id="bk">💾 ${t('Backup data')}</button>` : ''}<button class="btn" id="ins" style="display:${window._installEvt ? '' : 'none'}">📲 ${t('Install app')}</button>${S.user.app_metadata?.provider === 'email' ? `<button class="btn" id="cpw">🔑 ${LANG === 'th' ? 'เปลี่ยนรหัสผ่าน' : 'Change password'}</button>` : ''}<button class="btn bad" id="lo">${t('Logout')}</button></div>
           <p class="muted" style="font-size:12px">${t('Version')} ${VERSION} · <a href="https://github.com/khalil203/khalil203/tree/main/pos" target="_blank">GitHub</a></p></div>
       </div>
     </div>`;
@@ -935,6 +949,13 @@ VIEWS.settings = pg => {
   $$('[data-s]', pg).forEach(b => b.onclick = () => { localStorage.setItem('pos_shop', b.dataset.s); S.cart = []; boot(); });
   $('#nb').onclick = () => renderCreateShop(false);
   $('#lo').onclick = logout;
+  if ($('#cpw')) $('#cpw').onclick = () => formModal(LANG === 'th' ? 'เปลี่ยนรหัสผ่าน' : 'Change password', [
+    {k:'p1', label: LANG === 'th' ? 'รหัสผ่านใหม่' : 'New password', type:'password', req:true},
+    {k:'p2', label: LANG === 'th' ? 'ยืนยันรหัสผ่านใหม่' : 'Confirm new password', type:'password', req:true}], {}, async o => {
+      if (o.p1.length < 6) throw new Error(LANG === 'th' ? 'รหัสผ่านอย่างน้อย 6 ตัว' : 'At least 6 characters');
+      if (o.p1 !== o.p2) throw new Error(LANG === 'th' ? 'รหัสผ่านไม่ตรงกัน' : 'Passwords do not match');
+      const { error } = await sb.auth.updateUser({ password: o.p1 }); if (error) throw error;
+    });
   $('#ins').onclick = () => window._installEvt?.prompt();
   if ($('#bk')) $('#bk').onclick = async () => {
     const id = S.shop.id; const out = {shop: sh, exported_at: new Date().toISOString()};
