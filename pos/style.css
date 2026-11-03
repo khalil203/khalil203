@@ -630,3 +630,4 @@ code{font-family:ui-monospace,monospace;font-size:13px;background:var(--bg);padd
 .pm-add:hover{border-color:var(--brand)}
 @media (max-width:860px){.pmgrid{--pm:160px;gap:10px}}
 @media (max-width:860px){.sbox:has(#ps){flex:1 1 100%!important;max-width:none!important}#pzs{flex:1 1 100%}}
+.lprog{position:sticky;top:0;z-index:3;background:var(--card);border-radius:12px;padding:10px 12px;margin-bottom:8px;box-shadow:0 4px 14px #0001;font-size:13px;font-weight:600}

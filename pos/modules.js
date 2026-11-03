@@ -1423,7 +1423,7 @@ const _goC = go;
 go = function (page) { _goC(page); $('.top')?.classList.toggle('posmode', S.page === 'pos'); };
 /* ================= Shop POS v4 — promotions engine, data center, barcodes, personal use,
    activity log, branding, receipt image, cashier upgrades, auto-update ================= */
-const APP_VERSION = '4.3.0';
+const APP_VERSION = '4.3.1';
 Object.assign(TH, { 'Data center': 'ศูนย์ข้อมูล', 'Barcodes': 'บาร์โค้ด', 'Branches': 'สาขา' });
 PAGES.splice(PAGES.findIndex(p => p.id === 'settings'), 0,
   { id: 'barcodes', ic: '🏷', name: 'Barcodes', roles: ['owner', 'manager', 'stock'] },
@@ -2491,6 +2491,12 @@ VIEWS.reports = pg => {
 };
 
 /* ---------- LABEL DESIGNER: templates × sizes × price modes ---------- */
+let JSPDF_P = null;
+function a4Layout(z) {
+  const cols = z.a4 || 1, gap = cols > 1 ? Math.max(0, Math.min(3, (200 - cols * z.w) / (cols - 1))) : 0;
+  const rows = Math.max(1, Math.floor(297 / z.h)), mx = Math.max(0, (210 - cols * z.w - (cols - 1) * gap) / 2), my = Math.max(0, (297 - rows * z.h) / 2);
+  return { cols, rows, gap, mx, my };
+}
 const LBL_SIZES = {
   's30x20': { w: 30, h: 20, n: '30 × 20 มม. (เล็กมาก)' }, 's40x25': { w: 40, h: 25, n: '40 × 25 มม.' }, 's40x30': { w: 40, h: 30, n: '40 × 30 มม. (ยอดนิยม)' },
   's50x30': { w: 50, h: 30, n: '50 × 30 มม.' }, 's50x40': { w: 50, h: 40, n: '50 × 40 มม.' }, 's58x40': { w: 58, h: 40, n: '58 × 40 มม.' },
@@ -2517,11 +2523,26 @@ function lblPrices(p, mode) {
   const pct = old ? Math.round((1 - now / old) * 100) : (pr?.kind === 'percent' ? num(pr.value) : 0);
   return { now, old, tag, pct, hasPromo };
 }
-function lblCSS(o) {
+const BC_CACHE = new Map(), QR_CACHE = new Map();
+async function barcodeImg(code) {
+  if (BC_CACHE.has(code)) return BC_CACHE.get(code);
+  await loadJsBarcode();
+  const c = document.createElement('canvas');
+  const opt = { height: 120, width: 3, displayValue: false, margin: 4 };
+  try { JsBarcode(c, code, { ...opt, format: validEAN(code) ? 'EAN13' : 'CODE128' }); } catch { JsBarcode(c, code, { ...opt, format: 'CODE128' }); }
+  const url = c.toDataURL('image/png'); BC_CACHE.set(code, url); return url;
+}
+function qrImg(text) {
+  if (!QR_CACHE.has(text)) QR_CACHE.set(text, 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(qrSvg(text)));
+  return QR_CACHE.get(text);
+}
+const yieldUI = () => new Promise(r => setTimeout(r, 0));
+function lblCSS(o) { return lblCSS0(o).replace(/ svg\{/g, ' :is(svg,img){').replace(/\.lb \.bc :is\(svg,img\)\{/, '.lb .bc :is(svg,img){object-fit:fill;display:block;'); }
+function lblCSS0(o) {
   const z = LBL_SIZES[o.size], W = z.w, H = z.h, u = Math.min(W, H * 1.6);
-  const pageCSS = z.a4 ? `@page{size:A4;margin:8mm 7mm}` : `@page{size:${W}mm ${H}mm;margin:0}`;
+  const L = a4Layout(z), pageCSS = z.a4 ? `@page{size:A4;margin:${L.my.toFixed(2)}mm ${L.mx.toFixed(2)}mm}` : `@page{size:${W}mm ${H}mm;margin:0}`;
   return `${pageCSS}
-  .lbls{display:${z.a4 ? 'grid' : 'block'};${z.a4 ? `grid-template-columns:repeat(${z.a4},${W}mm);gap:0 ${z.a4 > 1 ? Math.max(0, (196 - z.a4 * W) / (z.a4 - 1)).toFixed(1) : 0}mm;` : ''}}
+  .lbls{display:${z.a4 ? 'grid' : 'block'};${z.a4 ? `grid-template-columns:repeat(${z.a4},${W}mm);gap:0 ${L.gap.toFixed(2)}mm;` : ''}}
   .lb{width:${W}mm;height:${H}mm;box-sizing:border-box;padding:${(H * .05).toFixed(2)}mm ${(W * .04).toFixed(2)}mm;overflow:hidden;position:relative;display:flex;flex-direction:column;align-items:center;justify-content:space-between;
     text-align:center;font-family:'Prompt','IBM Plex Sans Thai',sans-serif;color:#111;background:#fff;page-break-inside:avoid;break-inside:avoid;${z.a4 ? '' : 'page-break-after:always;break-after:page;'}}
   .lb .ln{font-size:${(H * .12).toFixed(2)}mm;font-weight:600;line-height:1.15;width:100%;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
@@ -2549,7 +2570,7 @@ function lblCSS(o) {
 async function lblHTML(p, o) {
   const pr = lblPrices(p, o.price), money2 = v => '฿' + money(v);
   const code = p.barcode || p.sku || '';
-  const svg = code && o.tpl !== 'qr' ? (await barcodeSVG(code, { h: 60, w: 2, text: false })).replace('<svg ', '<svg preserveAspectRatio="none" ') : '';
+  const svg = code && o.tpl !== 'qr' ? `<img src="${await barcodeImg(code)}" alt="">` : '';
   const nm = o.name ? `<div class="ln">${esc(p.name)}</div>` : '';
   const price = pr.now == null ? '' : `<div>${pr.old ? `<span class="od">${money2(pr.old)}</span> ` : ''}<span class="pp">${money2(pr.now)}</span>${o.unit && p.unit ? `<span class="un"> / ${esc(p.unit)}</span>` : ''}</div>`;
   const bc = code ? `<div class="bc">${svg}${o.code ? `<div class="cd">${esc(code)}</div>` : ''}</div>` : '<div class="bc"><small style="color:#c00">ไม่มีบาร์โค้ด</small></div>';
@@ -2562,7 +2583,7 @@ async function lblHTML(p, o) {
     case 'shelf': inner = `${shop}${nm}<div class="row2">${bc}${price}</div>`; break;
     case 'promo': inner = `${tag}${nm}${price}${bc}`; break;
     case 'burst': inner = `${pr.pct || pr.tag ? `<div class="pct">${pr.pct ? '-' + pr.pct + '%' : esc(pr.tag).slice(0, 12)}</div>` : ''}${nm}${price}${bc}`; break;
-    case 'qr': inner = `<div class="qrb">${qrSvg(code || p.name)}</div><div class="txt">${shop}${nm}${price}${o.code && code ? `<div class="cd">${esc(code)}</div>` : ''}</div>`; break;
+    case 'qr': inner = `<div class="qrb"><img src="${qrImg(code || p.name)}" alt=""></div><div class="txt">${shop}${nm}${price}${o.code && code ? `<div class="cd">${esc(code)}</div>` : ''}</div>`; break;
     default: inner = `${tag}${shop}${nm}${bc}${price}`;
   }
   return `<div class="lb t-${o.tpl}">${inner}</div>`;
@@ -2584,7 +2605,7 @@ printLabels = async function (items) {
       <label class="row"><input type="checkbox" id="lsh" ${o.shop ? 'checked' : ''}> ชื่อร้าน</label>
     </div>
     <div class="lbd-prev"><div class="muted" id="lcount"></div><div id="lprev" class="lprev"></div></div></div>`,
-    { wide: true, foot: `<button class="btn" id="lpdf">📄 บันทึกเป็น PDF / รูป</button><button class="btn" id="lxl">📗 ส่งออกรายการ</button><button class="btn p" id="lgo">🖨️ พิมพ์</button>` });
+    { wide: true, foot: `<button class="btn" id="lpdf">⬇ ดาวน์โหลด PDF</button><button class="btn" id="lxl">📗 ส่งออกรายการ</button><button class="btn p" id="lgo">🖨️ พิมพ์</button>` });
   m.querySelector('.modal')?.classList.add('xwide');
   const read = () => Object.assign(o, { size: $('#ls', m).value, price: $('#lpr', m).value, copies: Math.max(1, +$('#lq', m).value || 1), color: $('#lc', m).value,
     byStock: $('#lbs', m).checked, only: $('#lonly', m).checked, name: $('#lpn', m).checked, code: $('#lcd', m).checked, unit: $('#lun', m).checked, shop: $('#lsh', m).checked });
@@ -2603,15 +2624,68 @@ printLabels = async function (items) {
   $$('[data-t]', m).forEach(b => b.onclick = () => { o.tpl = b.dataset.t; LBL_OPT.tpl = o.tpl; $$('[data-t]', m).forEach(x => x.classList.toggle('on', x === b));
     if (['promo', 'burst'].includes(o.tpl) && o.price === 'retail') $('#lpr', m).value = 'auto'; go2(); });
   $('.lbd-opt', m).addEventListener('input', go2); $('.lbd-opt', m).addEventListener('change', go2);
-  const build = async () => {
+  const progress = (txt, f) => { let el = $('#lprog', m); if (!el) { $('.lbd-prev', m).insertAdjacentHTML('afterbegin', '<div id="lprog" class="lprog"><span></span><div class="bar"><i></i></div></div>'); el = $('#lprog', m); }
+    if (f == null) { el.remove(); return; } el.querySelector('span').textContent = txt; el.querySelector('i').style.width = Math.round(f * 100) + '%'; };
+  let busy = false;
+  const setBusy = b => { busy = b; $$('.mf .btn', m).forEach(x => x.disabled = b); };
+  const plan = async () => {
     read(); const tg = targets(); if (!tg.length) { toast('ไม่มีสินค้าตามเงื่อนไข', 'bad'); return null; }
-    const n = count(); if (n > 3000 && !await confirmBox(`จะพิมพ์ ${n} ดวง ต้องการดำเนินการต่อหรือไม่?`)) return null;
-    const cells = [];
-    for (const p of tg) { const h = await lblHTML(p, o); const k = o.byStock ? Math.max(0, Math.floor(num(p.stock))) : o.copies; for (let i = 0; i < k; i++) cells.push(h); }
+    const n = count(); if (n > 3000 && !await confirmBox(`จะสร้าง ${n} ดวง ต้องการดำเนินการต่อหรือไม่?`)) return null;
+    const items = [];
+    for (const [i, p] of tg.entries()) { items.push({ p, html: await lblHTML(p, o), k: o.byStock ? Math.max(0, Math.floor(num(p.stock))) : o.copies });
+      if (i % 15 === 0) { progress(`กำลังเตรียมฉลาก ${i + 1}/${tg.length}`, (i + 1) / tg.length * .3); await yieldUI(); } }
+    return items;
+  };
+  const build = async () => {
+    const items = await plan(); if (!items) return null;
+    const cells = []; items.forEach(it => { for (let i = 0; i < it.k; i++) cells.push(it.html); });
     return `<style>${lblCSS(o)}</style><div class="lbls">${cells.join('')}</div>`;
   };
-  $('#lgo', m).onclick = async () => { const h = await build(); if (h) { printReceipt(h); logAct('labels_print', 'product', `${targets().length} สินค้า`, { template: o.tpl, size: o.size, labels: count() }); } };
-  $('#lpdf', m).onclick = async () => { const h = await build(); if (h) { toast('เลือกเครื่องพิมพ์ “บันทึกเป็น PDF / Save as PDF”', 'ok'); setTimeout(() => printReceipt(h), 400); } };
+  /* PDF: each different label is rendered once to an image, then placed as many times as needed */
+  const makePDF = async () => {
+    const items = await plan(); if (!items) return null;
+    await Promise.all([loadH2C(), JSPDF_P ||= loadScript('https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js')]);
+    const z = LBL_SIZES[o.size], { jsPDF } = window.jspdf;
+    const host = document.createElement('div'); host.style.cssText = 'position:fixed;left:-20000px;top:0;background:#fff';
+    host.innerHTML = `<style>${lblCSS(o).replace(/@page\{[^}]*\}/, '')}</style><div id="lhost"></div>`; document.body.appendChild(host);
+    const imgs = [];
+    try {
+      for (const [i, it] of items.entries()) {
+        if (!it.k) continue;
+        $('#lhost', host).innerHTML = it.html; const el = $('#lhost .lb', host);
+        const cv = await html2canvas(el, { scale: z.w > 90 ? 2.5 : 4, backgroundColor: o.tpl === 'dark' ? '#0f172a' : '#ffffff', logging: false });
+        imgs.push({ url: cv.toDataURL('image/jpeg', 0.92), k: it.k, id: 'L' + imgs.length });
+        progress(`กำลังสร้าง PDF ${i + 1}/${items.length}`, .3 + (i + 1) / items.length * .6); await yieldUI();
+      }
+    } finally { host.remove(); }
+    const pdf = z.a4 ? new jsPDF({ unit: 'mm', format: 'a4' }) : new jsPDF({ unit: 'mm', format: [z.w, z.h], orientation: z.w > z.h ? 'l' : 'p' });
+    const { mx, my, cols, gap, rows } = a4Layout(z);
+    let slot = 0, first = true;
+    for (const im of imgs) for (let c = 0; c < im.k; c++) {
+      if (z.a4) { if (slot === cols * rows) { pdf.addPage('a4'); slot = 0; } const col = slot % cols, row = Math.floor(slot / cols);
+        pdf.addImage(im.url, 'JPEG', mx + col * (z.w + gap), my + row * z.h, z.w, z.h, im.id, 'FAST'); slot++; }
+      else { if (!first) pdf.addPage([z.w, z.h], z.w > z.h ? 'l' : 'p'); pdf.addImage(im.url, 'JPEG', 0, 0, z.w, z.h, im.id, 'FAST'); }
+      first = false;
+    }
+    progress('', null);
+    return pdf.output('blob');
+  };
+  const downloadPDF = async () => {
+    if (busy) return; setBusy(true);
+    try { const blob = await makePDF(); if (!blob) return;
+      const name = safeName(`labels_${o.size}_${ymd(new Date())}.pdf`);
+      if (isNativeApp()) await nativeSave(name, blob); else saveBlob(name, blob);
+      toast('ดาวน์โหลด PDF ฉลากแล้ว — เปิดไฟล์แล้วสั่งพิมพ์ได้เลย', 'ok');
+      logAct('labels_print', 'product', `${targets().length} สินค้า (PDF)`, { template: o.tpl, size: o.size, labels: count() });
+    } catch (e) { progress('', null); fail(e); } finally { setBusy(false); }
+  };
+  $('#lgo', m).onclick = async () => {
+    if (isNativeApp()) return downloadPDF();
+    if (busy) return; setBusy(true);
+    try { const h = await build(); progress('', null); if (h) { printReceipt(h); logAct('labels_print', 'product', `${targets().length} สินค้า`, { template: o.tpl, size: o.size, labels: count() }); } }
+    catch (e) { progress('', null); fail(e); } finally { setBusy(false); }
+  };
+  $('#lpdf', m).onclick = downloadPDF;
   $('#lxl', m).onclick = () => xlsxDownload('labels', [{ name: 'ฉลาก', rows: targets().map(p => { const pr = lblPrices(p, o.price); return { 'ชื่อสินค้า': p.name, 'บาร์โค้ด': p.barcode || '', 'SKU': p.sku || '', 'ราคาบนฉลาก': pr.now ?? '', 'ราคาเดิม': pr.old ?? '', 'โปรโมชั่น': pr.tag, 'จำนวนดวง': o.byStock ? Math.max(0, Math.floor(num(p.stock))) : o.copies }; }) }]);
   go2();
 };
