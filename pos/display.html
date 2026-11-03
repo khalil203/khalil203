@@ -21,7 +21,7 @@ new BroadcastChannel('pos-display').onmessage=({data:d})=>{
     document.getElementById('items').innerHTML=d.cart.map(l=>`<div class="it"><span>${e(l.name)} × ${l.qty}</span><b>${m(l.price*l.qty-(l.discount||0))}</b></div>`).join('');
     document.getElementById('tot').textContent='฿'+m(d.calc.total);
     document.getElementById('cust').textContent=d.customer?('⭐ '+d.customer):''; }
-  if(d.type==='qr'){R.innerHTML=`<div class="k">สแกนจ่าย PromptPay</div><div class="qr">${d.svg}</div><div class="tot" style="font-size:44px">฿${m(d.total)}</div>`;}
+  if(d.type==='qr'){R.innerHTML=`<div class="k">${d.label?e(d.label):"สแกนจ่าย QR"}</div><div class="qr">${d.svg}</div><div class="tot" style="font-size:44px">฿${m(d.total)}</div>`;}
   if(d.type==='thanks'){R.innerHTML=`<div class="tot" style="font-size:44px">ขอบคุณค่ะ 🙏</div><div class="k">Thank you</div>${d.change>0?`<div class="k" style="margin-top:20px">เงินทอน / Change</div><div class="tot">฿${m(d.change)}</div>`:''}`;
     document.getElementById('items').innerHTML='';setTimeout(base,8000);}
 };
