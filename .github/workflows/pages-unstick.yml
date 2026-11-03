@@ -1,0 +1,17 @@
+name: Cancel a stuck Pages deployment
+on:
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: Commit SHA of the stuck Pages deployment
+        required: true
+permissions:
+  pages: write
+  deployments: write
+jobs:
+  cancel:
+    runs-on: ubuntu-latest
+    steps:
+      - env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh api -X POST "repos/${{ github.repository }}/pages/deployments/${{ inputs.sha }}/cancel" && echo cancelled
