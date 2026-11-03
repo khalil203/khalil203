@@ -1,6 +1,6 @@
 {
   "name": "shop-pos",
-  "productName": "Shop POS",
+  "productName": "Yanisa Shop POS",
   "version": "4.0.0",
   "description": "Shop POS desktop app (Windows / macOS) — opens the live POS so it is always up to date",
   "main": "main.js",
@@ -17,7 +17,7 @@
   },
   "build": {
     "appId": "com.khalil203.shoppos",
-    "productName": "Shop POS",
+    "productName": "Yanisa Shop POS",
     "directories": {
       "output": "dist",
       "buildResources": "build"

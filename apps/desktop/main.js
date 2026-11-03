@@ -7,7 +7,7 @@ if (!app.requestSingleInstanceLock()) app.quit();
 
 function createWindow() {
   const win = new BrowserWindow({
-    width: 1400, height: 900, minWidth: 360, minHeight: 560, backgroundColor: '#f3f4fa', title: 'Shop POS', autoHideMenuBar: true,
+    width: 1400, height: 900, minWidth: 360, minHeight: 560, backgroundColor: '#f3f4fa', title: 'Yanisa Shop POS', autoHideMenuBar: true,
     webPreferences: { contextIsolation: true, nodeIntegration: false, spellcheck: false },
   });
   win.webContents.setUserAgent(win.webContents.getUserAgent() + ' ShopPOSApp/' + app.getVersion());
@@ -24,7 +24,7 @@ function createWindow() {
 }
 
 const template = [
-  { label: 'Shop POS', submenu: [
+  { label: 'Yanisa Shop POS', submenu: [
     { label: 'Reload / update', accelerator: 'CmdOrCtrl+R', click: (_, w) => w && w.webContents.reloadIgnoringCache() },
     { role: 'togglefullscreen' }, { type: 'separator' },
     { role: 'zoomIn' }, { role: 'zoomOut' }, { role: 'resetZoom' }, { type: 'separator' },

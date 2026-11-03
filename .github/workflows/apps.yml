@@ -86,10 +86,10 @@ jobs:
       - uses: softprops/action-gh-release@v2
         with:
           tag_name: app-latest
-          name: Shop POS — แอปสำหรับ Android / Windows / Mac
+          name: Yanisa Shop POS — แอปสำหรับ Android / Windows / Mac
           make_latest: true
           body: |
-            แอปเปิดระบบ Shop POS ตัวจริงจากอินเทอร์เน็ต — อัปเดตอัตโนมัติทุกครั้งที่ระบบมีเวอร์ชันใหม่ ไม่ต้องดาวน์โหลดซ้ำ
+            แอปเปิดระบบ Yanisa Shop POS ตัวจริงจากอินเทอร์เน็ต — อัปเดตอัตโนมัติทุกครั้งที่ระบบมีเวอร์ชันใหม่ ไม่ต้องดาวน์โหลดซ้ำ
             • Android: ShopPOS.apk (อนุญาต "ติดตั้งจากแหล่งที่ไม่รู้จัก")
             • Windows: ShopPOS-Setup.exe (ติดตั้ง) หรือ ShopPOS-Portable.exe (ไม่ต้องติดตั้ง) — ถ้าขึ้นคำเตือน กด "More info → Run anyway"
             • Mac: ShopPOS-mac.dmg — ครั้งแรกให้คลิกขวาที่แอป → Open
