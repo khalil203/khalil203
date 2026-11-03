@@ -1,0 +1,97 @@
+name: Build Shop POS apps (Android APK · Windows EXE · macOS DMG)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['apps/**', '.github/workflows/apps.yml']
+
+permissions:
+  contents: write
+
+jobs:
+  desktop:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            script: dist:win
+            files: apps/desktop/dist/*.exe
+          - os: macos-latest
+            script: dist:mac
+            files: apps/desktop/dist/*.dmg
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: apps/desktop
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm install --no-audit --no-fund
+      - run: npm run ${{ matrix.script }}
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: desktop-${{ matrix.os }}
+          path: ${{ matrix.files }}
+
+  android:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/android
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - run: npm install --no-audit --no-fund
+      - run: npx cap add android
+      - name: Camera permission + app icon
+        run: |
+          M=android/app/src/main/AndroidManifest.xml
+          grep -q 'android.permission.CAMERA' $M || sed -i 's#<uses-permission android:name="android.permission.INTERNET" />#&\n    <uses-permission android:name="android.permission.CAMERA" />#' $M
+          rm -rf android/app/src/main/res/mipmap-anydpi-v26
+          for d in android/app/src/main/res/mipmap-*dpi; do
+            cp icon.png "$d/ic_launcher.png"; cp icon.png "$d/ic_launcher_round.png"; cp icon.png "$d/ic_launcher_foreground.png"
+          done
+      - run: npx cap sync android
+      - run: chmod +x gradlew && ./gradlew assembleDebug --no-daemon
+        working-directory: apps/android/android
+      - run: cp android/app/build/outputs/apk/debug/app-debug.apk ShopPOS.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android
+          path: apps/android/ShopPOS.apk
+
+  release:
+    needs: [desktop, android]
+    if: always() && (needs.desktop.result == 'success' || needs.android.result == 'success')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: out
+          merge-multiple: true
+      - run: ls -la out
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: app-latest
+          name: Shop POS — แอปสำหรับ Android / Windows / Mac
+          make_latest: true
+          body: |
+            แอปเปิดระบบ Shop POS ตัวจริงจากอินเทอร์เน็ต — อัปเดตอัตโนมัติทุกครั้งที่ระบบมีเวอร์ชันใหม่ ไม่ต้องดาวน์โหลดซ้ำ
+            • Android: ShopPOS.apk (อนุญาต "ติดตั้งจากแหล่งที่ไม่รู้จัก")
+            • Windows: ShopPOS-Setup.exe (ติดตั้ง) หรือ ShopPOS-Portable.exe (ไม่ต้องติดตั้ง) — ถ้าขึ้นคำเตือน กด "More info → Run anyway"
+            • Mac: ShopPOS-mac.dmg — ครั้งแรกให้คลิกขวาที่แอป → Open
+          files: out/*
+          fail_on_unmatched_files: false

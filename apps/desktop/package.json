@@ -1,0 +1,29 @@
+{
+  "name": "shop-pos",
+  "productName": "Shop POS",
+  "version": "4.0.0",
+  "description": "Shop POS desktop app (Windows / macOS) — opens the live POS so it is always up to date",
+  "main": "main.js",
+  "author": "khalil203",
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "dist:win": "electron-builder --win nsis portable --publish never",
+    "dist:mac": "electron-builder --mac dmg --universal --publish never"
+  },
+  "devDependencies": {
+    "electron": "^31.7.7",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.khalil203.shoppos",
+    "productName": "Shop POS",
+    "directories": { "output": "dist", "buildResources": "build" },
+    "files": ["main.js", "package.json"],
+    "win": { "icon": "build/icon.png" },
+    "nsis": { "oneClick": false, "allowToChangeInstallationDirectory": true, "createDesktopShortcut": true, "artifactName": "ShopPOS-Setup.${ext}" },
+    "portable": { "artifactName": "ShopPOS-Portable.${ext}" },
+    "mac": { "icon": "build/icon.png", "category": "public.app-category.business", "identity": null, "artifactName": "ShopPOS-mac.${ext}" },
+    "dmg": { "artifactName": "ShopPOS-mac.${ext}" }
+  }
+}

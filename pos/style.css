@@ -529,3 +529,21 @@ code{background:var(--bg2);padding:2px 6px;border-radius:6px;font-size:13px}
   .profile{padding:0}.profile .av{width:34px;height:34px}
   .iconbtn.mob svg{width:20px;height:20px}
 }
+/* ================= v4 ================= */
+.ptag{display:inline-block;margin-top:3px;padding:1px 7px;border-radius:999px;background:var(--oksoft);color:var(--ok);font-size:11px;font-weight:600;line-height:1.5}
+.promo-rb{position:absolute;left:6px;bottom:6px;max-width:calc(100% - 12px);padding:3px 8px;border-radius:8px;background:#e5384f;color:#fff;font-style:normal;font-size:11px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;box-shadow:0 2px 8px #e5384f55;z-index:2}
+.zctl{display:flex;align-items:center;gap:4px;padding:3px 6px;border:1px solid var(--line);border-radius:12px;background:var(--card)}
+.zctl button{width:32px;height:32px;border:0;border-radius:8px;background:var(--bg);font-size:18px;font-weight:700;cursor:pointer;color:var(--ink)}
+.zctl input[type=range]{width:110px;accent-color:var(--brand)}
+@media (max-width:860px){.zctl input[type=range]{width:70px}}
+.dropzone{display:block;padding:26px 16px;border:2px dashed var(--line);border-radius:16px;text-align:center;cursor:pointer;transition:.2s;background:var(--bg)}
+.dropzone:hover,.dropzone.on{border-color:var(--brand);background:var(--brandsoft)}
+.bar{height:8px;border-radius:99px;background:var(--line);overflow:hidden;margin:6px 0}.bar i{display:block;height:100%;background:var(--brand);transition:width .2s}
+.brgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px}
+.brcard.cur{outline:2px solid var(--brand)}
+.bbar{height:6px;border-radius:99px;background:var(--line);margin-top:10px;overflow:hidden}.bbar i{display:block;height:100%;background:var(--brand)}
+.swatch{width:28px;height:28px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 0 1px var(--line);cursor:pointer}
+.updbar{position:fixed;left:50%;bottom:calc(84px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:120;display:flex;align-items:center;gap:10px;padding:10px 12px 10px 16px;border-radius:14px;background:#0f172a;color:#fff;box-shadow:0 10px 30px #0005;font-size:14px;max-width:calc(100vw - 24px);animation:fade .25s}
+.updbar .x{color:#fff;background:transparent;border:0;font-size:20px;cursor:pointer}
+code{font-family:ui-monospace,monospace;font-size:13px;background:var(--bg);padding:1px 6px;border-radius:6px}
+@media (max-width:860px){.pos .toolbar{flex-wrap:wrap!important;row-gap:8px}.pos .toolbar .sbox{flex:1 1 100%!important;min-width:0}.zctl{flex:1}.zctl input[type=range]{flex:1;width:auto}}

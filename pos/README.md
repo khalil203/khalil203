@@ -10,6 +10,18 @@ Free point-of-sale + inventory web app. Runs in any browser (PC, tablet, phone) 
 - Database + login: Supabase free tier (project `shop-pos`, region Tokyo)
 - No paid plan, no feature locks
 
+## What's new in v4.0
+- **Apps:** Android `.apk`, Windows `.exe`, Mac `.dmg` — [download](https://github.com/khalil203/khalil203/releases/latest). Apps open the live system, so they update automatically. The web app shows a "new version" bar and updates in one tap.
+- **Promotions:** per product / per category / whole bill · % off · baht off · special price · buy X get Y · bundle price · weekdays and time windows · members only · auto-applied in the cart · promotion report
+- **Data center:** Excel templates for products, categories, customers, suppliers, promotions, expenses and stock count; export current data → edit → import (update + add); full backup (JSON + Excel) and restore
+- **Barcodes:** with / without barcode, duplicates, wrong check digit, auto-generate in-store EAN-13, print labels (40×30, 50×30, A4)
+- **Personal use:** "🙋 เบิกใช้ส่วนตัว" stock withdrawals with who/why and cost value, plus a report
+- **Activity log:** login/logout, every stock in/out/adjust/personal, product/category/customer/promotion changes; filter by staff, type and date; daily attendance (first login → last activity); Excel export
+- **Cashier:** picture size slider, grid/list toggle, quick sale of items not in the system, wholesale price mode, receipt saved as an image (button or automatic)
+- **Branding:** shop logo, name and main colour on login, menu, tab title and receipts
+- **Branches:** branches page with side-by-side sales, profit, expenses and stock value; create a branch with a copy of the products
+- **Reports added:** promotions, personal use, damaged/expired/out, hourly, weekday, barcodes, quick-sale items, staff activity, branch comparison
+
 ## Features
 | | |
 |---|---|

@@ -1,0 +1,14 @@
+{
+  "appId": "com.khalil203.shoppos",
+  "appName": "Shop POS",
+  "webDir": "www",
+  "server": {
+    "url": "https://khalil203.github.io/khalil203/pos/",
+    "cleartext": false,
+    "allowNavigation": ["khalil203.github.io", "*.supabase.co"]
+  },
+  "android": {
+    "backgroundColor": "#f3f4fa",
+    "appendUserAgent": "ShopPOSApp"
+  }
+}
