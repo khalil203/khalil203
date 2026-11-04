@@ -1199,3 +1199,19 @@ html.v5 .cart .ft .tline.big{align-items:center;gap:8px}html.v5 .cart .ft .tline
   html.v5 .tbl:has(td.right[style*="nowrap"]) tr:has(>th){display:none}
   html.v5 .tbl tr:has(>td.right[style*="nowrap"])>td:first-child{flex:1 1 100%}
 }
+/* v5.0.3 — phone sell screen: at least 2 products per row, compact header */
+@media (max-width:860px){
+  .pgrid,html.v5 .pgrid{grid-template-columns:repeat(auto-fill,minmax(min(var(--tile),calc(50% - 6px)),1fr))!important;gap:10px!important}
+  html.v5 .pgrid.list{grid-template-columns:1fr!important}
+  html.v5 .posstats{grid-template-columns:repeat(4,38%)}
+  .kpi{padding:8px 10px;border-radius:14px}.kpi .kic{display:none}.kpi small{font-size:11px}.kpi b{font-size:16px;line-height:1.15}.kpi em{display:none}
+  .pcard .img .deal-prog{left:6px;right:6px;bottom:6px;font-size:11px}
+  html.v5 .pcard .nm{margin:7px 9px 2px;min-height:2.5em}
+  html.v5 .pcard .pr{padding:0 9px 9px}
+}
+/* barcode inside the product stock card */
+.sq-bc{margin:12px 0 4px;padding:12px;border:1px dashed var(--line);border-radius:16px;background:#fff;display:flex;flex-direction:column;align-items:center;gap:8px}
+.sq-bc .bcimg{width:100%;max-width:340px;display:flex;justify-content:center}.sq-bc .bcimg svg{width:100%;height:auto;max-height:110px}
+.sq-bc .bcacts{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+.sq-bc.none{background:var(--warnsoft,#fff5e5);border-color:#f5c26b}
+html[data-theme=dark] .sq-bc{background:#fff}
