@@ -1394,3 +1394,22 @@ tr.del-row td{background:#fff1f2}html[data-theme=dark] tr.del-row td{background:
   #al .tbl td:nth-child(1){color:var(--muted);font-size:12px}
   #al .tblwrap{overflow:visible}
 }
+/* v5.1.3 — receive goods: manual mode */
+.rcv-mode{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
+.rcv-mode button{display:flex;flex-direction:column;align-items:center;gap:2px;padding:12px;border-radius:16px;border:1px solid var(--line);background:var(--card);font:inherit;font-weight:800;font-size:16px;cursor:pointer;color:var(--ink);box-shadow:var(--shadow)}
+.rcv-mode button small{font-weight:500;font-size:12px;color:var(--muted)}
+.rcv-mode button.on{background:linear-gradient(135deg,#2f86ff,#1660f0);color:#fff;border-color:transparent}.rcv-mode button.on small{color:#e0ecff}
+.rcv.manual .rcv-bill{display:none!important}
+.rcv.manual .rcv-head{grid-template-columns:1fr!important}
+.rcv-tools{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}.rcv-tools .btn{flex:1}
+.rb-box{margin:12px 0}.rb-h{display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap}
+.rb-box .cs-cats i{width:10px;height:10px;border-radius:50%;background:var(--cc);display:inline-block}
+.rb-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:8px;max-height:340px;overflow:auto;margin-top:8px;padding:2px}
+.rb-tile{display:flex;flex-direction:column;align-items:center;gap:4px;padding:8px;border-radius:14px;border:1px solid var(--line);background:var(--card);cursor:pointer;font:inherit;color:var(--ink);transition:transform .12s,border-color .12s}
+.rb-tile:hover{border-color:var(--brand);transform:translateY(-1px)}.rb-tile.pop{animation:bump2 .4s}
+.rb-tile.low{border-color:#f59e0b;background:#fffbeb}html[data-theme=dark] .rb-tile.low{background:#3a2a0a}
+.rb-img{width:56px;height:56px;border-radius:12px;background:#f3f7ff center/cover no-repeat;display:grid;place-items:center;color:#fff;font-weight:800;font-size:22px}
+.rb-n{font-size:12.5px;font-weight:700;text-align:center;line-height:1.25;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.rb-tile small{font-size:11px;color:var(--muted)}.rb-tile.low small{color:#b45309;font-weight:700}
+@media (max-width:860px){.rb-grid{grid-template-columns:repeat(3,1fr);max-height:300px}.rcv-mode button{font-size:14px;padding:10px}}
+@media (max-width:860px){html.v5 .rcv-foot{position:sticky;bottom:calc(var(--tabh,72px) + 6px)!important;z-index:15;flex-wrap:wrap;gap:8px}html.v5 .rcv-foot #rsave{flex:1 1 100%}.rcv{padding-bottom:calc(var(--tabh,72px) + 20px)}}
