@@ -1382,3 +1382,15 @@ html.pfs .cartfab{bottom:calc(14px + var(--safe-b))}
 .hk-log{margin-top:14px;border:1px solid var(--line);border-radius:14px;padding:10px 12px;background:var(--card)}
 .hk-log summary{cursor:pointer;font-weight:800;font-size:14px}.hk-log .rtable{margin-top:8px;font-size:13px}.hk-log .bad{color:#dc2626}
 tr.del-row td{background:#fff1f2}html[data-theme=dark] tr.del-row td{background:#3b1219}
+.hk-keep{margin:4px 0 10px;font-size:13.5px;gap:8px;align-items:flex-start}.hk-keep input{width:18px;height:18px;flex:none;margin-top:2px}
+/* activity log on phones: each entry as a small card so the details are visible */
+@media (max-width:860px){
+  #al .tbl{display:block;min-width:0!important;width:100%}
+  #al .tbl tbody{display:block}
+  #al .tbl tr:first-child:has(th){display:none}
+  #al .tbl tr{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px;padding:10px 12px;border-bottom:1px solid var(--line)}
+  #al .tbl td{border:0;padding:0;font-size:13px}
+  #al .tbl td:last-child{flex:1 1 100%;word-break:break-word}
+  #al .tbl td:nth-child(1){color:var(--muted);font-size:12px}
+  #al .tblwrap{overflow:visible}
+}

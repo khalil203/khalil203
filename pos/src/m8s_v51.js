@@ -7,9 +7,9 @@ const HIST_KINDS = {
   audit: ['🛡️', 'บันทึกการใช้งานทั้งหมด', 'audit_log', 'ลบบันทึกกิจกรรมทุกประเภท'],
   cash_moves: ['💰', 'เงินเข้า-ออกลิ้นชัก', 'cash_moves', 'ลบรายการนำเงินเข้า/ออกลิ้นชัก'],
 };
-async function adminDelete(kind, { ids = null, before = null } = {}) {
+async function adminDelete(kind, { ids = null, before = null, keepLog = true } = {}) {
   if (!isAdmin()) { toast('เฉพาะผู้ดูแลระบบ (Admin) เท่านั้น', 'bad'); return null; }
-  const n = await q(sb.rpc('admin_delete_history', { p_shop: S.shop.id, p_kind: kind, p_ids: ids, p_before: before }));
+  const n = await q(sb.rpc('admin_delete_history2', { p_shop: S.shop.id, p_kind: kind, p_ids: ids, p_before: before, p_keep_log: keepLog }));
   toast(`ลบประวัติแล้ว ${n} รายการ`, 'ok'); sfx('remove'); return n;
 }
 async function typedConfirm(msg) {
@@ -24,20 +24,23 @@ async function typedConfirm(msg) {
 }
 function historyCleaner(preset) {
   if (!isAdmin()) return toast('เฉพาะผู้ดูแลระบบ (Admin) เท่านั้น', 'bad');
-  const d30 = ymd(new Date(Date.now() - 30 * 864e5));
+  const d30 = ymd(new Date(Date.now() + 864e5)); // default: everything up to now
   const m = modal('🗑️ ลบประวัติ (เฉพาะ Admin)', `
     <div class="hk-list">${Object.entries(HIST_KINDS).map(([k, [ic, l, , note]]) => `<label class="hk ${k === (preset || 'stock_moves') ? 'on' : ''}"><input type="radio" name="hk" value="${k}" ${k === (preset || 'stock_moves') ? 'checked' : ''}><span>${ic}</span><div><b>${l}</b><small>${note}</small></div></label>`).join('')}</div>
     <div class="fg"><label class="f">ลบรายการที่เก่ากว่าวันที่</label><input class="in" type="date" id="hkb" value="${d30}" max="${ymd(new Date(Date.now() + 864e5))}">
       <div class="pills" style="margin-top:8px">${[[7, '7 วัน'], [30, '30 วัน'], [90, '3 เดือน'], [365, '1 ปี'], [-1, 'ทั้งหมด']].map(([d, l]) => `<button type="button" data-d="${d}">เก่ากว่า ${l}</button>`).join('')}</div></div>
+    <label class="row hk-keep"><input type="checkbox" id="hkkeep"> 📜 เก็บบันทึกไว้ว่าใครเป็นคนลบ (ถ้าไม่ติ๊ก จะไม่เหลือร่องรอยการลบ)</label>
     <div class="hk-prev" id="hkp">กำลังนับ…</div>`,
     { foot: '<button class="btn" data-c>ปิด</button><span style="flex:1"></span><button class="btn bad" id="hkgo">🗑️ ลบประวัติ</button>' });
   const kind = () => $('input[name=hk]:checked', m).value;
   const count = async () => {
     const k = kind(), tbl = HIST_KINDS[k][2], b = $('#hkb', m).value;
     $$('.hk', m).forEach(l => l.classList.toggle('on', $('input', l).checked));
+    if (count.k !== k) { count.k = k; $('#hkkeep', m).checked = !/^audit/.test(k); }
     let qy = sb.from(tbl).select('id', { count: 'exact', head: true }).eq('shop_id', S.shop.id).lt('created_at', b);
     if (k === 'audit_login') qy = qy.in('action', ['login', 'logout']);
-    try { const { count: n, error } = await qy; if (error) throw error; $('#hkp', m).innerHTML = n ? `จะลบ <b>${qtyf(n)}</b> รายการ ที่เก่ากว่า ${dOnly(b)}` : 'ไม่มีรายการที่เข้าเงื่อนไข'; $('#hkgo', m).disabled = !n; }
+    const allTime = b > ymd(new Date());
+    try { const { count: n, error } = await qy; if (error) throw error; $('#hkp', m).innerHTML = n ? `จะลบ <b>${qtyf(n)}</b> รายการ${allTime ? ' (ทั้งหมดจนถึงตอนนี้)' : ` ที่เก่ากว่า ${dOnly(b)}`}` : 'ไม่มีรายการที่เข้าเงื่อนไข'; $('#hkgo', m).disabled = !n; }
     catch (e) { $('#hkp', m).textContent = 'นับไม่ได้: ' + e.message; }
   };
   $$('input[name=hk]', m).forEach(r => r.onchange = count); $('#hkb', m).onchange = count;
@@ -45,8 +48,9 @@ function historyCleaner(preset) {
   $('[data-c]', m).onclick = m.close;
   $('#hkgo', m).onclick = async () => {
     const k = kind(), b = $('#hkb', m).value;
-    if (!(await typedConfirm(`ลบ “${HIST_KINDS[k][1]}” ที่เก่ากว่า ${dOnly(b)} ทั้งหมด?<br><small class="muted">${HIST_KINDS[k][3]}</small>`))) return;
-    try { await adminDelete(k, { before: b }); count(); } catch (e) { fail(e); }
+    const allTime = b > ymd(new Date());
+    if (!(await typedConfirm(`ลบ “${HIST_KINDS[k][1]}” ${allTime ? '<b>ทั้งหมด</b>' : `ที่เก่ากว่า ${dOnly(b)}`}?<br><small class="muted">${HIST_KINDS[k][3]}</small>`))) return;
+    try { await adminDelete(k, { before: b, keepLog: $('#hkkeep', m).checked }); count(); if (S.page === 'audit') go('audit'); } catch (e) { fail(e); }
   };
   count();
 }
@@ -105,7 +109,7 @@ const _audit51 = VIEWS.audit;
 VIEWS.audit = async pg => {
   await _audit51(pg);
   if (!isAdmin()) return;
-  const t = $('#tact'); if (t && !$('#audclr', t)) { t.insertAdjacentHTML('beforeend', '<button class="btn bad" id="audclr">🗑️ ลบประวัติ (Admin)</button>'); $('#audclr').onclick = () => historyCleaner('audit_login'); }
+  const t = $('#tact'); if (t && !$('#audclr', t)) { t.insertAdjacentHTML('beforeend', '<button class="btn bad" id="audclr">🗑️ ลบประวัติ (Admin)</button>'); $('#audclr').onclick = () => historyCleaner('audit'); }
 };
 
 /* v5.1.1 — show who deleted what: labels in the activity log + recent deletions in the cleaner */
