@@ -24,3 +24,5 @@ stockQuick = async function (p, after) {
   }
   return run;
 };
+/* light theme is the default look (dark only when chosen with the theme button) */
+if (localStorage.getItem('pos_theme_v5') !== '1') { localStorage.setItem('pos_theme_v5', '1'); setTheme('light'); }

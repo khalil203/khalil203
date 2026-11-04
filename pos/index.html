@@ -11,7 +11,7 @@
 <meta name="apple-mobile-web-app-title" content="Yanisa Shop">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="manifest" href="manifest.json">
-<script>try{document.documentElement.dataset.theme=localStorage.getItem("pos_theme")||(matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light")}catch(e){}</script>
+<script>try{if(localStorage.getItem("pos_theme_v5")!=="1"){localStorage.setItem("pos_theme_v5","1");localStorage.setItem("pos_theme","light")}document.documentElement.dataset.theme=localStorage.getItem("pos_theme")||"light"}catch(e){}</script>
 <link rel="icon" type="image/png" href="logo-round.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -25,8 +25,8 @@
 <div id="toast"></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
-<script src="config.js?v=5.0.3"></script>
-<script src="app.js?v=5.0.3"></script>
-<script src="modules.js?v=5.0.3"></script>
+<script src="config.js?v=5.0.4"></script>
+<script src="app.js?v=5.0.4"></script>
+<script src="modules.js?v=5.0.4"></script>
 </body>
 </html>

@@ -1215,3 +1215,40 @@ html.v5 .cart .ft .tline.big{align-items:center;gap:8px}html.v5 .cart .ft .tline
 .sq-bc .bcacts{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
 .sq-bc.none{background:var(--warnsoft,#fff5e5);border-color:#f5c26b}
 html[data-theme=dark] .sq-bc{background:#fff}
+/* v5.0.4 — compact cart so more items fit without scrolling */
+@media (min-width:861px) and (max-height:960px), (min-width:861px) and (max-width:1366px){
+  html.v5 .cart .hd:not(.ch){padding:8px 12px!important;gap:6px}
+  html.v5 .cart .custbtn{min-height:40px;padding:4px 8px}html.v5 .cart .custbtn small{display:none}
+  html.v5 .cart .custbtn .av{width:28px;height:28px}
+  html.v5 .cart #promoSel{min-height:36px;padding:4px 8px!important}
+  html.v5 .cart .citem{padding:8px 12px;gap:2px 10px;grid-template-columns:44px 1fr auto}
+  .cthumb{width:44px;height:44px;border-radius:11px;font-size:18px}
+  html.v5 .cart .citem .nm{font-size:13.5px;line-height:1.25}html.v5 .cart .citem .nm small{font-size:11.5px}
+  html.v5 .cart .citem .qty button{width:30px;height:30px;border-radius:9px}
+  html.v5 .cart .citem>b{font-size:15px}
+  html.v5 .cart .ft{padding:8px 12px 10px;gap:2px}
+  html.v5 .cart .ft .tline{font-size:12.5px;padding:1px 0;min-height:0}
+  html.v5 .cart .ft .tline.muted{display:none}
+  html.v5 .cart .ft .tline.big{margin:2px 0 4px}
+  html.v5 .cart .ft .tline.big span:first-child{font-size:17px}html.v5 .cart .ft .tline.big span:last-child{font-size:26px}
+  html.v5 .cart .paytiles{gap:8px;margin:4px 0 8px}
+  html.v5 .cart .paytiles button{flex-direction:row;min-height:0;height:42px;padding:0 10px;gap:8px;border-radius:12px;font-size:13.5px}
+  html.v5 .cart .paytiles button svg{width:20px;height:20px}
+  html.v5 #payBtn{height:52px;font-size:16px;border-radius:15px}
+}
+@media (max-width:860px){
+  html.v5 .cart .ft .tline.muted{display:none}
+  html.v5 .cart .paytiles button{flex-direction:row;height:44px;min-height:0;gap:8px;font-size:13.5px}
+  html.v5 .cart .paytiles button svg{width:20px;height:20px}
+}
+/* dark theme: keep the new look readable */
+html[data-theme=dark].v5 .modal,html[data-theme=dark] .pop5{background:var(--card);color:var(--ink)}
+html[data-theme=dark].v5 body{background:var(--bg)}
+html[data-theme=dark].v5 .kpi.blue,html[data-theme=dark].v5 .kpi.green,html[data-theme=dark].v5 .kpi.purple,html[data-theme=dark].v5 .kpi.orange{background:var(--card)}
+html[data-theme=dark].v5 .cart .custbtn{background:var(--card2);color:var(--ink)}
+html.v5[data-theme=dark]{--bg:#0b1120;--bg2:#111a2e;--card:#131c31;--card2:#1a2540;--ink:#e5e7eb;--muted:#94a3b8;--line:#26334f;--brandsoft:#172554}
+html[data-theme=dark].v5 .gsearch input,html[data-theme=dark].v5 .pcard .pr b{color:inherit}
+html[data-theme=dark].v5 .pcard .pr b{color:#fb7185}
+html[data-theme=dark].v5 .cart .citem .qty button,html[data-theme=dark].v5 .cashbar.dock button.pri{background:var(--card2);color:var(--ink)}
+html[data-theme=dark].v5 .kpi small{color:var(--muted)}
+html[data-theme=dark].v5 .top #tact .btn,html[data-theme=dark] .pv-btn{background:var(--card);color:var(--ink);border-color:var(--line)}
