@@ -1348,3 +1348,21 @@ html.pfs .cartfab{bottom:calc(14px + var(--safe-b))}
 .savebar.dirty .savebtn{animation:saveglow 1.6s ease-in-out infinite}@keyframes saveglow{50%{box-shadow:0 0 0 6px rgba(47,134,255,.25),0 6px 14px rgba(32,110,255,.3)}}
 @media (max-width:860px){#stf>.row.savebar{bottom:calc(76px + env(safe-area-inset-bottom,0px));padding:8px 8px 8px 12px}.sb-state{font-size:12px}.savebar .savebtn{min-height:42px!important;padding:0 14px!important;font-size:14px!important}}
 @media (prefers-reduced-motion:reduce){.savebar.dirty .savebtn{animation:none}}
+@media (min-width:861px){#stf>.row.savebar{width:fit-content;max-width:520px;margin-left:auto;right:0}}
+/* v5.0.10 — bars never cover the tab bar; tablets in both orientations */
+@media (max-width:860px){
+  html.v5 .cartfab{bottom:calc(var(--tabh,72px) + 8px)!important}
+  #stf>.row.savebar{bottom:calc(var(--tabh,72px) + 8px)}
+  html.v5 .pgrid{padding-bottom:calc(var(--tabh,72px) + 90px)}
+}
+@media (min-width:600px) and (max-width:860px){
+  html.v5 .posstats{grid-template-columns:repeat(4,minmax(0,1fr))}
+  .kpi b{font-size:18px}.kpi small{font-size:12px}
+}
+/* landscape tablets with short screens: slimmer KPI cards and dock = more room for products */
+@media (min-width:861px) and (max-height:860px){
+  .kpi{padding:8px 12px;min-height:0}.kpi .kic{width:36px;height:36px;border-radius:11px}.kpi .kic svg{width:20px;height:20px}.kpi b{font-size:17px}.kpi em{display:none}
+  .cashbar.dock{padding:6px;margin-bottom:8px;gap:6px}.cashbar.dock button{height:42px;font-size:13px;padding:0 12px}.cashbar.dock button span{font-size:18px}.cashbar.dock button.pri span svg{width:22px;height:22px}.cashbar.dock button.pri small{display:none}
+  html.v5 .cats .tab{height:40px}.pv-btn{height:46px}
+  html.v5 .pos .left{gap:8px;padding-top:8px}
+}

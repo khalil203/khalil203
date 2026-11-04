@@ -166,3 +166,11 @@ VIEWS.settings = pg => {
   f.addEventListener('input', () => dirty(true)); f.addEventListener('change', () => dirty(true));
   btn.addEventListener('click', () => { setTimeout(() => { if (!$('.mbg')) { dirty(false); st.textContent = '✓ บันทึกแล้ว'; } }, 1200); });
 };
+
+/* v5.0.10 — keep floating bars above the bottom tab bar (its height differs per device) */
+const setTabH = () => { const t = $('.tabbar'); const h = t && getComputedStyle(t).display !== 'none' ? t.offsetHeight : 0; document.documentElement.style.setProperty('--tabh', h + 'px'); };
+addEventListener('resize', setTabH); addEventListener('orientationchange', () => setTimeout(setTabH, 300));
+const _renderShell510 = renderShell;
+renderShell = function () { _renderShell510(); setTabH(); setTimeout(setTabH, 400); };
+const _drawCart510 = drawCart;
+drawCart = function () { _drawCart510(); const t = $('#cart .ch-t span'); if (t && t.textContent !== 'ตะกร้า' && matchMedia('(max-width:1366px)').matches) t.textContent = 'ตะกร้า'; };

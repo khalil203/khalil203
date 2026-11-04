@@ -1423,7 +1423,7 @@ const _goC = go;
 go = function (page) { _goC(page); $('.top')?.classList.toggle('posmode', S.page === 'pos'); };
 /* ================= Shop POS v4 — promotions engine, data center, barcodes, personal use,
    activity log, branding, receipt image, cashier upgrades, auto-update ================= */
-const APP_VERSION = '5.0.9';
+const APP_VERSION = '5.0.10';
 Object.assign(TH, { 'Data center': 'ศูนย์ข้อมูล', 'Barcodes': 'บาร์โค้ด', 'Branches': 'สาขา' });
 PAGES.splice(PAGES.findIndex(p => p.id === 'settings'), 0,
   { id: 'barcodes', ic: '🏷', name: 'Barcodes', roles: ['owner', 'manager', 'stock'] },
@@ -5113,6 +5113,14 @@ VIEWS.settings = pg => {
   f.addEventListener('input', () => dirty(true)); f.addEventListener('change', () => dirty(true));
   btn.addEventListener('click', () => { setTimeout(() => { if (!$('.mbg')) { dirty(false); st.textContent = '✓ บันทึกแล้ว'; } }, 1200); });
 };
+
+/* v5.0.10 — keep floating bars above the bottom tab bar (its height differs per device) */
+const setTabH = () => { const t = $('.tabbar'); const h = t && getComputedStyle(t).display !== 'none' ? t.offsetHeight : 0; document.documentElement.style.setProperty('--tabh', h + 'px'); };
+addEventListener('resize', setTabH); addEventListener('orientationchange', () => setTimeout(setTabH, 300));
+const _renderShell510 = renderShell;
+renderShell = function () { _renderShell510(); setTabH(); setTimeout(setTabH, 400); };
+const _drawCart510 = drawCart;
+drawCart = function () { _drawCart510(); const t = $('#cart .ch-t span'); if (t && t.textContent !== 'ตะกร้า' && matchMedia('(max-width:1366px)').matches) t.textContent = 'ตะกร้า'; };
 /* ================= start ================= */
 updateNet();
 boot().then(() => { updateNet(); syncQueue(); }).catch(e => { fail(e); renderAuth(); });
