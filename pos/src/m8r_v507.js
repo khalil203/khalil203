@@ -57,7 +57,7 @@ const I18N_EN = {
   'การแจ้งเตือน': 'Notifications', 'ออนไลน์': 'Online', 'ออฟไลน์': 'Offline', 'ยังไม่เปิดกะ': 'No open shift', 'สาขา / โปรไฟล์ร้าน': 'Branches / shop profile', 'ร้านที่ใช้งานอยู่': 'Current shop',
   'ใช้งานอยู่': 'In use', '✓ ใช้งานอยู่': '✓ In use', 'จัดการสาขา': 'Manage branches', 'ทุกสาขา': 'All branches', '＋ เพิ่มสาขา': '＋ Add branch', 'สลับ →': 'Switch →',
   'เข้าสู่ระบบ': 'Log in', 'ชื่อผู้ใช้': 'Username', 'รหัสผ่าน': 'Password', 'กำลังโหลดข้อมูลร้าน…': 'Loading shop data…', 'กำลังเริ่มระบบ…': 'Starting…',
-  'ภาษา': 'Language', 'เหลือ QX1Q': 'Left QX1Q', 'QX1Q รายการ': 'QX1Q items', 'QX1Q บิล': 'QX1Q bills', '🔥 ขายดี': '🔥 Hot', 'ใกล้หมด QX1Q รายการ': 'Low stock: QX1Q items', 'รวมสินค้า QX1Q ชิ้น (QX2Q รายการ)': 'Items QX1Q pcs (QX2Q lines)', 'ไทย': 'Thai', 'อังกฤษ': 'English', 'ประหยัด': 'Save', 'ได้โปรแล้ว': 'Deal applied', 'ราคาปกติ': 'Regular price', 'เจ้าของร้าน': 'Owner', 'ผู้จัดการ': 'Manager', 'พนักงานขาย': 'Cashier',
+  'ภาษา': 'Language', 'ภาพรวม': 'Overview', 'ขาย': 'Sell', 'บิล': 'Bills', 'สมาชิก': 'Members', 'โปร': 'Deals', 'สั่งซื้อ': 'Purchase', 'ผู้ขาย': 'Suppliers', 'รายจ่าย': 'Expenses', 'กะ': 'Shifts', 'ประวัติ': 'Log', 'ข้อมูล': 'Data', 'เหลือ QX1Q': 'Left QX1Q', 'QX1Q รายการ': 'QX1Q items', 'QX1Q บิล': 'QX1Q bills', '🔥 ขายดี': '🔥 Hot', 'ใกล้หมด QX1Q รายการ': 'Low stock: QX1Q items', 'รวมสินค้า QX1Q ชิ้น (QX2Q รายการ)': 'Items QX1Q pcs (QX2Q lines)', 'ไทย': 'Thai', 'อังกฤษ': 'English', 'ประหยัด': 'Save', 'ได้โปรแล้ว': 'Deal applied', 'ราคาปกติ': 'Regular price', 'เจ้าของร้าน': 'Owner', 'ผู้จัดการ': 'Manager', 'พนักงานขาย': 'Cashier',
 };
 const TH_RX = /[\u0E01-\u0E3A\u0E40-\u0E5B]/;
 const I18N_SKIP = '.dtchip,.pcard .img > span,.pm-img > span,.nm,.pm-name,.rcpt,.a4,.sb-brand,.sb-branch b,.brsw b,.ttsw span,.brc-b b,.brmenu b,.cthumb,code,script,style,textarea,[data-notr],.citem .nm,#cats .tab:not([data-c=all]):not([data-c=fav]):not([data-c=best]):not([data-c=recent]):not([data-c=promo])';
@@ -142,3 +142,12 @@ VIEWS.settings = pg => {
 
 // English date/time in the top chip
 if (LANG === 'en') setInterval(() => { const c = $('#dtchip'); if (!c) return; const d = new Date(); $('b', c).textContent = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }); $('small', c).textContent = d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }); }, 1000);
+
+/* v5.0.8 — short captions under the rail icons */
+const RAIL_SHORT = { dashboard: 'ภาพรวม', pos: 'ขาย', sales: 'บิล', products: 'สินค้า', stock: 'สต็อก', receive: 'รับเข้า', members: 'สมาชิก', promotions: 'โปร',
+  purchases: 'สั่งซื้อ', suppliers: 'ผู้ขาย', expenses: 'รายจ่าย', reports: 'รายงาน', shifts: 'กะ', staff: 'พนักงาน', audit: 'ประวัติ', barcodes: 'บาร์โค้ด', data: 'ข้อมูล', branches: 'สาขา', settings: 'ตั้งค่า' };
+const _renderShell508 = renderShell;
+renderShell = function () {
+  _renderShell508();
+  $$('.side .navs .nav[data-p]').forEach(n => { if (!$('.sl', n)) n.insertAdjacentHTML('beforeend', `<span class="sl">${RAIL_SHORT[n.dataset.p] || $('.lb', n)?.textContent || ''}</span>`); });
+};
