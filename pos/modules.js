@@ -1423,7 +1423,7 @@ const _goC = go;
 go = function (page) { _goC(page); $('.top')?.classList.toggle('posmode', S.page === 'pos'); };
 /* ================= Shop POS v4 — promotions engine, data center, barcodes, personal use,
    activity log, branding, receipt image, cashier upgrades, auto-update ================= */
-const APP_VERSION = '5.2.3';
+const APP_VERSION = '5.2.4';
 Object.assign(TH, { 'Data center': 'ศูนย์ข้อมูล', 'Barcodes': 'บาร์โค้ด', 'Branches': 'สาขา' });
 PAGES.splice(PAGES.findIndex(p => p.id === 'settings'), 0,
   { id: 'barcodes', ic: '🏷', name: 'Barcodes', roles: ['owner', 'manager', 'stock'] },
@@ -5399,8 +5399,8 @@ quickMenu = function (id) {
 /* ================= v5.1.6 — fix a bill's payment method in one tap, and record everything staff do ================= */
 Object.assign(AUDIT_L, { change_payment: '💳 แก้ช่องทางชำระ', cart_clear: '🗑️ ล้างตะกร้า', cart_hold: '⏸️ พักบิล', cart_remove: '➖ ลบสินค้าออกจากตะกร้า',
   drawer_open: '💰 เปิดลิ้นชักเงิน', reprint: '🧾 พิมพ์ใบเสร็จซ้ำ', cash_in: '💵 นำเงินเข้าลิ้นชัก', cash_out: '💸 นำเงินออกลิ้นชัก', insert_shifts: '🟢 เปิดกะ', update_shifts: '🔴 ปิดกะ/แก้ไขกะ', stock_import: '📥 นำเข้าสต็อกจากไฟล์' });
-const CP_REASONS = [['cash', 'ลูกค้าจ่ายเงินสด', 'cash'], ['scan', 'ลูกค้าสแกนจ่าย', 'promptpay'], ['transfer', 'ลูกค้าโอนเงิน', 'transfer']];
-const PAY_EDIT = ['cash', 'promptpay', 'transfer', 'credit_card', 'debit_card'];
+const CP_REASONS = [['cash', 'ลูกค้าจ่ายเงินสด', 'cash'], ['scan', 'ลูกค้าสแกนจ่าย', 'promptpay'], ['transfer', 'ลูกค้าโอนเงิน', 'promptpay']];
+const PAY_EDIT = ['cash', 'promptpay'];
 const canEditPay = sale => sale && sale.status !== 'void' && sale.payment_method !== 'store_credit' &&
   (can('owner', 'manager') || (sale.cashier_id === S.user.id && Date.now() - new Date(sale.created_at) < 864e5));
 function changePayment(sale, after) {
@@ -5422,7 +5422,7 @@ function changePayment(sale, after) {
   dd.onclick = e => { e.stopPropagation(); menu.classList.toggle('hidden'); dd.classList.toggle('open', !menu.classList.contains('hidden')); };
   m.addEventListener('click', e => { if (!e.target.closest('#cpmenu,#cpdd')) { menu.classList.add('hidden'); dd.classList.remove('open'); } });
   $$('[data-pm]', m).forEach(b => b.onclick = () => { pick = b.dataset.pm; $$('[data-pm]', m).forEach(x => x.classList.toggle('on', x === b));
-    setReason(pick === 'cash' ? 'cash' : pick === 'promptpay' ? 'scan' : pick === 'transfer' ? 'transfer' : ''); });
+    setReason(pick === 'cash' ? 'cash' : pick === 'promptpay' ? 'scan' : ''); });
   $$('[data-rs]', m).forEach(b => b.onclick = () => { menu.classList.add('hidden'); dd.classList.remove('open');
     if (b.dataset.rs === '_own') { $('#cpdl', m).textContent = '✏️ พิมพ์เหตุผลเอง'; dd.classList.add('set'); const i = $('#cpr', m); i.classList.remove('hidden'); i.value = ''; i.focus(); valid(); return; }
     setReason(b.dataset.rs); const r = CP_REASONS.find(x => x[0] === b.dataset.rs);
@@ -5572,6 +5572,20 @@ function watchGrid(pg, sel) {
 const _products522 = VIEWS.products, _stock522 = VIEWS.stock;
 VIEWS.products = pg => { const r = _products522(pg); watchGrid(pg, '#pmg'); pg.classList.add('ps-compact'); return r; };
 VIEWS.stock = pg => { const r = _stock522(pg); watchGrid(pg, '#stkg'); pg.classList.add('ps-compact'); return r; };
+
+/* v5.2.4 — stock page always opens with big picture cards; filters above the list */
+if (localStorage.getItem('pos_sview_v524') !== '1') {
+  localStorage.setItem('pos_sview_v524', '1'); localStorage.setItem('pos_sview', 'cards');
+  if (num(localStorage.getItem('pos_ssize')) < 200) localStorage.setItem('pos_ssize', innerWidth < 600 ? '170' : '240');
+  try { SVIEW.mode = 'cards'; SVIEW.size = num(localStorage.getItem('pos_ssize')); } catch {}
+  if (num(localStorage.getItem('pos_psize') || 0) && num(localStorage.getItem('pos_psize')) < 200) localStorage.setItem('pos_psize', '230');
+}
+const _stock524 = VIEWS.stock;
+VIEWS.stock = pg => { const r = _stock524(pg);
+  const fix = () => { const scan = $('.stk-scan', pg), f = $('#stkf', pg), stk = $('#stk', pg); if (!scan || !f) return;
+    if (scan.nextElementSibling !== f && !(stk && scan.nextElementSibling === stk && stk.nextElementSibling === f)) { (stk || scan).after(f); }
+    const g = $('#stkg', pg); if (g && f.nextElementSibling !== g) f.after(g); };
+  fix(); new MutationObserver(fix).observe(pg, { childList: true }); return r; };
 /* ================= start ================= */
 updateNet();
 boot().then(() => { updateNet(); syncQueue(); }).catch(e => { fail(e); renderAuth(); });

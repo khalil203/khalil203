@@ -75,3 +75,17 @@ function watchGrid(pg, sel) {
 const _products522 = VIEWS.products, _stock522 = VIEWS.stock;
 VIEWS.products = pg => { const r = _products522(pg); watchGrid(pg, '#pmg'); pg.classList.add('ps-compact'); return r; };
 VIEWS.stock = pg => { const r = _stock522(pg); watchGrid(pg, '#stkg'); pg.classList.add('ps-compact'); return r; };
+
+/* v5.2.4 — stock page always opens with big picture cards; filters above the list */
+if (localStorage.getItem('pos_sview_v524') !== '1') {
+  localStorage.setItem('pos_sview_v524', '1'); localStorage.setItem('pos_sview', 'cards');
+  if (num(localStorage.getItem('pos_ssize')) < 200) localStorage.setItem('pos_ssize', innerWidth < 600 ? '170' : '240');
+  try { SVIEW.mode = 'cards'; SVIEW.size = num(localStorage.getItem('pos_ssize')); } catch {}
+  if (num(localStorage.getItem('pos_psize') || 0) && num(localStorage.getItem('pos_psize')) < 200) localStorage.setItem('pos_psize', '230');
+}
+const _stock524 = VIEWS.stock;
+VIEWS.stock = pg => { const r = _stock524(pg);
+  const fix = () => { const scan = $('.stk-scan', pg), f = $('#stkf', pg), stk = $('#stk', pg); if (!scan || !f) return;
+    if (scan.nextElementSibling !== f && !(stk && scan.nextElementSibling === stk && stk.nextElementSibling === f)) { (stk || scan).after(f); }
+    const g = $('#stkg', pg); if (g && f.nextElementSibling !== g) f.after(g); };
+  fix(); new MutationObserver(fix).observe(pg, { childList: true }); return r; };

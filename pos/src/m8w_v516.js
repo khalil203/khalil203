@@ -1,8 +1,8 @@
 /* ================= v5.1.6 — fix a bill's payment method in one tap, and record everything staff do ================= */
 Object.assign(AUDIT_L, { change_payment: '💳 แก้ช่องทางชำระ', cart_clear: '🗑️ ล้างตะกร้า', cart_hold: '⏸️ พักบิล', cart_remove: '➖ ลบสินค้าออกจากตะกร้า',
   drawer_open: '💰 เปิดลิ้นชักเงิน', reprint: '🧾 พิมพ์ใบเสร็จซ้ำ', cash_in: '💵 นำเงินเข้าลิ้นชัก', cash_out: '💸 นำเงินออกลิ้นชัก', insert_shifts: '🟢 เปิดกะ', update_shifts: '🔴 ปิดกะ/แก้ไขกะ', stock_import: '📥 นำเข้าสต็อกจากไฟล์' });
-const CP_REASONS = [['cash', 'ลูกค้าจ่ายเงินสด', 'cash'], ['scan', 'ลูกค้าสแกนจ่าย', 'promptpay'], ['transfer', 'ลูกค้าโอนเงิน', 'transfer']];
-const PAY_EDIT = ['cash', 'promptpay', 'transfer', 'credit_card', 'debit_card'];
+const CP_REASONS = [['cash', 'ลูกค้าจ่ายเงินสด', 'cash'], ['scan', 'ลูกค้าสแกนจ่าย', 'promptpay'], ['transfer', 'ลูกค้าโอนเงิน', 'promptpay']];
+const PAY_EDIT = ['cash', 'promptpay'];
 const canEditPay = sale => sale && sale.status !== 'void' && sale.payment_method !== 'store_credit' &&
   (can('owner', 'manager') || (sale.cashier_id === S.user.id && Date.now() - new Date(sale.created_at) < 864e5));
 function changePayment(sale, after) {
@@ -24,7 +24,7 @@ function changePayment(sale, after) {
   dd.onclick = e => { e.stopPropagation(); menu.classList.toggle('hidden'); dd.classList.toggle('open', !menu.classList.contains('hidden')); };
   m.addEventListener('click', e => { if (!e.target.closest('#cpmenu,#cpdd')) { menu.classList.add('hidden'); dd.classList.remove('open'); } });
   $$('[data-pm]', m).forEach(b => b.onclick = () => { pick = b.dataset.pm; $$('[data-pm]', m).forEach(x => x.classList.toggle('on', x === b));
-    setReason(pick === 'cash' ? 'cash' : pick === 'promptpay' ? 'scan' : pick === 'transfer' ? 'transfer' : ''); });
+    setReason(pick === 'cash' ? 'cash' : pick === 'promptpay' ? 'scan' : ''); });
   $$('[data-rs]', m).forEach(b => b.onclick = () => { menu.classList.add('hidden'); dd.classList.remove('open');
     if (b.dataset.rs === '_own') { $('#cpdl', m).textContent = '✏️ พิมพ์เหตุผลเอง'; dd.classList.add('set'); const i = $('#cpr', m); i.classList.remove('hidden'); i.value = ''; i.focus(); valid(); return; }
     setReason(b.dataset.rs); const r = CP_REASONS.find(x => x[0] === b.dataset.rs);
