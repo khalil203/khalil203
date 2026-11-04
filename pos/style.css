@@ -1422,3 +1422,7 @@ tr.del-row td{background:#fff1f2}html[data-theme=dark] tr.del-row td{background:
 .cp-grid button svg{width:28px;height:28px;color:var(--brand)}.cp-grid button small{position:absolute;top:4px;right:6px;font-size:10.5px;color:var(--muted)}
 .cp-grid button.on{border-color:var(--brand);background:var(--brandsoft);box-shadow:0 0 0 3px color-mix(in srgb,var(--brand) 20%,transparent)}
 .cpe{padding:0 6px!important;min-height:26px!important;margin-left:4px}
+.cp-rs{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.cp-rs button{padding:10px 6px;border-radius:12px;border:2px solid var(--line);background:var(--card);font:inherit;font-weight:700;font-size:13.5px;cursor:pointer;color:var(--ink)}
+.cp-rs button.on{border-color:#16a34a;background:#dcfce7;color:#166534}html[data-theme=dark] .cp-rs button.on{background:#14321f;color:#bbf7d0}
+@media (max-width:420px){.cp-rs{grid-template-columns:1fr}}

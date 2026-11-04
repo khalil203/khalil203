@@ -1,6 +1,7 @@
 /* ================= v5.1.6 — fix a bill's payment method in one tap, and record everything staff do ================= */
 Object.assign(AUDIT_L, { change_payment: '💳 แก้ช่องทางชำระ', cart_clear: '🗑️ ล้างตะกร้า', cart_hold: '⏸️ พักบิล', cart_remove: '➖ ลบสินค้าออกจากตะกร้า',
   drawer_open: '💰 เปิดลิ้นชักเงิน', reprint: '🧾 พิมพ์ใบเสร็จซ้ำ', cash_in: '💵 นำเงินเข้าลิ้นชัก', cash_out: '💸 นำเงินออกลิ้นชัก', insert_shifts: '🟢 เปิดกะ', update_shifts: '🔴 ปิดกะ/แก้ไขกะ', stock_import: '📥 นำเข้าสต็อกจากไฟล์' });
+const CP_REASONS = [['cash', 'ลูกค้าจ่ายเงินสด', 'cash'], ['scan', 'ลูกค้าสแกนจ่าย', 'promptpay'], ['transfer', 'ลูกค้าโอนเงิน', 'transfer']];
 const PAY_EDIT = ['cash', 'promptpay', 'transfer', 'credit_card', 'debit_card'];
 const canEditPay = sale => sale && sale.status !== 'void' && sale.payment_method !== 'store_credit' &&
   (can('owner', 'manager') || (sale.cashier_id === S.user.id && Date.now() - new Date(sale.created_at) < 864e5));
@@ -10,12 +11,21 @@ function changePayment(sale, after) {
   const m = modal('💳 แก้ช่องทางชำระเงิน', `<div class="cp-bill"><b>บิล ${esc(sale.bill_no)}</b><span>${dt(sale.created_at)} · ${esc(sale.cashier_name || '')}</span><b class="cp-tot">${baht(sale.total)}</b></div>
     <p class="muted" style="margin:10px 0 6px">ตอนนี้บันทึกเป็น <b>${payIcon(sale.payment_method)} ${payName(sale.payment_method)}</b> — เลือกช่องทางที่ถูกต้อง</p>
     <div class="cp-grid">${PAY_EDIT.map(k => `<button type="button" data-pm="${k}" class="${k === pick ? 'on cur' : ''}">${payIcon(k)}<span>${payName(k)}</span>${k === sale.payment_method ? '<small>เดิม</small>' : ''}</button>`).join('')}</div>
-    <div class="fg" style="margin-top:10px"><label class="f">เหตุผล (ไม่บังคับ)</label><input class="in" id="cpr" placeholder="เช่น กดผิด ลูกค้าจ่ายเงินสด"></div>
+    <div class="fg" style="margin-top:12px"><label class="f">เหตุผล <b style="color:var(--bad)">* บังคับ</b></label>
+      <div class="cp-rs">${CP_REASONS.map(([k, t]) => `<button type="button" data-rs="${k}">${t}</button>`).join('')}</div>
+      <input class="in" id="cpr" placeholder="เลือกเหตุผลด้านบน หรือพิมพ์เพิ่มเติม" style="margin-top:8px"></div>
     <p class="muted" style="font-size:12px;margin:0">ระบบจะบันทึกไว้ว่าใครแก้ เมื่อไหร่ จากอะไรเป็นอะไร</p>`,
     { foot: '<button class="btn" data-c>ยกเลิก</button><span style="flex:1"></span><button class="btn p" id="cpok" disabled>✔ บันทึกการแก้ไข</button>' });
-  $$('[data-pm]', m).forEach(b => b.onclick = () => { pick = b.dataset.pm; $$('[data-pm]', m).forEach(x => x.classList.toggle('on', x === b)); $('#cpok', m).disabled = pick === sale.payment_method; });
+  const valid = () => { $('#cpok', m).disabled = pick === sale.payment_method || !$('#cpr', m).value.trim(); };
+  const setReason = k => { const r = CP_REASONS.find(x => x[0] === k); $$('[data-rs]', m).forEach(x => x.classList.toggle('on', x.dataset.rs === k)); if (r) $('#cpr', m).value = r[1]; valid(); };
+  $$('[data-pm]', m).forEach(b => b.onclick = () => { pick = b.dataset.pm; $$('[data-pm]', m).forEach(x => x.classList.toggle('on', x === b));
+    setReason(pick === 'cash' ? 'cash' : pick === 'promptpay' ? 'scan' : pick === 'transfer' ? 'transfer' : ''); });
+  $$('[data-rs]', m).forEach(b => b.onclick = () => { setReason(b.dataset.rs); const r = CP_REASONS.find(x => x[0] === b.dataset.rs);
+    if (r && r[2] !== pick) { pick = r[2]; $$('[data-pm]', m).forEach(x => x.classList.toggle('on', x.dataset.pm === pick)); } valid(); });
+  $('#cpr', m).oninput = () => { $$('[data-rs]', m).forEach(x => x.classList.toggle('on', CP_REASONS.find(r => r[0] === x.dataset.rs)[1] === $('#cpr', m).value.trim())); valid(); };
   $('[data-c]', m).onclick = m.close;
   $('#cpok', m).onclick = async () => {
+    if (!$('#cpr', m).value.trim()) { $('#cpr', m).focus(); return toast('กรุณาระบุเหตุผล', 'bad'); }
     const b = $('#cpok', m); b.disabled = true;
     try { await q(sb.rpc('change_sale_payment', { p_sale: sale.id, p_method: pick, p_reason: $('#cpr', m).value.trim() }));
       const old = sale.payment_method; sale.payment_method = pick; if (sale._payments) sale._payments = [{ method: pick, amount: sale.total }];
