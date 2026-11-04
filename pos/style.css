@@ -1453,3 +1453,7 @@ html[data-theme=dark] .rd-ok{background:#14321f;color:#bbf7d0}
 .rcpt-done .mf .btn:not(.rd-next){flex:1 1 30%;min-width:0;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 html.v5 .ps-compact .stats{grid-template-columns:repeat(auto-fill,minmax(150px,1fr))!important}
 @media (max-width:860px){html.v5 .ps-compact .stats{grid-template-columns:repeat(3,minmax(0,1fr))!important}html.v5 .ps-compact .stat .k{font-size:10.5px}}
+/* v5.2.3 — visible close (X) on the blue cart header */
+html.v5 .cart .hd.ch #cartClose{display:grid;place-items:center;width:40px;height:40px;border-radius:12px;background:#ffffff2e!important;color:#fff!important;font-size:24px;font-weight:700;line-height:1;border:1px solid #ffffff55!important;box-shadow:none}
+html.v5 .cart .hd.ch #cartClose:hover{background:#ffffff4d!important}
+html.v5 .cart .hd.ch #cartClose[style*="none"]{display:none}

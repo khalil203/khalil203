@@ -143,7 +143,7 @@ productCard = function (p) {
     badges += `<i class="deal-rb off"><span>ลด ${Math.round((1 - p.promo_price / p.price) * 100)}%</span></i>`;
   }
   if (bestTop().has(p.id)) { cls.push('hot'); badges += '<i class="hot-b">🔥 ขายดี</i>'; }
-  if (p.created_at && Date.now() - new Date(p.created_at) < 7 * 864e5) badges += '<i class="new-b">ใหม่</i>';
+  if (p.created_at && new Date(p.created_at) > new Date('2026-11-04T15:00:00Z') && Date.now() - new Date(p.created_at) < 3 * 864e5) badges += '<i class="new-b">ใหม่</i>';
   const bp = prs.find(x => x.kind === 'bundle' || x.kind === 'bxgy');
   if (bp) badges += `<i class="deal-prog" data-dp="${p.id}"></i>`;
   h = h.replace('<button class="more"', badges + '<button class="more"');

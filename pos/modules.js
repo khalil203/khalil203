@@ -1423,7 +1423,7 @@ const _goC = go;
 go = function (page) { _goC(page); $('.top')?.classList.toggle('posmode', S.page === 'pos'); };
 /* ================= Shop POS v4 — promotions engine, data center, barcodes, personal use,
    activity log, branding, receipt image, cashier upgrades, auto-update ================= */
-const APP_VERSION = '5.2.2';
+const APP_VERSION = '5.2.3';
 Object.assign(TH, { 'Data center': 'ศูนย์ข้อมูล', 'Barcodes': 'บาร์โค้ด', 'Branches': 'สาขา' });
 PAGES.splice(PAGES.findIndex(p => p.id === 'settings'), 0,
   { id: 'barcodes', ic: '🏷', name: 'Barcodes', roles: ['owner', 'manager', 'stock'] },
@@ -4396,7 +4396,7 @@ productCard = function (p) {
     badges += `<i class="deal-rb off"><span>ลด ${Math.round((1 - p.promo_price / p.price) * 100)}%</span></i>`;
   }
   if (bestTop().has(p.id)) { cls.push('hot'); badges += '<i class="hot-b">🔥 ขายดี</i>'; }
-  if (p.created_at && Date.now() - new Date(p.created_at) < 7 * 864e5) badges += '<i class="new-b">ใหม่</i>';
+  if (p.created_at && new Date(p.created_at) > new Date('2026-11-04T15:00:00Z') && Date.now() - new Date(p.created_at) < 3 * 864e5) badges += '<i class="new-b">ใหม่</i>';
   const bp = prs.find(x => x.kind === 'bundle' || x.kind === 'bxgy');
   if (bp) badges += `<i class="deal-prog" data-dp="${p.id}"></i>`;
   h = h.replace('<button class="more"', badges + '<button class="more"');
