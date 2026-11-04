@@ -1413,3 +1413,6 @@ tr.del-row td{background:#fff1f2}html[data-theme=dark] tr.del-row td{background:
 .rb-tile small{font-size:11px;color:var(--muted)}.rb-tile.low small{color:#b45309;font-weight:700}
 @media (max-width:860px){.rb-grid{grid-template-columns:repeat(3,1fr);max-height:300px}.rcv-mode button{font-size:14px;padding:10px}}
 @media (max-width:860px){html.v5 .rcv-foot{position:sticky;bottom:calc(var(--tabh,72px) + 6px)!important;z-index:15;flex-wrap:wrap;gap:8px}html.v5 .rcv-foot #rsave{flex:1 1 100%}.rcv{padding-bottom:calc(var(--tabh,72px) + 20px)}}
+.ch-s{border:1px solid var(--line);border-radius:14px;margin-bottom:8px;background:var(--card)}
+.ch-s summary{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;padding:10px 12px;cursor:pointer;font-size:13.5px}
+.ch-s .ch-d{color:var(--muted);font-size:12.5px}.ch-s .rtable{margin:0 10px 10px;width:calc(100% - 20px);font-size:13px}

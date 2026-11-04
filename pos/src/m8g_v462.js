@@ -54,7 +54,7 @@ stockCountSheet = function (after) {
   $('#csclr', m).onclick = async () => { if (await confirmBox('ล้างยอดที่นับไว้ทั้งหมด?')) { counted = {}; lastId = null; save(); draw(); } };
   $('#csave', m).onclick = async () => {
     const ids = Object.keys(counted).filter(id => { const p = S.products.find(x => x.id === id); return p && counted[id] !== num(p.stock); });
-    if (!ids.length) { localStorage.removeItem(key); m.close(); return toast('ยอดที่นับตรงกับในระบบทั้งหมด', 'ok'); }
+    if (!ids.length) { localStorage.removeItem(key); setTimeout(() => m.close(), 500); return toast('ยอดที่นับตรงกับในระบบทั้งหมด — บันทึกประวัติแล้ว', 'ok'); }
     if (!await confirmBox(`ปรับยอดสต็อก ${ids.length} รายการให้ตรงกับที่นับได้?`)) return;
     const b = $('#csave', m); b.disabled = true;
     try { for (const id of ids) { await q(sb.rpc('stock_move', { p_shop: S.shop.id, p_product: id, p_kind: 'adjust', p_qty: counted[id], p_cost: null, p_supplier: null, p_note: 'ตรวจนับสต็อก' })); S.products.find(p => p.id === id).stock = counted[id]; }
