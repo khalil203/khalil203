@@ -1266,3 +1266,20 @@ html.v5:not([data-theme=dark]) .tabbar .tb{color:#334155}
 html.v5:not([data-theme=dark]) .cart .citem .nm small,html.v5:not([data-theme=dark]) .pf-n small{color:#475569}
 html.v5:not([data-theme=dark]) .tbl th{color:#334155}
 html.v5 .sb-card{display:none!important}
+/* v5.0.6 — pseudo fullscreen, settings sections */
+html.pfs .side,html.pfs .tabbar,html.pfs .top .gsearch,html.pfs .top .dtchip,html.pfs .top #net{display:none!important}
+html.pfs .top{padding-top:calc(6px + var(--safe-t))}
+#fsExit{position:fixed;top:calc(8px + env(safe-area-inset-top,0px));right:8px;z-index:9500;border:0;border-radius:12px;padding:8px 12px;background:#0b1324cc;color:#fff;font:inherit;font-weight:700;font-size:13px;cursor:pointer;backdrop-filter:blur(6px);opacity:.75}
+#fsExit:hover{opacity:1}
+html.pfs .cartfab{bottom:calc(14px + var(--safe-b))}
+@media (max-width:860px){html.pfs .pgrid{padding-bottom:110px}}
+.set-nav{position:sticky;top:0;z-index:5;display:flex;flex-direction:column;gap:10px;margin:-4px -4px 14px;padding:4px;background:linear-gradient(180deg,var(--bg) 85%,transparent)}
+.set-search{display:flex;align-items:center;gap:8px;padding:0 12px;border-radius:14px;background:var(--card);border:1px solid var(--line);box-shadow:var(--shadow)}
+.set-search .in{border:0;box-shadow:none;background:transparent;flex:1;padding-left:0}
+.set-tabs{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;padding-bottom:2px}.set-tabs::-webkit-scrollbar{display:none}
+.set-tabs button{flex:none;display:flex;align-items:center;gap:8px;height:46px;padding:0 16px;border-radius:14px;border:1px solid var(--line);background:var(--card);font:inherit;font-weight:700;color:var(--ink);cursor:pointer;white-space:nowrap;box-shadow:var(--shadow)}
+.set-tabs button span{font-size:19px}
+.set-tabs button.on{background:linear-gradient(135deg,#2f86ff,#1660f0);color:#fff;border-color:transparent;box-shadow:0 8px 18px rgba(32,110,255,.35)}
+#pg [hidden]{display:none!important}
+@media (max-width:860px){.set-tabs button{height:40px;padding:0 12px;font-size:13px}.set-tabs button span{font-size:16px}}
+@media (max-width:860px){html.v5 #setBtn{width:40px;height:40px}html.v5 .top .tt{min-width:0;flex:1}html.v5 #ttl{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}}
