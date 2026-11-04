@@ -44,7 +44,7 @@ function dailyBillHTML(D, cashierName) {
     <hr><div class="c">พิมพ์เมื่อ ${dt(new Date())}</div></div>`;
 }
 async function dailySummary(day = ymd(new Date())) {
-  const all = canDo('view_reports') || canDo('view_sales') && ['owner', 'admin', 'manager', 'accountant'].includes(S.role);
+  const all = true; // every staff member sees the whole shop's bills (filter by staff inside)
   let cashier = all ? '' : S.user.id, members = [];
   if (all) { try { members = await q(sb.from('shop_members').select('user_id,display_name,username').eq('shop_id', S.shop.id)); } catch {} }
   const m = modal('📊 สรุปยอดประจำวัน', `<div class="row ds-bar"><button class="btn" id="dsPrev">◀</button><input class="in" type="date" id="dsDay" value="${day}" style="width:auto"><button class="btn" id="dsNext">▶</button><button class="btn sm" id="dsToday">วันนี้</button>

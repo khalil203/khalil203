@@ -142,7 +142,6 @@ VIEWS.sales = pg => {
   let A, B;
   const load = async () => {
     rows = await fetchAll(() => sb.from('sales').select('*, customer:customers(name,tax_id,address,tax_branch,points,balance)').eq('shop_id', S.shop.id).gte('created_at', A.toISOString()).lte('created_at', B.toISOString()).order('created_at', { ascending: false }));
-    if (S.role === 'cashier') rows = rows.filter(r => r.cashier_id === S.user.id);
     draw();
   };
   $('#bs').oninput = $('#bst').onchange = $('#bpm').onchange = draw;

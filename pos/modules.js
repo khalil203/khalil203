@@ -404,7 +404,6 @@ VIEWS.sales = pg => {
   let A, B;
   const load = async () => {
     rows = await fetchAll(() => sb.from('sales').select('*, customer:customers(name,tax_id,address,tax_branch,points,balance)').eq('shop_id', S.shop.id).gte('created_at', A.toISOString()).lte('created_at', B.toISOString()).order('created_at', { ascending: false }));
-    if (S.role === 'cashier') rows = rows.filter(r => r.cashier_id === S.user.id);
     draw();
   };
   $('#bs').oninput = $('#bst').onchange = $('#bpm').onchange = draw;
@@ -1423,7 +1422,7 @@ const _goC = go;
 go = function (page) { _goC(page); $('.top')?.classList.toggle('posmode', S.page === 'pos'); };
 /* ================= Shop POS v4 — promotions engine, data center, barcodes, personal use,
    activity log, branding, receipt image, cashier upgrades, auto-update ================= */
-const APP_VERSION = '5.2.4';
+const APP_VERSION = '5.2.5';
 Object.assign(TH, { 'Data center': 'ศูนย์ข้อมูล', 'Barcodes': 'บาร์โค้ด', 'Branches': 'สาขา' });
 PAGES.splice(PAGES.findIndex(p => p.id === 'settings'), 0,
   { id: 'barcodes', ic: '🏷', name: 'Barcodes', roles: ['owner', 'manager', 'stock'] },
@@ -3490,7 +3489,7 @@ function dailyBillHTML(D, cashierName) {
     <hr><div class="c">พิมพ์เมื่อ ${dt(new Date())}</div></div>`;
 }
 async function dailySummary(day = ymd(new Date())) {
-  const all = canDo('view_reports') || canDo('view_sales') && ['owner', 'admin', 'manager', 'accountant'].includes(S.role);
+  const all = true; // every staff member sees the whole shop's bills (filter by staff inside)
   let cashier = all ? '' : S.user.id, members = [];
   if (all) { try { members = await q(sb.from('shop_members').select('user_id,display_name,username').eq('shop_id', S.shop.id)); } catch {} }
   const m = modal('📊 สรุปยอดประจำวัน', `<div class="row ds-bar"><button class="btn" id="dsPrev">◀</button><input class="in" type="date" id="dsDay" value="${day}" style="width:auto"><button class="btn" id="dsNext">▶</button><button class="btn sm" id="dsToday">วันนี้</button>
@@ -5586,6 +5585,31 @@ VIEWS.stock = pg => { const r = _stock524(pg);
     if (scan.nextElementSibling !== f && !(stk && scan.nextElementSibling === stk && stk.nextElementSibling === f)) { (stk || scan).after(f); }
     const g = $('#stkg', pg); if (g && f.nextElementSibling !== g) f.after(g); };
   fix(); new MutationObserver(fix).observe(pg, { childList: true }); return r; };
+/* ================= v5.2.5 — every device sees every bill, live sync between devices ================= */
+let SYNC_LAST = null;
+async function syncTick() {
+  if (!S.shop || document.hidden || !navigator.onLine) return;
+  try {
+    const r = await q(sb.from('sales').select('id,created_at,payment_method,status').eq('shop_id', S.shop.id).order('created_at', { ascending: false }).limit(1));
+    const sig = r[0] ? r[0].id + r[0].payment_method + r[0].status : '';
+    // also catch edits (payment changes / voids) on today's bills
+    const t0 = new Date(); t0.setHours(0, 0, 0, 0);
+    const c = await q(sb.from('sales').select('payment_method,status').eq('shop_id', S.shop.id).gte('created_at', t0.toISOString()));
+    const full = sig + '|' + c.length + '|' + c.filter(x => x.status === 'void').length + '|' + c.filter(x => x.payment_method === 'cash').length;
+    if (SYNC_LAST !== null && full !== SYNC_LAST) {
+      // fresh stock numbers
+      try { const ps = await q(sb.from('products').select('id,stock').eq('shop_id', S.shop.id)); const m = new Map(ps.map(p => [p.id, p.stock])); S.products.forEach(p => { if (m.has(p.id)) p.stock = m.get(p.id); }); } catch {}
+      const busy = $('.mbg') || (document.activeElement && /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName));
+      if (S.page === 'pos') { try { await loadPosStats(); } catch {} if (!busy && !S.cart.length) try { drawGrid(); } catch {} }
+      else if (!busy && ['sales', 'dashboard', 'stock', 'products'].includes(S.page)) go(S.page);
+    }
+    SYNC_LAST = full;
+  } catch {}
+}
+setInterval(syncTick, 20000);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) syncTick(); });
+const _renderShell525 = renderShell;
+renderShell = function () { _renderShell525(); SYNC_LAST = null; setTimeout(syncTick, 3000); };
 /* ================= start ================= */
 updateNet();
 boot().then(() => { updateNet(); syncQueue(); }).catch(e => { fail(e); renderAuth(); });
