@@ -1,6 +1,6 @@
 /* ================= Shop POS v4 — promotions engine, data center, barcodes, personal use,
    activity log, branding, receipt image, cashier upgrades, auto-update ================= */
-const APP_VERSION = '5.1.0';
+const APP_VERSION = '5.1.1';
 Object.assign(TH, { 'Data center': 'ศูนย์ข้อมูล', 'Barcodes': 'บาร์โค้ด', 'Branches': 'สาขา' });
 PAGES.splice(PAGES.findIndex(p => p.id === 'settings'), 0,
   { id: 'barcodes', ic: '🏷', name: 'Barcodes', roles: ['owner', 'manager', 'stock'] },
@@ -24,8 +24,8 @@ Object.assign(AUDIT_L, {
   insert_promotions: 'สร้างโปรโมชั่น', update_promotions: 'แก้ไขโปรโมชั่น', delete_promotions: 'ลบโปรโมชั่น', insert_expenses: 'บันทึกค่าใช้จ่าย', update_expenses: 'แก้ไขค่าใช้จ่าย', delete_expenses: 'ลบค่าใช้จ่าย',
   import: 'นำเข้าข้อมูล', restore: 'กู้คืนข้อมูล', backup: 'สำรองข้อมูล', barcode_generate: 'สร้างบาร์โค้ด',
 });
-const ACT_GROUP = { login: 'เข้า/ออกระบบ', logout: 'เข้า/ออกระบบ', stock: 'สต็อก', product: 'สินค้า', sale: 'การขาย', staff: 'พนักงาน', data: 'ข้อมูล/ตั้งค่า', other: 'อื่นๆ' };
-const actGroup = a => /^log(in|out)$/.test(a) ? 'login' : /^stock_|transfer|receive_purchase/.test(a) ? 'stock' : /product/.test(a) ? 'product'
+const ACT_GROUP = { delete: '🗑️ การลบประวัติ', login: 'เข้า/ออกระบบ', logout: 'เข้า/ออกระบบ', stock: 'สต็อก', product: 'สินค้า', sale: 'การขาย', staff: 'พนักงาน', data: 'ข้อมูล/ตั้งค่า', other: 'อื่นๆ' };
+const actGroup = a => a === 'delete_history' ? 'delete' : /^log(in|out)$/.test(a) ? 'login' : /^stock_|transfer|receive_purchase/.test(a) ? 'stock' : /product/.test(a) ? 'product'
   : /sale|refund|payment|tax_invoice|shift|cash_/.test(a) ? 'sale' : /^staff|permissions/.test(a) ? 'staff' : /import|restore|backup|settings|barcode/.test(a) ? 'data' : 'other';
 const logAct = (action, entity, id, detail) => sb.rpc('log_action', { p_shop: S.shop.id, p_action: action, p_entity: entity || '', p_id: id || '', p_detail: detail || {} }).then(() => {}, () => {});
 let H2C_P = null, JSB_P = null;

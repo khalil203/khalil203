@@ -1379,3 +1379,6 @@ html.pfs .cartfab{bottom:calc(14px + var(--safe-b))}
 .hk.on{border-color:#ef4444;background:#fef2f2}html[data-theme=dark] .hk.on{background:#3b1219}
 .hk-prev{padding:12px;border-radius:12px;background:var(--brandsoft);font-size:14px}
 .sq-del{padding:0 8px!important;min-height:30px!important}
+.hk-log{margin-top:14px;border:1px solid var(--line);border-radius:14px;padding:10px 12px;background:var(--card)}
+.hk-log summary{cursor:pointer;font-weight:800;font-size:14px}.hk-log .rtable{margin-top:8px;font-size:13px}.hk-log .bad{color:#dc2626}
+tr.del-row td{background:#fff1f2}html[data-theme=dark] tr.del-row td{background:#3b1219}

@@ -1423,7 +1423,7 @@ const _goC = go;
 go = function (page) { _goC(page); $('.top')?.classList.toggle('posmode', S.page === 'pos'); };
 /* ================= Shop POS v4 — promotions engine, data center, barcodes, personal use,
    activity log, branding, receipt image, cashier upgrades, auto-update ================= */
-const APP_VERSION = '5.1.0';
+const APP_VERSION = '5.1.1';
 Object.assign(TH, { 'Data center': 'ศูนย์ข้อมูล', 'Barcodes': 'บาร์โค้ด', 'Branches': 'สาขา' });
 PAGES.splice(PAGES.findIndex(p => p.id === 'settings'), 0,
   { id: 'barcodes', ic: '🏷', name: 'Barcodes', roles: ['owner', 'manager', 'stock'] },
@@ -1447,8 +1447,8 @@ Object.assign(AUDIT_L, {
   insert_promotions: 'สร้างโปรโมชั่น', update_promotions: 'แก้ไขโปรโมชั่น', delete_promotions: 'ลบโปรโมชั่น', insert_expenses: 'บันทึกค่าใช้จ่าย', update_expenses: 'แก้ไขค่าใช้จ่าย', delete_expenses: 'ลบค่าใช้จ่าย',
   import: 'นำเข้าข้อมูล', restore: 'กู้คืนข้อมูล', backup: 'สำรองข้อมูล', barcode_generate: 'สร้างบาร์โค้ด',
 });
-const ACT_GROUP = { login: 'เข้า/ออกระบบ', logout: 'เข้า/ออกระบบ', stock: 'สต็อก', product: 'สินค้า', sale: 'การขาย', staff: 'พนักงาน', data: 'ข้อมูล/ตั้งค่า', other: 'อื่นๆ' };
-const actGroup = a => /^log(in|out)$/.test(a) ? 'login' : /^stock_|transfer|receive_purchase/.test(a) ? 'stock' : /product/.test(a) ? 'product'
+const ACT_GROUP = { delete: '🗑️ การลบประวัติ', login: 'เข้า/ออกระบบ', logout: 'เข้า/ออกระบบ', stock: 'สต็อก', product: 'สินค้า', sale: 'การขาย', staff: 'พนักงาน', data: 'ข้อมูล/ตั้งค่า', other: 'อื่นๆ' };
+const actGroup = a => a === 'delete_history' ? 'delete' : /^log(in|out)$/.test(a) ? 'login' : /^stock_|transfer|receive_purchase/.test(a) ? 'stock' : /product/.test(a) ? 'product'
   : /sale|refund|payment|tax_invoice|shift|cash_/.test(a) ? 'sale' : /^staff|permissions/.test(a) ? 'staff' : /import|restore|backup|settings|barcode/.test(a) ? 'data' : 'other';
 const logAct = (action, entity, id, detail) => sb.rpc('log_action', { p_shop: S.shop.id, p_action: action, p_entity: entity || '', p_id: id || '', p_detail: detail || {} }).then(() => {}, () => {});
 let H2C_P = null, JSB_P = null;
@@ -5243,6 +5243,34 @@ VIEWS.audit = async pg => {
   if (!isAdmin()) return;
   const t = $('#tact'); if (t && !$('#audclr', t)) { t.insertAdjacentHTML('beforeend', '<button class="btn bad" id="audclr">🗑️ ลบประวัติ (Admin)</button>'); $('#audclr').onclick = () => historyCleaner('audit_login'); }
 };
+
+/* v5.1.1 — show who deleted what: labels in the activity log + recent deletions in the cleaner */
+AUDIT_L.delete_history = '🗑️ ลบประวัติ';
+const HK_NAME = k => HIST_KINDS[k]?.[1] || k;
+async function deletionLog(box) {
+  try {
+    const rows = await q(sb.from('audit_log').select('user_name,entity,detail,created_at').eq('shop_id', S.shop.id).eq('action', 'delete_history').order('created_at', { ascending: false }).limit(15));
+    box.innerHTML = rows.length ? `<table class="rtable">${rows.map(r => `<tr><td>${dt(r.created_at)}</td><td><b>${esc(r.user_name || '-')}</b></td><td>${esc(HK_NAME(r.entity))}</td>
+      <td class="right"><b class="bad">${qtyf(r.detail?.count || 0)}</b> รายการ${r.detail?.before ? `<br><small class="muted">ก่อน ${dOnly(r.detail.before)}</small>` : ''}</td></tr>`).join('')}</table>` : '<p class="muted">ยังไม่เคยมีการลบประวัติ</p>';
+  } catch (e) { box.textContent = e.message; }
+}
+const _historyCleaner511 = historyCleaner;
+historyCleaner = function (preset) {
+  _historyCleaner511(preset);
+  const m = $$('.mbg').pop(); if (!m || !isAdmin()) return;
+  $('.mb', m)?.insertAdjacentHTML('beforeend', '<details class="hk-log" open><summary>📜 ประวัติการลบล่าสุด (ใครลบ เมื่อไหร่ อะไร)</summary><div id="hklog" class="muted">กำลังโหลด…</div></details>');
+  deletionLog($('#hklog', m));
+  const go2 = $('#hkgo', m); go2?.addEventListener('click', () => setTimeout(() => { const b = $('#hklog', m); if (b) deletionLog(b); }, 2500));
+};
+/* the activity log reads the deletion details in Thai */
+const _audit511 = VIEWS.audit;
+VIEWS.audit = async pg => {
+  await _audit511(pg);
+  const fix = () => $$('#al tr', pg).forEach(tr => { if (!tr.textContent.includes('ลบประวัติ') || tr.dataset.fx) return; tr.dataset.fx = 1;
+    tr.querySelectorAll('small').forEach(sm => { sm.innerHTML = sm.innerHTML.replace(/count: (\d+)/, 'ลบ $1 รายการ').replace(/before: ([\d-]+)/, 'เก่ากว่า $1').replace(/ids: \d+/, '').replace(/before: null|ids: 0/g, ''); }); tr.classList.add('del-row'); });
+  new MutationObserver(fix).observe($('#al', pg) || pg, { childList: true, subtree: true }); fix();
+};
+delete ACT_GROUP.logout;
 /* ================= start ================= */
 updateNet();
 boot().then(() => { updateNet(); syncQueue(); }).catch(e => { fail(e); renderAuth(); });

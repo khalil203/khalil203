@@ -107,3 +107,31 @@ VIEWS.audit = async pg => {
   if (!isAdmin()) return;
   const t = $('#tact'); if (t && !$('#audclr', t)) { t.insertAdjacentHTML('beforeend', '<button class="btn bad" id="audclr">🗑️ ลบประวัติ (Admin)</button>'); $('#audclr').onclick = () => historyCleaner('audit_login'); }
 };
+
+/* v5.1.1 — show who deleted what: labels in the activity log + recent deletions in the cleaner */
+AUDIT_L.delete_history = '🗑️ ลบประวัติ';
+const HK_NAME = k => HIST_KINDS[k]?.[1] || k;
+async function deletionLog(box) {
+  try {
+    const rows = await q(sb.from('audit_log').select('user_name,entity,detail,created_at').eq('shop_id', S.shop.id).eq('action', 'delete_history').order('created_at', { ascending: false }).limit(15));
+    box.innerHTML = rows.length ? `<table class="rtable">${rows.map(r => `<tr><td>${dt(r.created_at)}</td><td><b>${esc(r.user_name || '-')}</b></td><td>${esc(HK_NAME(r.entity))}</td>
+      <td class="right"><b class="bad">${qtyf(r.detail?.count || 0)}</b> รายการ${r.detail?.before ? `<br><small class="muted">ก่อน ${dOnly(r.detail.before)}</small>` : ''}</td></tr>`).join('')}</table>` : '<p class="muted">ยังไม่เคยมีการลบประวัติ</p>';
+  } catch (e) { box.textContent = e.message; }
+}
+const _historyCleaner511 = historyCleaner;
+historyCleaner = function (preset) {
+  _historyCleaner511(preset);
+  const m = $$('.mbg').pop(); if (!m || !isAdmin()) return;
+  $('.mb', m)?.insertAdjacentHTML('beforeend', '<details class="hk-log" open><summary>📜 ประวัติการลบล่าสุด (ใครลบ เมื่อไหร่ อะไร)</summary><div id="hklog" class="muted">กำลังโหลด…</div></details>');
+  deletionLog($('#hklog', m));
+  const go2 = $('#hkgo', m); go2?.addEventListener('click', () => setTimeout(() => { const b = $('#hklog', m); if (b) deletionLog(b); }, 2500));
+};
+/* the activity log reads the deletion details in Thai */
+const _audit511 = VIEWS.audit;
+VIEWS.audit = async pg => {
+  await _audit511(pg);
+  const fix = () => $$('#al tr', pg).forEach(tr => { if (!tr.textContent.includes('ลบประวัติ') || tr.dataset.fx) return; tr.dataset.fx = 1;
+    tr.querySelectorAll('small').forEach(sm => { sm.innerHTML = sm.innerHTML.replace(/count: (\d+)/, 'ลบ $1 รายการ').replace(/before: ([\d-]+)/, 'เก่ากว่า $1').replace(/ids: \d+/, '').replace(/before: null|ids: 0/g, ''); }); tr.classList.add('del-row'); });
+  new MutationObserver(fix).observe($('#al', pg) || pg, { childList: true, subtree: true }); fix();
+};
+delete ACT_GROUP.logout;
