@@ -51,7 +51,7 @@ showReceipt = function (sale, items, cust, autoPrint) { _showReceipt516(sale, it
 const _sales516 = VIEWS.sales;
 VIEWS.sales = pg => {
   _sales516(pg);
-  const deco = () => $$('#bl tr[data-id]', pg).forEach(tr => { const td = tr.children[3]; if (!td || $('.cpe', td)) return;
+  const deco = () => $$('#bl tr[data-id]', pg).forEach(tr => { if ($('.cpe', tr)) return; const td = [...tr.children].find(c => c.classList.contains('spay')) || [...tr.children].find(c => PAY_EDIT.concat(['store_credit']).some(k => c.textContent.includes(payName(k)))); if (!td) return;
     td.insertAdjacentHTML('beforeend', ' <button class="btn sm cpe" title="แก้ช่องทางชำระ">✏️</button>');
     $('.cpe', td).onclick = async e => { e.stopPropagation();
       try { const s = await q(sb.from('sales').select('*').eq('id', tr.dataset.id).single()); changePayment(s, () => go('sales')); } catch (er) { fail(er); } }; });

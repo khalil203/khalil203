@@ -1433,3 +1433,20 @@ html[data-theme=dark] .cp-dd{background:#3a2a0a;color:#fde68a}html[data-theme=da
 .cp-menu{position:absolute;left:0;right:0;bottom:calc(100% - 22px);z-index:5;display:flex;flex-direction:column;gap:4px;padding:6px;border-radius:16px;background:var(--card);border:1px solid var(--line);box-shadow:0 18px 44px rgba(15,40,90,.25);animation:pfin .15s ease}
 .cp-menu button{display:flex;align-items:center;gap:10px;padding:13px 12px;border:0;border-radius:12px;background:none;font:inherit;font-weight:700;font-size:15px;color:var(--ink);cursor:pointer;text-align:left}
 .cp-menu button:hover,.cp-menu button.on{background:var(--brandsoft)}.cp-menu button.on::after{content:'✓';margin-left:auto;color:#16a34a}
+/* v5.2.0 — organised sales list */
+#bl th.sn,#bl td.sn{width:44px;text-align:center}
+.sno{display:inline-grid;place-items:center;min-width:30px;height:30px;padding:0 6px;border-radius:10px;background:var(--brandsoft);color:var(--brand);font-weight:800}
+.sno.void{background:#fee2e2;color:#b91c1c}
+#bl td.sitems{font-size:13px;max-width:280px;line-height:1.35}
+#bl td b .bfull{display:block;font-weight:500;font-size:11px}
+#bl tr.daysep td{background:var(--brandsoft);font-size:13px;padding:8px 12px!important;color:var(--ink)}
+@media (max-width:860px){
+  #bl table.tbl{display:block;min-width:0!important}#bl tbody{display:block}#bl table.tbl tr:has(th){display:none}
+  #bl tr[data-id]{display:flex!important;flex-wrap:wrap;align-items:center;gap:4px 8px;padding:10px 10px;border-bottom:1px solid var(--line)}
+  #bl tr[data-id] td{border:0!important;padding:0!important;background:none!important;font-size:12.5px}
+  #bl td.sn{width:auto;order:0}#bl td.sbill{order:1;flex:1;min-width:0}#bl td.stot{order:2;font-size:16px!important}
+  #bl td.sitems{order:3;flex:1 1 100%;max-width:none;font-size:13.5px;padding-left:40px!important;color:var(--ink)}
+  #bl td.sdate{order:4;padding-left:40px!important;color:var(--muted)}#bl td.spay{order:5}#bl td.scash{order:6;color:var(--muted)}#bl td.sst{order:7;margin-left:auto}
+  #bl td.scust{display:none}#bl td b .bfull{display:inline;margin-left:6px}
+  #bl tr.daysep{display:block}#bl tr.daysep td{display:block;border-radius:10px}}
+@media (min-width:861px){#bl table.tbl{display:table!important;width:100%}#bl table.tbl td,#bl table.tbl th{padding:10px 10px}}
