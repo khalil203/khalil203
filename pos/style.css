@@ -1092,3 +1092,110 @@ html.v5 .auth .btn.p{height:54px;border-radius:16px;font-size:17px}
 @media (min-width:861px) and (max-width:1100px){.ch-t span{display:none}html.v5 .cart .ft .tline.big span:first-child{font-size:20px}html.v5 .cart .ft .tline.big span:last-child{font-size:24px}}
 html.v5 .cart .ft .tline.big{align-items:center;gap:8px}html.v5 .cart .ft .tline.big span:first-child{white-space:nowrap}
 .pos .toolbar.tb-slim .sbox{flex:1;min-width:0}
+
+/* ===== v5.0.2 — phone sizing: everything fits, calmer type scale ===== */
+@media (max-width:860px){
+  html.v5 body{font-size:14px}
+  html.v5 .top{padding:8px 12px;gap:8px}
+  html.v5 #ttl{font-size:18px;line-height:1.2}
+  html.v5 .pdesc{display:none!important}
+  html.v5 .ttsw{font-size:11.5px;padding:1px 8px}
+  html.v5 .bellbtn,html.v5 .top .iconbtn{width:40px;height:40px;border-radius:12px}
+  html.v5 .profile .av{width:40px;height:40px}
+  html.v5 #shopBtn{width:40px;height:40px}
+  html.v5 .page{padding:12px}
+  html.v5 .page.flush{padding:0}
+  /* page actions: one scrollable row */
+  html.v5 .top:not(.posmode) #tact{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;padding-bottom:2px;margin:0 -12px;padding-left:12px;padding-right:12px}
+  html.v5 .top:not(.posmode) #tact::-webkit-scrollbar{display:none}
+  html.v5 .top:not(.posmode) #tact .btn{height:38px;font-size:13px;padding:0 12px;flex:none;white-space:nowrap}
+  html.v5 .top.posmode #tact .btn{width:40px;height:40px}
+  /* buttons, inputs */
+  html.v5 .btn{font-size:14px;min-height:38px;padding:0 14px}
+  html.v5 .btn.sm{font-size:12.5px;min-height:32px;padding:0 10px}
+  html.v5 .btn.lg{min-height:46px;font-size:15px}
+  html.v5 .in{font-size:16px;min-height:42px;padding:8px 12px}
+  html.v5 label.f,html.v5 .f{font-size:12.5px}
+  /* range tabs & pills: single row that scrolls */
+  html.v5 .tabs{flex-wrap:nowrap!important;overflow-x:auto;scrollbar-width:none;gap:6px;padding-bottom:2px}
+  html.v5 .tabs::-webkit-scrollbar{display:none}
+  html.v5 .tabs .tab{flex:none;padding:7px 12px;font-size:13px;white-space:nowrap}
+  html.v5 .pills{gap:6px}html.v5 .pills button{padding:6px 11px;font-size:13px}
+  html.v5 .seg button{padding:7px 11px;font-size:13px}
+  /* stat cards */
+  html.v5 .stats{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+  html.v5 .stat{padding:10px 12px;border-radius:14px}
+  html.v5 .stat .k{font-size:11.5px;line-height:1.3}
+  html.v5 .stat .v{font-size:19px;line-height:1.25;word-break:break-word}
+  html.v5 .stat small,html.v5 .stat .s{font-size:11px}
+  /* cards & headings */
+  html.v5 .card{padding:14px;border-radius:16px}
+  html.v5 .card h3,html.v5 h3{font-size:16px}
+  html.v5 h2{font-size:19px}
+  html.v5 .grid2{gap:10px}
+  /* tables */
+  html.v5 table.tbl,html.v5 .rtable{font-size:12.5px}
+  html.v5 .tbl th,html.v5 .tbl td{padding:8px 8px}
+  html.v5 .tblwrap{margin:0 -4px}
+  /* reports */
+  .rgroups{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+  .rgroups button{padding:10px 12px;border-radius:14px;font-size:13px}
+  /* products & stock tabs */
+  .ps-tabs{padding:4px;margin-bottom:10px;border-radius:14px}.ps-tabs button{height:40px;font-size:14px;padding:0 10px}
+  /* modals */
+  html.v5 .mbg .modal h2,html.v5 .modal .hd h2,html.v5 .modal .mh{font-size:17px}
+  html.v5 .modal{font-size:14px}
+  /* toast */
+  html.v5 #toast > *{font-size:13.5px;max-width:calc(100vw - 32px)}
+  /* data center list: let the buttons wrap instead of being cut */
+  html.v5 .page .row{flex-wrap:wrap}
+  /* tabbar */
+  html.v5 .tabbar .tb span:last-child{font-size:11px}
+}
+/* sell screen on phones */
+@media (max-width:860px){
+  html.v5 .pos .left{padding:8px 10px 0;gap:8px}
+  html.v5 .posstats{grid-template-columns:repeat(4,46%);gap:8px;padding:2px 2px 4px}
+  .kpi{min-height:0;padding:10px;gap:8px;border-radius:16px}
+  .kpi .kic{width:36px;height:36px;border-radius:11px}.kpi .kic svg{width:20px;height:20px}
+  .kpi small{font-size:11.5px}.kpi b{font-size:17px}.kpi em{font-size:10.5px}
+  .kpi .spk,.kpi .kbox{display:none}
+  .cashbar.dock{padding:5px;gap:6px;border-radius:14px}
+  .cashbar.dock button{height:40px;padding:0 10px;font-size:12.5px;gap:6px;border-radius:12px}
+  .cashbar.dock button span{font-size:17px}.cashbar.dock button.pri span svg{width:20px;height:20px}.cashbar.dock button.pri small{display:none}
+  .pos .toolbar.tb-slim{gap:6px}.pos .toolbar.tb-slim .sbox{width:auto!important;flex:1}
+  .pos .toolbar.tb-slim .sbox .in{min-height:40px}
+  .pos .toolbar.tb-slim #scanBtn{flex:none;width:44px;min-height:40px;padding:0;justify-content:center}
+  .catrow{gap:6px}
+  html.v5 .cats{padding:3px;gap:5px;border-radius:14px}
+  html.v5 .cats .tab{height:36px;padding:0 11px;font-size:13px;border-radius:11px}
+  .pv-btn{height:42px;padding:0 10px;border-radius:13px}.pv-btn span{display:none}
+  html.v5 .pcard .nm{font-size:13.5px}
+  html.v5 .pcard .pr b{font-size:clamp(15px,calc(var(--tile) * .1),22px)}
+  html.v5 .pcard .qadd{height:32px;padding:0 10px;font-size:13px;border-radius:10px}
+  .pcard .img .stkp{font-size:11px;padding:2px 8px}
+  .pcard .img .deal-rb{font-size:12px;padding:4px 8px 4px 6px}
+  html.v5 .cart .hd.ch{padding:10px 12px}.ch-t{font-size:16px}.ch-t svg{width:22px;height:22px}
+  html.v5 .cart .citem{grid-template-columns:48px 1fr auto;padding:10px 12px;gap:4px 10px}.cthumb{width:48px;height:48px;border-radius:12px}
+  html.v5 .cart .citem .qty button{width:32px;height:32px}
+  html.v5 .cart .ft .tline.big span:first-child{font-size:18px}html.v5 .cart .ft .tline.big span:last-child{font-size:24px}
+  html.v5 #payBtn{height:54px;font-size:16px;border-radius:16px}
+  html.v5 .cartfab{font-size:15px}
+}
+@media (max-width:380px){
+  html.v5 .posstats{grid-template-columns:repeat(4,52%)}
+  html.v5 .stat .v{font-size:17px}
+  html.v5 #ttl{font-size:16.5px}
+  html.v5 .tabbar .tb span:last-child{font-size:10px}
+}
+@media (max-width:860px){
+  .pos .toolbar.tb-slim{flex-wrap:nowrap!important}
+  html.v5 .tbl td.right[style*="nowrap"]{white-space:normal!important;text-align:right}
+  html.v5 .tbl td.right[style*="nowrap"] .btn{margin:2px 0}
+  html.v5 .tbl tr:has(>td.right[style*="nowrap"]){display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;padding:8px 0;border-bottom:1px solid var(--line)}
+  html.v5 .tbl tr:has(>td.right[style*="nowrap"])>td{border:0;padding:2px 8px}
+  html.v5 .tbl tr:has(>td.right[style*="nowrap"])>td.right{flex:1 1 100%;display:flex;gap:6px;justify-content:flex-start;flex-wrap:wrap}
+  html.v5 .tbl:has(td.right[style*="nowrap"]){width:100%!important;min-width:0!important}
+  html.v5 .tbl:has(td.right[style*="nowrap"]) tr:has(>th){display:none}
+  html.v5 .tbl tr:has(>td.right[style*="nowrap"])>td:first-child{flex:1 1 100%}
+}

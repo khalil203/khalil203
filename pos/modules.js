@@ -1423,7 +1423,7 @@ const _goC = go;
 go = function (page) { _goC(page); $('.top')?.classList.toggle('posmode', S.page === 'pos'); };
 /* ================= Shop POS v4 — promotions engine, data center, barcodes, personal use,
    activity log, branding, receipt image, cashier upgrades, auto-update ================= */
-const APP_VERSION = '5.0.1';
+const APP_VERSION = '5.0.2';
 Object.assign(TH, { 'Data center': 'ศูนย์ข้อมูล', 'Barcodes': 'บาร์โค้ด', 'Branches': 'สาขา' });
 PAGES.splice(PAGES.findIndex(p => p.id === 'settings'), 0,
   { id: 'barcodes', ic: '🏷', name: 'Barcodes', roles: ['owner', 'manager', 'stock'] },
@@ -4795,6 +4795,13 @@ renderShell = function () {
 /* cart header: proper pause icon for "hold" */
 const _drawCart501 = drawCart;
 drawCart = function () { _drawCart501(); const hb = $('#cart #holdBtn'); if (hb) hb.innerHTML = '<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><rect x="6" y="5" width="4" height="14" rx="1.5"/><rect x="14" y="5" width="4" height="14" rx="1.5"/></svg>'; };
+/* ================= v5.0.2 — phone sizing pass + ignore stale-page DOM errors ================= */
+fail = function (e) {
+  const msg = e?.message || String(e);
+  // a page that was still loading when the user navigated away tries to write into removed elements — harmless
+  if (/of null \(|is null|reading 'innerHTML'|setting 'innerHTML'/.test(msg)) { console.warn('stale view update ignored:', msg); return; }
+  console.error(e); toast(msg, 'bad');
+};
 /* ================= start ================= */
 updateNet();
 boot().then(() => { updateNet(); syncQueue(); }).catch(e => { fail(e); renderAuth(); });
