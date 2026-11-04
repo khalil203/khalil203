@@ -1457,3 +1457,5 @@ html.v5 .ps-compact .stats{grid-template-columns:repeat(auto-fill,minmax(150px,1
 html.v5 .cart .hd.ch #cartClose{display:grid;place-items:center;width:40px;height:40px;border-radius:12px;background:#ffffff2e!important;color:#fff!important;font-size:24px;font-weight:700;line-height:1;border:1px solid #ffffff55!important;box-shadow:none}
 html.v5 .cart .hd.ch #cartClose:hover{background:#ffffff4d!important}
 html.v5 .cart .hd.ch #cartClose[style*="none"]{display:none}
+/* v5.2.6: last rows must never hide under the bottom tab bar */
+@media (max-width:860px){html.v5 #pg.page{padding-bottom:calc(var(--tabh,72px) + 28px + var(--safe-b))!important}html.pfs #pg.page{padding-bottom:calc(28px + var(--safe-b))!important}}
