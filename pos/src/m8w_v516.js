@@ -78,3 +78,22 @@ VIEWS.audit = async pg => {
     h = h.replace(/\b(cash|promptpay|transfer|credit_card|debit_card|store_credit)\b/g, k => payName(k)); s.innerHTML = h; });
   new MutationObserver(fix).observe($('#al', pg) || pg, { childList: true, subtree: true }); fix();
 };
+
+/* v5.1.9 — warn before saving the same bill twice (same items + total within 2 minutes) */
+let LAST_SALE = null, dupOK = false;
+const sigOf = (lines, total) => lines.map(l => `${l.product_id || l.name}x${num(l.qty)}`).sort().join('|') + '#' + r2(num(total));
+const _showReceipt519 = showReceipt;
+showReceipt = function (sale, items, cust, autoPrint) {
+  if (sale && items && Date.now() - new Date(sale.created_at || Date.now()) < 120000) LAST_SALE = { sig: sigOf(items, sale.total), at: Date.now(), bill: sale.bill_no, method: sale.payment_method };
+  return _showReceipt519(sale, items, cust, autoPrint);
+};
+document.addEventListener('click', async e => {
+  const b = e.target.closest('#cfm'); if (!b || dupOK || !LAST_SALE || Date.now() - LAST_SALE.at > 120000) return;
+  if (sigOf(S.cart, calc().total) !== LAST_SALE.sig) return;
+  e.stopImmediatePropagation(); e.preventDefault(); sfx('error');
+  const ok = await confirmBox(`⚠️ บิลนี้เหมือนบิล ${LAST_SALE.bill} ที่เพิ่งขายไป (${payName(LAST_SALE.method)}) — สินค้าและยอดเงินเท่ากัน\n\nถ้ากดชำระเงินผิดช่องทาง ให้ “แก้ช่องทางชำระ” ในบิลเดิมแทน ไม่ต้องขายซ้ำ\n\nยืนยันว่าเป็นลูกค้าคนใหม่ และต้องการขายอีกบิล?`);
+  if (!ok) { logAct('duplicate_blocked', 'sale', LAST_SALE.bill, { value: r2(calc().total) }); return; }
+  logAct('duplicate_confirmed', 'sale', LAST_SALE.bill, { value: r2(calc().total) });
+  dupOK = true; try { b.click(); } finally { setTimeout(() => { dupOK = false; }, 500); }
+}, true);
+Object.assign(AUDIT_L, { duplicate_blocked: '🛑 กันบิลซ้ำ (ยกเลิก)', duplicate_confirmed: '⚠️ ยืนยันขายบิลซ้ำ' });
