@@ -1423,7 +1423,7 @@ const _goC = go;
 go = function (page) { _goC(page); $('.top')?.classList.toggle('posmode', S.page === 'pos'); };
 /* ================= Shop POS v4 — promotions engine, data center, barcodes, personal use,
    activity log, branding, receipt image, cashier upgrades, auto-update ================= */
-const APP_VERSION = '5.0.8';
+const APP_VERSION = '5.0.9';
 Object.assign(TH, { 'Data center': 'ศูนย์ข้อมูล', 'Barcodes': 'บาร์โค้ด', 'Branches': 'สาขา' });
 PAGES.splice(PAGES.findIndex(p => p.id === 'settings'), 0,
   { id: 'barcodes', ic: '🏷', name: 'Barcodes', roles: ['owner', 'manager', 'stock'] },
@@ -5097,6 +5097,21 @@ const _renderShell508 = renderShell;
 renderShell = function () {
   _renderShell508();
   $$('.side .navs .nav[data-p]').forEach(n => { if (!$('.sl', n)) n.insertAdjacentHTML('beforeend', `<span class="sl">${RAIL_SHORT[n.dataset.p] || $('.lb', n)?.textContent || ''}</span>`); });
+};
+
+/* v5.0.9 — settings save bar: floating, never hidden behind the tab bar, shows unsaved changes */
+const _settings509 = VIEWS.settings;
+VIEWS.settings = pg => {
+  _settings509(pg);
+  const f = $('#stf', pg), row = f && $(':scope > .row', f); if (!row) return;
+  row.removeAttribute('style'); row.classList.add('savebar');
+  const btn = $('button', row); if (!btn) return;
+  btn.classList.add('savebtn');
+  row.insertAdjacentHTML('afterbegin', '<span class="sb-state">ยังไม่มีการแก้ไข</span>');
+  const st = $('.sb-state', row);
+  const dirty = on => { row.classList.toggle('dirty', on); st.textContent = on ? '● มีการแก้ไขที่ยังไม่บันทึก' : 'ยังไม่มีการแก้ไข'; };
+  f.addEventListener('input', () => dirty(true)); f.addEventListener('change', () => dirty(true));
+  btn.addEventListener('click', () => { setTimeout(() => { if (!$('.mbg')) { dirty(false); st.textContent = '✓ บันทึกแล้ว'; } }, 1200); });
 };
 /* ================= start ================= */
 updateNet();

@@ -151,3 +151,18 @@ renderShell = function () {
   _renderShell508();
   $$('.side .navs .nav[data-p]').forEach(n => { if (!$('.sl', n)) n.insertAdjacentHTML('beforeend', `<span class="sl">${RAIL_SHORT[n.dataset.p] || $('.lb', n)?.textContent || ''}</span>`); });
 };
+
+/* v5.0.9 — settings save bar: floating, never hidden behind the tab bar, shows unsaved changes */
+const _settings509 = VIEWS.settings;
+VIEWS.settings = pg => {
+  _settings509(pg);
+  const f = $('#stf', pg), row = f && $(':scope > .row', f); if (!row) return;
+  row.removeAttribute('style'); row.classList.add('savebar');
+  const btn = $('button', row); if (!btn) return;
+  btn.classList.add('savebtn');
+  row.insertAdjacentHTML('afterbegin', '<span class="sb-state">ยังไม่มีการแก้ไข</span>');
+  const st = $('.sb-state', row);
+  const dirty = on => { row.classList.toggle('dirty', on); st.textContent = on ? '● มีการแก้ไขที่ยังไม่บันทึก' : 'ยังไม่มีการแก้ไข'; };
+  f.addEventListener('input', () => dirty(true)); f.addEventListener('change', () => dirty(true));
+  btn.addEventListener('click', () => { setTimeout(() => { if (!$('.mbg')) { dirty(false); st.textContent = '✓ บันทึกแล้ว'; } }, 1200); });
+};
