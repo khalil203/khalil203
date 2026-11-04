@@ -2,16 +2,26 @@
 stockCountSheet = function (after) {
   const key = 'pos_count_' + S.shop.id;
   let counted = {}; try { counted = JSON.parse(localStorage.getItem(key) || '{}'); } catch {}
-  let filter = Object.keys(counted).length ? 'done' : 'all', lastId = null;
-  const list = () => S.products.filter(p => p.track_stock && p.active !== false);
+  let filter = Object.keys(counted).length ? 'done' : 'all', lastId = null, cat = localStorage.getItem('pos_count_cat') || '';
+  const allTracked = () => S.products.filter(p => p.track_stock && p.active !== false);
+  const list = () => allTracked().filter(p => !cat || (cat === '_none' ? !p.category_id : p.category_id === cat));
   const m = modal('📋 ตรวจนับสต็อก', `<div class="row" style="gap:8px"><div class="sbox" style="flex:1"><span>${ICON.barcodes}</span><input class="in" id="csq" placeholder="สแกนบาร์โค้ด = +1 · 12*บาร์โค้ด = +12 · หรือพิมพ์ชื่อค้นหา" autocomplete="off"></div>
       <button class="btn p" id="cscam">📷 สแกน</button></div>
+      <div class="cs-cats" id="cscat"></div>
       <div class="pills" id="csf" style="margin:10px 0">${[['all', 'ทั้งหมด'], ['done', 'นับแล้ว'], ['todo', 'ยังไม่นับ'], ['diff', 'ยอดไม่ตรง']].map(([k, l]) => `<button data-f="${k}" class="${filter === k ? 'on' : ''}">${l}</button>`).join('')}</div>
       <div id="cl" class="cslist"></div>
       ${Object.keys(counted).length ? '<p class="muted" style="font-size:12px">มีการนับค้างไว้จากครั้งก่อน — นับต่อได้เลย หรือกด “ล้างยอดนับ”</p>' : ''}`,
     { wide: true, foot: `<span class="muted" id="cn"></span><span style="flex:1"></span><button class="btn" id="csclr">ล้างยอดนับ</button><button class="btn ok" id="csave">✔ บันทึกการตรวจนับ</button>` });
   const save = () => localStorage.setItem(key, JSON.stringify(counted));
+  const drawCats = () => {
+    const all = allTracked(), cats = [...S.categories].sort((a, b) => num(a.sort) - num(b.sort)).filter(c => all.some(p => p.category_id === c.id));
+    const chip = (id, label, items) => { const d = items.filter(p => p.id in counted).length; return `<button type="button" data-cc="${id}" class="${cat === id ? 'on' : ''}" ${id && id !== '_none' ? `style="--cc:${esc(S.categories.find(c => c.id === id)?.color || '#6366f1')}"` : ''}>${label}<small>${d}/${items.length}</small>${items.length && d === items.length ? '<em>✓</em>' : ''}</button>`; };
+    $('#cscat', m).innerHTML = chip('', '🗂️ ทุกหมวด', all) + cats.map(c => chip(c.id, `${c.icon ? esc(c.icon) + ' ' : '<i></i>'}${esc(c.name)}`, all.filter(p => p.category_id === c.id))).join('')
+      + (all.some(p => !p.category_id) ? chip('_none', 'ไม่มีหมวด', all.filter(p => !p.category_id)) : '');
+    $$('[data-cc]', m).forEach(b => b.onclick = () => { cat = b.dataset.cc; localStorage.setItem('pos_count_cat', cat); drawCats(); draw(); });
+  };
   const draw = () => {
+    drawCats.done || (drawCats(), drawCats.done = true);
     const v = $('#csq', m).value.trim().toLowerCase();
     let L = list().filter(p => !v || p.name.toLowerCase().includes(v) || (p.barcode || '').includes(v));
     if (filter === 'done') L = L.filter(p => p.id in counted); if (filter === 'todo') L = L.filter(p => !(p.id in counted)); if (filter === 'diff') L = L.filter(p => p.id in counted && counted[p.id] !== num(p.stock));
@@ -22,7 +32,9 @@ stockCountSheet = function (after) {
         <div class="qty"><button data-m="${p.id}">−</button><input class="in" type="number" step="any" inputmode="decimal" data-c="${p.id}" value="${c ?? ''}" placeholder="—"><button data-p="${p.id}">+</button></div>
         <b class="csd" style="color:${d == null ? 'var(--muted)' : d < 0 ? 'var(--bad)' : d > 0 ? 'var(--ok)' : 'var(--ink)'}">${d == null ? '' : d === 0 ? '✓' : (d > 0 ? '+' : '') + qtyf(d)}</b></div>`; }).join('') : '<div class="empty">ไม่มีรายการ</div>';
     const done = Object.keys(counted).length, diff = Object.keys(counted).filter(id => { const p = S.products.find(x => x.id === id); return p && counted[id] !== num(p.stock); }).length;
-    $('#cn', m).textContent = `นับแล้ว ${done}/${list().length} · ยอดไม่ตรง ${diff}`;
+    const inCat = list().filter(p => p.id in counted).length;
+    $('#cn', m).textContent = cat ? `หมวดนี้นับแล้ว ${inCat}/${list().length} · ทั้งหมด ${done}/${allTracked().length} · ยอดไม่ตรง ${diff}` : `นับแล้ว ${done}/${list().length} · ยอดไม่ตรง ${diff}`;
+    drawCats();
     $$('[data-c]', m).forEach(i => i.onchange = () => { if (i.value === '') delete counted[i.dataset.c]; else counted[i.dataset.c] = num(i.value); lastId = i.dataset.c; save(); draw(); });
     $$('[data-p]', m).forEach(b => b.onclick = () => { counted[b.dataset.p] = (counted[b.dataset.p] || 0) + 1; lastId = b.dataset.p; save(); draw(); });
     $$('[data-m]', m).forEach(b => b.onclick = () => { counted[b.dataset.m] = Math.max(0, (counted[b.dataset.m] || 0) - 1); lastId = b.dataset.m; save(); draw(); });
@@ -31,6 +43,7 @@ stockCountSheet = function (after) {
     const p = S.products.find(x => x.barcode === code || x.sku === code);
     if (!p) { if (looksCode(code)) { unknownBarcode(code); } return false; }
     if (!p.track_stock) { toast(`${p.name} ไม่ได้ตัดสต็อก`, 'bad'); return true; }
+    if (cat && !list().includes(p)) { cat = ''; localStorage.setItem('pos_count_cat', ''); toast(`สลับไปทุกหมวด — ${p.name} อยู่หมวดอื่น`); }
     counted[p.id] = (counted[p.id] || 0) + n; lastId = p.id; save(); sfx('scan'); if (filter === 'todo') filter = 'all';
     $$('#csf button', m).forEach(b => b.classList.toggle('on', b.dataset.f === filter)); $('#csq', m).value = ''; draw(); return true; };
   const q0 = $('#csq', m);

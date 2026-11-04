@@ -1366,3 +1366,16 @@ html.pfs .cartfab{bottom:calc(14px + var(--safe-b))}
   html.v5 .cats .tab{height:40px}.pv-btn{height:46px}
   html.v5 .pos .left{gap:8px;padding-top:8px}
 }
+/* v5.1 — stock count category menu */
+.cs-cats{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;padding:10px 0 2px}.cs-cats::-webkit-scrollbar{display:none}
+.cs-cats button{flex:none;display:flex;align-items:center;gap:6px;height:40px;padding:0 12px;border-radius:12px;border:1px solid var(--line);background:var(--card);font:inherit;font-weight:700;font-size:13.5px;cursor:pointer;color:var(--ink);white-space:nowrap}
+.cs-cats button i{width:10px;height:10px;border-radius:50%;background:var(--cc)}
+.cs-cats button small{padding:1px 7px;border-radius:999px;background:#0000000d;font-size:11.5px;color:var(--muted)}
+.cs-cats button em{font-style:normal;color:#16a34a;font-weight:900}
+.cs-cats button.on{background:linear-gradient(135deg,#2f86ff,#1660f0);color:#fff;border-color:transparent}.cs-cats button.on small{background:#ffffff33;color:#fff}.cs-cats button.on em{color:#bbf7d0}
+.hk-list{display:flex;flex-direction:column;gap:8px;margin-bottom:12px}
+.hk{display:flex;align-items:center;gap:12px;padding:10px 12px;border:1px solid var(--line);border-radius:14px;cursor:pointer;background:var(--card)}
+.hk input{width:18px;height:18px;flex:none}.hk span{font-size:22px}.hk div{display:flex;flex-direction:column}.hk small{color:var(--muted);font-size:12px}
+.hk.on{border-color:#ef4444;background:#fef2f2}html[data-theme=dark] .hk.on{background:#3b1219}
+.hk-prev{padding:12px;border-radius:12px;background:var(--brandsoft);font-size:14px}
+.sq-del{padding:0 8px!important;min-height:30px!important}
