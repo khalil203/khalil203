@@ -1252,3 +1252,17 @@ html[data-theme=dark].v5 .pcard .pr b{color:#fb7185}
 html[data-theme=dark].v5 .cart .citem .qty button,html[data-theme=dark].v5 .cashbar.dock button.pri{background:var(--card2);color:var(--ink)}
 html[data-theme=dark].v5 .kpi small{color:var(--muted)}
 html[data-theme=dark].v5 .top #tact .btn,html[data-theme=dark] .pv-btn{background:var(--card);color:var(--ink);border-color:var(--line)}
+/* v5.0.5 — stronger text contrast everywhere */
+html.v5:not([data-theme=dark]){--ink:#0b1324;--muted:#3f4b5e;--line:#d5deee}
+html.v5 body{color:var(--ink);font-weight:500;-webkit-font-smoothing:antialiased}
+html.v5 .muted,html.v5 small,html.v5 .k,html.v5 label.f,html.v5 .f{color:var(--muted)}
+html.v5:not([data-theme=dark]) .in::placeholder{color:#6b7689;opacity:1}
+html.v5:not([data-theme=dark]) .in{color:#0b1324;border-color:#cfd8ea}
+html.v5:not([data-theme=dark]) .tab:not(.on),html.v5:not([data-theme=dark]) .pills button:not(.on),html.v5:not([data-theme=dark]) .seg button:not(.on){color:#1e293b}
+html.v5:not([data-theme=dark]) .stat .k{color:#334155;font-weight:600}
+html.v5:not([data-theme=dark]) .kpi small{color:#1e293b}html.v5:not([data-theme=dark]) .kpi em:not(.up):not(.dn){color:#475569}
+html.v5:not([data-theme=dark]) .side .nav{color:#e8efff}
+html.v5:not([data-theme=dark]) .tabbar .tb{color:#334155}
+html.v5:not([data-theme=dark]) .cart .citem .nm small,html.v5:not([data-theme=dark]) .pf-n small{color:#475569}
+html.v5:not([data-theme=dark]) .tbl th{color:#334155}
+html.v5 .sb-card{display:none!important}

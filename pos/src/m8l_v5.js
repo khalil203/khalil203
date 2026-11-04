@@ -113,7 +113,6 @@ renderShell = function () {
     $('.sb-branch', side).onclick = e => { e.stopPropagation(); branchSwitcher(); };
     const me = $('.me', side);
     if (me) {
-      me.insertAdjacentHTML('beforebegin', `<div class="sb-card"><span>👑</span><div><b>Yanisa Shop v${esc(APP_VERSION)}</b><small>อัปเดตอัตโนมัติ · ใช้งานได้ทุกฟีเจอร์</small></div></div>`);
       const av = $('.av', me); if (av) { av.classList.add('logo'); av.innerHTML = `<img src="${esc(S.shop.logo_url || 'logo-round.png')}" alt="">`; }
       me.insertAdjacentHTML('beforeend', `<button type="button" class="sb-out" title="ออกจากระบบ">${SVG5.out}</button>`);
       $('.sb-out', me).onclick = async () => { if (await confirmBox('ออกจากระบบ?')) logout(); };

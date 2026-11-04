@@ -1423,7 +1423,7 @@ const _goC = go;
 go = function (page) { _goC(page); $('.top')?.classList.toggle('posmode', S.page === 'pos'); };
 /* ================= Shop POS v4 — promotions engine, data center, barcodes, personal use,
    activity log, branding, receipt image, cashier upgrades, auto-update ================= */
-const APP_VERSION = '5.0.4';
+const APP_VERSION = '5.0.5';
 Object.assign(TH, { 'Data center': 'ศูนย์ข้อมูล', 'Barcodes': 'บาร์โค้ด', 'Branches': 'สาขา' });
 PAGES.splice(PAGES.findIndex(p => p.id === 'settings'), 0,
   { id: 'barcodes', ic: '🏷', name: 'Barcodes', roles: ['owner', 'manager', 'stock'] },
@@ -4586,7 +4586,6 @@ renderShell = function () {
     $('.sb-branch', side).onclick = e => { e.stopPropagation(); branchSwitcher(); };
     const me = $('.me', side);
     if (me) {
-      me.insertAdjacentHTML('beforebegin', `<div class="sb-card"><span>👑</span><div><b>Yanisa Shop v${esc(APP_VERSION)}</b><small>อัปเดตอัตโนมัติ · ใช้งานได้ทุกฟีเจอร์</small></div></div>`);
       const av = $('.av', me); if (av) { av.classList.add('logo'); av.innerHTML = `<img src="${esc(S.shop.logo_url || 'logo-round.png')}" alt="">`; }
       me.insertAdjacentHTML('beforeend', `<button type="button" class="sb-out" title="ออกจากระบบ">${SVG5.out}</button>`);
       $('.sb-out', me).onclick = async () => { if (await confirmBox('ออกจากระบบ?')) logout(); };
@@ -4830,6 +4829,27 @@ stockQuick = async function (p, after) {
 };
 /* light theme is the default look (dark only when chosen with the theme button) */
 if (localStorage.getItem('pos_theme_v5') !== '1') { localStorage.setItem('pos_theme_v5', '1'); setTheme('light'); }
+/* ================= v5.0.5 — no surprise keyboard on touch screens ================= */
+(() => {
+  const touch = matchMedia('(hover:none) and (pointer:coarse)').matches || (navigator.maxTouchPoints > 0 && matchMedia('(max-width:1366px)').matches);
+  if (!touch) return;
+  let tapEl = null, tapAt = 0, keyAt = 0;
+  addEventListener('pointerdown', e => { tapEl = e.target; tapAt = Date.now(); }, true);
+  addEventListener('keydown', () => { keyAt = Date.now(); }, true);
+  const TYPING = 'input:not([type=checkbox]):not([type=radio]):not([type=button]):not([type=submit]):not([type=range]):not([type=color]):not([type=file]):not([type=date]):not([type=time]),textarea,[contenteditable=true]';
+  const of = HTMLElement.prototype.focus;
+  HTMLElement.prototype.focus = function (o) {
+    if (this.matches?.(TYPING)) {
+      const tappedIt = tapEl && (tapEl === this || this.contains(tapEl) || tapEl.closest?.('label')?.control === this) && Date.now() - tapAt < 1500;
+      const typing = Date.now() - keyAt < 1500; // hardware keyboard / barcode scanner
+      if (!tappedIt && !typing) return; // the user did not ask for the keyboard
+    }
+    return of.call(this, o);
+  };
+  // strip autofocus from anything that appears later (dialogs, pages)
+  new MutationObserver(ms => ms.forEach(m => m.addedNodes.forEach(n => { if (n.nodeType !== 1) return; if (n.hasAttribute?.('autofocus')) n.removeAttribute('autofocus'); n.querySelectorAll?.('[autofocus]').forEach(x => x.removeAttribute('autofocus')); })))
+    .observe(document.documentElement, { childList: true, subtree: true });
+})();
 /* ================= start ================= */
 updateNet();
 boot().then(() => { updateNet(); syncQueue(); }).catch(e => { fail(e); renderAuth(); });
