@@ -12,20 +12,27 @@ function changePayment(sale, after) {
     <p class="muted" style="margin:10px 0 6px">ตอนนี้บันทึกเป็น <b>${payIcon(sale.payment_method)} ${payName(sale.payment_method)}</b> — เลือกช่องทางที่ถูกต้อง</p>
     <div class="cp-grid">${PAY_EDIT.map(k => `<button type="button" data-pm="${k}" class="${k === pick ? 'on cur' : ''}">${payIcon(k)}<span>${payName(k)}</span>${k === sale.payment_method ? '<small>เดิม</small>' : ''}</button>`).join('')}</div>
     <div class="fg" style="margin-top:12px"><label class="f">เหตุผล <b style="color:var(--bad)">* บังคับ</b></label>
-      <div class="cp-rs">${CP_REASONS.map(([k, t]) => `<button type="button" data-rs="${k}">${t}</button>`).join('')}</div>
-      <input class="in" id="cpr" placeholder="เลือกเหตุผลด้านบน หรือพิมพ์เพิ่มเติม" style="margin-top:8px"></div>
+      <button type="button" class="cp-dd" id="cpdd"><span id="cpdl">— แตะเพื่อเลือกเหตุผล —</span><i>▾</i></button>
+      <div class="cp-menu hidden" id="cpmenu">${CP_REASONS.map(([k, t]) => `<button type="button" data-rs="${k}">${payIcon(CP_REASONS.find(r => r[0] === k)[2])} ${t}</button>`).join('')}<button type="button" data-rs="_own">✏️ พิมพ์เหตุผลเอง</button></div>
+      <input class="in hidden" id="cpr" placeholder="พิมพ์เหตุผล" style="margin-top:8px"></div>
     <p class="muted" style="font-size:12px;margin:0">ระบบจะบันทึกไว้ว่าใครแก้ เมื่อไหร่ จากอะไรเป็นอะไร</p>`,
     { foot: '<button class="btn" data-c>ยกเลิก</button><span style="flex:1"></span><button class="btn p" id="cpok" disabled>✔ บันทึกการแก้ไข</button>' });
   const valid = () => { $('#cpok', m).disabled = pick === sale.payment_method || !$('#cpr', m).value.trim(); };
-  const setReason = k => { const r = CP_REASONS.find(x => x[0] === k); $$('[data-rs]', m).forEach(x => x.classList.toggle('on', x.dataset.rs === k)); if (r) $('#cpr', m).value = r[1]; valid(); };
+  const menu = $('#cpmenu', m), dd = $('#cpdd', m);
+  const setReason = k => { const r = CP_REASONS.find(x => x[0] === k); $$('[data-rs]', m).forEach(x => x.classList.toggle('on', x.dataset.rs === k));
+    if (r) { $('#cpr', m).value = r[1]; $('#cpdl', m).textContent = r[1]; dd.classList.add('set'); $('#cpr', m).classList.add('hidden'); } valid(); };
+  dd.onclick = e => { e.stopPropagation(); menu.classList.toggle('hidden'); dd.classList.toggle('open', !menu.classList.contains('hidden')); };
+  m.addEventListener('click', e => { if (!e.target.closest('#cpmenu,#cpdd')) { menu.classList.add('hidden'); dd.classList.remove('open'); } });
   $$('[data-pm]', m).forEach(b => b.onclick = () => { pick = b.dataset.pm; $$('[data-pm]', m).forEach(x => x.classList.toggle('on', x === b));
     setReason(pick === 'cash' ? 'cash' : pick === 'promptpay' ? 'scan' : pick === 'transfer' ? 'transfer' : ''); });
-  $$('[data-rs]', m).forEach(b => b.onclick = () => { setReason(b.dataset.rs); const r = CP_REASONS.find(x => x[0] === b.dataset.rs);
+  $$('[data-rs]', m).forEach(b => b.onclick = () => { menu.classList.add('hidden'); dd.classList.remove('open');
+    if (b.dataset.rs === '_own') { $('#cpdl', m).textContent = '✏️ พิมพ์เหตุผลเอง'; dd.classList.add('set'); const i = $('#cpr', m); i.classList.remove('hidden'); i.value = ''; i.focus(); valid(); return; }
+    setReason(b.dataset.rs); const r = CP_REASONS.find(x => x[0] === b.dataset.rs);
     if (r && r[2] !== pick) { pick = r[2]; $$('[data-pm]', m).forEach(x => x.classList.toggle('on', x.dataset.pm === pick)); } valid(); });
-  $('#cpr', m).oninput = () => { $$('[data-rs]', m).forEach(x => x.classList.toggle('on', CP_REASONS.find(r => r[0] === x.dataset.rs)[1] === $('#cpr', m).value.trim())); valid(); };
+  $('#cpr', m).oninput = valid;
   $('[data-c]', m).onclick = m.close;
   $('#cpok', m).onclick = async () => {
-    if (!$('#cpr', m).value.trim()) { $('#cpr', m).focus(); return toast('กรุณาระบุเหตุผล', 'bad'); }
+    if (!$('#cpr', m).value.trim()) { dd.click(); return toast('กรุณาระบุเหตุผล', 'bad'); }
     const b = $('#cpok', m); b.disabled = true;
     try { await q(sb.rpc('change_sale_payment', { p_sale: sale.id, p_method: pick, p_reason: $('#cpr', m).value.trim() }));
       const old = sale.payment_method; sale.payment_method = pick; if (sale._payments) sale._payments = [{ method: pick, amount: sale.total }];
