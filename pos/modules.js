@@ -5599,7 +5599,7 @@ async function syncTick() {
     if (SYNC_LAST !== null && full !== SYNC_LAST) {
       // fresh stock numbers
       try { const ps = await q(sb.from('products').select('id,stock').eq('shop_id', S.shop.id)); const m = new Map(ps.map(p => [p.id, p.stock])); S.products.forEach(p => { if (m.has(p.id)) p.stock = m.get(p.id); }); } catch {}
-      const busy = $('.mbg') || (document.activeElement && /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName));
+      const ae = document.activeElement, busy = $('.mbg') || (ae && /INPUT|TEXTAREA/.test(ae.tagName) && ae.value && ae.type !== 'range');
       if (S.page === 'pos') { try { await loadPosStats(); } catch {} if (!busy && !S.cart.length) try { drawGrid(); } catch {} }
       else if (!busy && ['sales', 'dashboard', 'stock', 'products'].includes(S.page)) go(S.page);
     }
