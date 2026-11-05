@@ -1466,3 +1466,10 @@ html.v5 .cart .hd.ch #cartClose[style*="none"]{display:none}
 .so-box{display:flex;flex-direction:column;gap:10px}.so-row{display:flex;gap:12px;align-items:center;padding:10px;border-radius:14px;background:color-mix(in srgb,#dc2626 8%,var(--card))}
 .so-img{width:64px;height:64px;border-radius:12px;background-size:cover;background-position:center;flex-shrink:0}
 .so-tx{display:flex;flex-direction:column;gap:4px;min-width:0}.so-tx b{font-size:17px}.so-tx .bad{color:#dc2626;font-weight:800;font-size:15px}.so-tx .warn{color:#d97706;font-weight:800;font-size:15px}
+/* v5.2.8 supplier picker */
+.sp-btn{display:flex;align-items:center;gap:10px;width:100%;min-height:52px;padding:10px 14px;border-radius:14px;border:2px solid color-mix(in srgb,var(--pri) 35%,var(--line));background:var(--card);cursor:pointer;font:inherit;font-size:16px;font-weight:700;color:var(--ink);text-align:left}
+.sp-btn:active{transform:scale(.98)}.sp-ic{font-size:22px}.sp-nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.sp-ch{font-size:24px;color:var(--muted)}
+.sp-top{display:flex;gap:10px;align-items:center}.sp-top .btn{white-space:nowrap;min-height:46px}
+.sp-list{display:flex;flex-direction:column;gap:10px;max-height:55vh;overflow:auto;padding-bottom:6px}
+.sp-item{display:flex;align-items:center;gap:8px;width:100%;padding:16px 20px;border-radius:999px;border:2px solid transparent;background:var(--card2,#f3f4f8);font:inherit;font-size:18px;color:var(--ink);cursor:pointer;text-align:left}
+.sp-item.on{border-color:var(--pri);background:color-mix(in srgb,var(--pri) 12%,var(--card))}.sp-item i{margin-left:auto;font-style:normal;color:var(--pri);font-weight:900}
