@@ -1,6 +1,6 @@
 /* Shop POS — free, open POS + stock web app.  Data: Supabase.  Hosting: GitHub Pages. */
 'use strict';
-const VERSION = '5.4.5';
+const VERSION = '5.4.6';
 const sb = supabase.createClient(window.POS_CONFIG.url, window.POS_CONFIG.key, { auth: { flowType: 'pkce', detectSessionInUrl: true, persistSession: true } });
 
 /* ================= i18n ================= */
@@ -236,23 +236,57 @@ async function boot() {
   if (!session) return renderAuth();
   S.user = session.user;
   if (location.search.includes('code=')) history.replaceState(null, '', location.pathname + location.hash);
-  try { await sb.rpc('accept_invites'); } catch (e) { /* ignore */ }
+  const startPage = () => location.hash.slice(1) || (canDo('dashboard') && matchMedia('(min-width:861px)').matches ? 'dashboard' : 'pos');
+  // FAST START: this device already has this user's shop data → show it at once, refresh from the server in the background
   try {
-    const mems = await q(sb.from('shop_members').select('role, permissions, active, display_name, username, shop:shops(*)').eq('user_id', S.user.id));
-    S.shops = mems.filter(m => m.shop && m.active !== false).map(m => ({ ...m.shop, _role: m.role, _perms: m.permissions, _name: m.display_name, _username: m.username }));
-    localStorage.setItem('pos_shops_cache', JSON.stringify(S.shops));
-  } catch (e) {
-    S.shops = JSON.parse(localStorage.getItem('pos_shops_cache') || '[]'); if (!S.shops.length) throw e;
-    setTimeout(() => toast(LANG === 'th' ? 'ออฟไลน์ — ใช้ข้อมูลที่บันทึกไว้ในเครื่อง' : 'Offline — using data saved on this device', 'bad'), 500);
-  }
-  if (!S.shops.length) { await sb.auth.signOut(); renderAuth(); return toast(LANG === 'th' ? 'บัญชีนี้ยังไม่ได้รับสิทธิ์เข้าร้าน — ติดต่อผู้ดูแลร้าน' : 'This account has no shop access — contact the admin', 'bad'); }
+    const cs = localStorage.getItem('pos_cache_uid') === S.user.id ? JSON.parse(localStorage.getItem('pos_shops_cache') || '[]') : [];
+    const want = localStorage.getItem('pos_shop'), shop = cs.find(s => s.id === want) || cs[0];
+    const master = shop && JSON.parse(localStorage.getItem('pos_cache_' + shop.id) || 'null');
+    if (shop && master && master.products) {
+      S.shops = cs; S.shop = shop; S.role = shop._role; Object.assign(S, master);
+      renderShell(); go(startPage());
+      bootRefresh().catch(() => {});
+      return;
+    }
+  } catch (e) { /* bad cache → normal start */ }
+  await loadMembership();
+  if (!S.shops.length) { await sb.auth.signOut(); renderAuth(); return toast(LANG === 'th' ? 'บัญชีนี้ยังไม่ได้รับสิทธิ์เข้าร้าน — ติดต่อผู้ดูแลร้าน' : 'This account has no shop access yet — ask the shop admin', 'bad'); }
   const want = localStorage.getItem('pos_shop');
   S.shop = S.shops.find(s => s.id === want) || S.shops[0];
   S.role = S.shop._role;
   localStorage.setItem('pos_shop', S.shop.id);
   await loadMaster();
   renderShell();
-  go(location.hash.slice(1) || (canDo('dashboard') && matchMedia('(min-width:861px)').matches ? 'dashboard' : 'pos'));
+  go(startPage());
+}
+async function loadMembership() {
+  const memQ = () => q(sb.from('shop_members').select('role, permissions, active, display_name, username, shop:shops(*)').eq('user_id', S.user.id));
+  try {
+    // invites and membership are asked at the same time; ask again only if an invite just added a shop
+    const [, first] = await Promise.all([sb.rpc('accept_invites').then(r => r, () => null), memQ()]);
+    let mems = first; if (!mems.some(m => m.shop && m.active !== false)) mems = await memQ();
+    S.shops = mems.filter(m => m.shop && m.active !== false).map(m => ({ ...m.shop, _role: m.role, _perms: m.permissions, _name: m.display_name, _username: m.username }));
+    localStorage.setItem('pos_shops_cache', JSON.stringify(S.shops)); localStorage.setItem('pos_cache_uid', S.user.id);
+  } catch (e) {
+    S.shops = localStorage.getItem('pos_cache_uid') === S.user.id ? JSON.parse(localStorage.getItem('pos_shops_cache') || '[]') : [];
+    if (!S.shops.length) throw e;
+    setTimeout(() => toast(LANG === 'th' ? 'ออฟไลน์ — ใช้ข้อมูลที่บันทึกไว้ในเครื่อง' : 'Offline — using data saved on this device', 'bad'), 500);
+  }
+}
+/* after a fast start: check access + fresh data, then quietly redraw */
+async function bootRefresh() {
+  if (!navigator.onLine) return;
+  const oldRole = S.role, shopId = S.shop.id;
+  await loadMembership();
+  const fresh = S.shops.find(s => s.id === shopId);
+  if (!fresh) { if (!S.shops.length) { await sb.auth.signOut(); return renderAuth(); } localStorage.removeItem('pos_shop'); return boot(); }
+  S.shop = fresh; S.role = fresh._role;
+  await loadMaster();
+  const busy = $('.mbg') || (document.activeElement && /INPUT|TEXTAREA/.test(document.activeElement.tagName) && document.activeElement.value);
+  if (S.role !== oldRole) { renderShell(); go(S.page || 'pos'); return; }
+  if (busy) return;
+  if (S.page === 'pos') { try { if (!S.cart.length) drawGrid(); loadPosStats?.(); } catch {} }
+  else if (['stock', 'products', 'barcodes'].includes(S.page)) go(S.page);
 }
 
 async function loadMaster() {
