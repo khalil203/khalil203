@@ -36,7 +36,7 @@ function unknownBarcode(code, qty = 1) {
     </div>${edit ? '' : '<p class="muted" style="font-size:13px">ให้ผู้จัดการหรือเจ้าของร้านเพิ่มสินค้านี้ในระบบ</p>'}`);
   let info = null;
   offLookup(code).then(r => { info = r; const el = $('#ubinfo', m); if (!el) return;
-    el.innerHTML = r && r.name ? `พบข้อมูล: <b>${esc(r.name)}</b>${r.brand ? ' · ' + esc(r.brand) : ''} — จะเติมให้อัตโนมัติ` : (/^\d{8,14}$/.test(code) ? 'ไม่พบข้อมูลสาธารณะ — กรอกเองได้' : ''); });
+    el.innerHTML = r && r.name ? `<div class="ub-found">${r.image ? `<img src="${esc(r.image)}" alt="">` : ''}<div><small>พบข้อมูลสินค้าอัตโนมัติ</small><b>${esc(r.name)}</b>${r.brand ? `<span>${esc(r.brand)}</span>` : ''}<em>กด “เพิ่มเป็นสินค้าใหม่” — ชื่อและรูปจะเติมให้เอง</em></div></div>` : (/^\d{8,14}$/.test(code) ? 'ไม่พบข้อมูลสาธารณะ — กรอกเองได้' : ''); });
   const sellAfter = p => { if (S.page === 'pos' && p) { addToCart(p, qty); } };
   $$('[data-a]', m).forEach(b => b.onclick = async () => {
     const a = b.dataset.a; m.close();

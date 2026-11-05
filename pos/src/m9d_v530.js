@@ -3,7 +3,7 @@ const SCAN_LOG = [];
 const scanFind = c => { const v = String(c).trim(); if (!v) return null;
   return S.products.find(p => p.barcode === v || p.sku === v) || S.products.find(p => (p.units || []).some(u => u.barcode === v)) || null; };
 
-function handleScan(code, src) {
+let handleScan = function (code, src) {
   code = String(code).trim().replace(/[\r\n\t]/g, ''); if (code.length < 3) return;
   let qty = 1; const mm = code.match(/^(\d+(?:\.\d+)?)\*(.+)$/); if (mm) { qty = num(mm[1]); code = mm[2]; }
   const hit = scanFind(code);
@@ -21,7 +21,7 @@ function handleScan(code, src) {
   if (!hit) return unknownBarcode(code);
   if (pg !== 'pos') go('pos');
   sfx('scan'); addToCart(hit, qty);
-}
+};
 
 (() => {
   const TYPING = 'input:not([type=checkbox]):not([type=radio]):not([type=button]):not([type=submit]):not([type=range]):not([type=color]):not([type=file]),textarea,select,[contenteditable=true]';
@@ -80,3 +80,30 @@ VIEWS.settings = pg => {
     $('#scanLive')?.classList.add('got'); setTimeout(() => $('#scanLive')?.classList.remove('got'), 600); };
   document.addEventListener('pos-scan', onScan);
 };
+
+/* v5.3.1 — every scan pops a big product card (picture, name, price, stock, qty in cart) */
+function scanPop(p) {
+  $('#scanPop')?.remove(); clearTimeout(scanPop._t);
+  const inCart = S.cart.filter(l => l.product_id === p.id).reduce((a, l) => a + num(l.qty), 0);
+  const bg = p.tile_color || catColor(p.category_id);
+  const pic = isImg(p) ? `<div class="spp-img" style="background-image:url('${esc(p.image_url)}')"></div>` : `<div class="spp-img ph" style="background:${esc(bg)}">${esc((p.name || '?').trim().charAt(0))}</div>`;
+  const low = p.track_stock && num(p.stock) - inCart <= num(p.low_stock || 0);
+  document.body.insertAdjacentHTML('beforeend', `<div id="scanPop" class="spp"><div class="spp-card">${pic}
+    <div class="spp-tx"><small>📡 ${esc(p.barcode || p.sku || '')}</small><b>${esc(p.name)}</b>
+      <div class="spp-pr">฿${money(p.price)}<span>/ ${esc(p.unit || 'ชิ้น')}</span></div>
+      <div class="spp-row"><span class="chip ok">✓ ในตะกร้า ${qtyf(inCart)}</span>${p.track_stock ? `<span class="chip ${low ? 'warn' : ''}">เหลือ ${qtyf(num(p.stock) - inCart)}</span>` : ''}</div></div></div></div>`);
+  const el = $('#scanPop'); el.onclick = () => el.remove();
+  requestAnimationFrame(() => el.classList.add('in'));
+  scanPop._t = setTimeout(() => { el.classList.remove('in'); setTimeout(() => el.remove(), 250); }, 2200);
+}
+const _handleScan531 = handleScan;
+handleScan = function (code, src) {
+  const before = S.cart.reduce((a, l) => a + num(l.qty), 0);
+  const r = _handleScan531(code, src);
+  const c = String(code).trim().replace(/^\d+(?:\.\d+)?\*/, ''), hit = scanFind(c);
+  if (hit && S.page === 'pos' && !$('.mbg') && S.cart.reduce((a, l) => a + num(l.qty), 0) > before) scanPop(hit);
+  return r;
+};
+/* the camera button on the cashier uses the same flow */
+const _posView531 = VIEWS.pos;
+VIEWS.pos = pg => { _posView531(pg); const b = $('#scanBtn'); if (b) b.onclick = () => scanBarcode(code => handleScan(code, 'cam')); };
