@@ -1,6 +1,6 @@
 /* Shop POS — free, open POS + stock web app.  Data: Supabase.  Hosting: GitHub Pages. */
 'use strict';
-const VERSION = '5.4.4';
+const VERSION = '5.4.5';
 const sb = supabase.createClient(window.POS_CONFIG.url, window.POS_CONFIG.key, { auth: { flowType: 'pkce', detectSessionInUrl: true, persistSession: true } });
 
 /* ================= i18n ================= */
@@ -471,6 +471,7 @@ VIEWS.pos = pg => {
   </div>`;
   const drawCats = () => {
     const cats = [{id: 'all', name: '🏠 ' + t('All')}, {id: 'fav', name: '★ ' + (LANG === 'th' ? 'รายการโปรด' : 'Favorites')}, {id: 'best', name: '🔥 ' + (LANG === 'th' ? 'ขายดี' : 'Best sellers')}, {id: 'recent', name: '🕘 ' + (LANG === 'th' ? 'ขายล่าสุด' : 'Recently sold')}, ...S.categories];
+    if (!$('#cats')) return;
     $('#cats').innerHTML = cats.map(c => `<button class="tab ${S.cat === c.id ? 'on' : ''}" data-c="${c.id}" ${c.color ? `style="--cc:${esc(c.color)}"` : ''}>${c.icon ? esc(c.icon) + ' ' : c.color ? '<i class="dot"></i>' : ''}${esc(c.name)} <small>${countIn(c.id)}</small></button>`).join('');
     $$('#cats .tab').forEach(b => b.onclick = () => { S.cat = b.dataset.c; drawCats(); drawGrid(); });
   };
@@ -623,7 +624,7 @@ function pickImage(capture) {
     i.onchange = () => res(i.files[0] || null); i.click();
   });
 }
-async function resizeImage(file, max = 800) {
+async function resizeImage(file, max = 640) {
   const bmp = await createImageBitmap(file);
   const sc = Math.min(1, max / Math.max(bmp.width, bmp.height));
   const cv = document.createElement('canvas'); cv.width = Math.round(bmp.width * sc); cv.height = Math.round(bmp.height * sc);
@@ -664,16 +665,18 @@ async function webImageBlob(url) {
   return await r.blob();
 }
 /* convert any picture to a square-fit PNG (max 600px) */
-async function toPng(blob, max = 600) {
+async function toPng(blob, max = 520) {
   const bmp = await createImageBitmap(blob);
   const sc = Math.min(1, max / Math.max(bmp.width, bmp.height));
   const cv = document.createElement('canvas'); cv.width = Math.round(bmp.width * sc); cv.height = Math.round(bmp.height * sc);
   cv.getContext('2d').drawImage(bmp, 0, 0, cv.width, cv.height);
-  return await new Promise(r => cv.toBlob(b => r(b), 'image/png'));
+  // WebP keeps transparency but is ~10× smaller than PNG for photos
+  return await new Promise(r => cv.toBlob(b => r(b && b.type === 'image/webp' ? b : null), 'image/webp', 0.82)) || await new Promise(r => cv.toBlob(b => r(b), 'image/png'));
 }
 async function savePng(p, png) {
-  const path = `${S.shop.id}/${p.id}-${Date.now()}.png`;
-  const { error } = await sb.storage.from('product-images').upload(path, png, { contentType: 'image/png', upsert: true });
+  const ext = png.type === 'image/webp' ? 'webp' : 'png';
+  const path = `${S.shop.id}/${p.id}-${Date.now()}.${ext}`;
+  const { error } = await sb.storage.from('product-images').upload(path, png, { contentType: png.type || 'image/png', upsert: true });
   if (error) throw error;
   const url = sb.storage.from('product-images').getPublicUrl(path).data.publicUrl;
   await q(sb.from('products').update({ image_url: url }).eq('id', p.id)); p.image_url = url;
@@ -1193,8 +1196,8 @@ function productForm(p, after) {
       $('#fw', w).innerHTML = imgs.map((x, i) => `<button data-i="${i}"><img src="${esc(x.thumb)}" loading="lazy" referrerpolicy="no-referrer" onerror="this.parentNode.remove()"></button>`).join('') || '—';
       $$('[data-i]', w).forEach(b => b.onclick = async () => { b.classList.add('busy');
         try { let blob; try { blob = await webImageBlob(imgs[+b.dataset.i].url); } catch (e) { blob = await webImageBlob(imgs[+b.dataset.i].thumb); }
-          const png = await toPng(blob); const path = `${S.shop.id}/${crypto.randomUUID()}.png`;
-          const { error } = await sb.storage.from('product-images').upload(path, png, { contentType: 'image/png' }); if (error) throw error;
+          const png = await toPng(blob); const path = `${S.shop.id}/${crypto.randomUUID()}.${png.type === 'image/webp' ? 'webp' : 'png'}`;
+          const { error } = await sb.storage.from('product-images').upload(path, png, { contentType: png.type || 'image/png' }); if (error) throw error;
           setImg(sb.storage.from('product-images').getPublicUrl(path).data.publicUrl); w.close(); toast(t('Saved'), 'ok'); } catch (e) { b.classList.remove('busy'); fail(e); } });
     } catch (e) { fail(e); }
   };

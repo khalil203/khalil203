@@ -309,8 +309,8 @@ VIEWS.settings = pg => {
   };
 };
 async function savePngLogo(file) {
-  const png = await toPng(file, 400); const path = `${S.shop.id}/logo-${Date.now()}.png`;
-  const { error } = await sb.storage.from('product-images').upload(path, png, { contentType: 'image/png' }); if (error) throw error;
+  const png = await toPng(file, 400); const path = `${S.shop.id}/logo-${Date.now()}.${png.type === 'image/webp' ? 'webp' : 'png'}`;
+  const { error } = await sb.storage.from('product-images').upload(path, png, { contentType: png.type || 'image/png' }); if (error) throw error;
   return sb.storage.from('product-images').getPublicUrl(path).data.publicUrl;
 }
 

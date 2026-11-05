@@ -71,6 +71,7 @@ VIEWS.dashboard = pg => {
     const months = []; for (let i = 11; i >= 0; i--) { const d = new Date(new Date().getFullYear(), new Date().getMonth() - i, 1); months.push([d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'), d]); }
     const monTot = {}; yearS.forEach(s => { const k = s.created_at.slice(0, 7); monTot[k] = (monTot[k] || 0) + num(s.total) - num(s.refunded_total); });
     const kpi = (ic, k, v, sub = '', col = '') => `<div class="stat"><div class="k">${ic} ${k}</div><div class="v" ${col ? `style="color:${col}"` : ''}>${v}</div>${sub ? `<div class="muted" style="font-size:12px;margin-top:4px">${sub}</div>` : ''}</div>`;
+    if (!$('#db')) return; // page was left while loading
     $('#db').innerHTML = `
       <div class="stats">
         ${kpi('💰', 'ยอดขายสุทธิ (หลังคืนเงิน)', baht(revenue), trend(revenue, prevRev) + ' เทียบช่วงก่อนหน้า')}

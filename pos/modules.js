@@ -333,6 +333,7 @@ VIEWS.dashboard = pg => {
     const months = []; for (let i = 11; i >= 0; i--) { const d = new Date(new Date().getFullYear(), new Date().getMonth() - i, 1); months.push([d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'), d]); }
     const monTot = {}; yearS.forEach(s => { const k = s.created_at.slice(0, 7); monTot[k] = (monTot[k] || 0) + num(s.total) - num(s.refunded_total); });
     const kpi = (ic, k, v, sub = '', col = '') => `<div class="stat"><div class="k">${ic} ${k}</div><div class="v" ${col ? `style="color:${col}"` : ''}>${v}</div>${sub ? `<div class="muted" style="font-size:12px;margin-top:4px">${sub}</div>` : ''}</div>`;
+    if (!$('#db')) return; // page was left while loading
     $('#db').innerHTML = `
       <div class="stats">
         ${kpi('💰', 'ยอดขายสุทธิ (หลังคืนเงิน)', baht(revenue), trend(revenue, prevRev) + ' เทียบช่วงก่อนหน้า')}
@@ -1194,8 +1195,8 @@ VIEWS.settings = pg => {
   };
 };
 async function savePngLogo(file) {
-  const png = await toPng(file, 400); const path = `${S.shop.id}/logo-${Date.now()}.png`;
-  const { error } = await sb.storage.from('product-images').upload(path, png, { contentType: 'image/png' }); if (error) throw error;
+  const png = await toPng(file, 400); const path = `${S.shop.id}/logo-${Date.now()}.${png.type === 'image/webp' ? 'webp' : 'png'}`;
+  const { error } = await sb.storage.from('product-images').upload(path, png, { contentType: png.type || 'image/png' }); if (error) throw error;
   return sb.storage.from('product-images').getPublicUrl(path).data.publicUrl;
 }
 
@@ -1422,7 +1423,7 @@ const _goC = go;
 go = function (page) { _goC(page); $('.top')?.classList.toggle('posmode', S.page === 'pos'); };
 /* ================= Shop POS v4 — promotions engine, data center, barcodes, personal use,
    activity log, branding, receipt image, cashier upgrades, auto-update ================= */
-const APP_VERSION = '5.4.4';
+const APP_VERSION = '5.4.5';
 Object.assign(TH, { 'Data center': 'ศูนย์ข้อมูล', 'Barcodes': 'บาร์โค้ด', 'Branches': 'สาขา' });
 PAGES.splice(PAGES.findIndex(p => p.id === 'settings'), 0,
   { id: 'barcodes', ic: '🏷', name: 'Barcodes', roles: ['owner', 'manager', 'stock'] },
