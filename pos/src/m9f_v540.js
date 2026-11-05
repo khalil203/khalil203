@@ -34,3 +34,12 @@ function bcSelBar(n) {
   el.innerHTML = `🖨️ พิมพ์ฉลาก <b>${n}</b> รายการที่เลือก`;
 }
 const _go540 = go; go = function (...a) { if (a[0] !== 'barcodes') $('#bcSel')?.remove(); return _go540.apply(this, a); };
+/* v5.4.1 — how many cards per row (phone default 3), remembered per device */
+function bcCols(pg, d) {
+  const phone = innerWidth < 600, key = 'pos_bc_cols_' + (phone ? 'm' : 'd'), def = phone ? 3 : Math.max(4, Math.min(7, Math.round((innerWidth - 120) / 190)));
+  let n = +localStorage.getItem(key) || def; n = Math.max(1, Math.min(phone ? 5 : 10, n + d));
+  if (d) localStorage.setItem(key, n);
+  $$('.bcg', pg).forEach(g => g.style.setProperty('--bccols', n));
+  pg.style.setProperty('--bccols', n); pg.classList.toggle('bc-small', n >= (phone ? 4 : 8));
+  const v = $('#bczv', pg); if (v) v.textContent = `${n} / แถว`;
+}

@@ -1422,7 +1422,7 @@ const _goC = go;
 go = function (page) { _goC(page); $('.top')?.classList.toggle('posmode', S.page === 'pos'); };
 /* ================= Shop POS v4 — promotions engine, data center, barcodes, personal use,
    activity log, branding, receipt image, cashier upgrades, auto-update ================= */
-const APP_VERSION = '5.4.0';
+const APP_VERSION = '5.4.1';
 Object.assign(TH, { 'Data center': 'ศูนย์ข้อมูล', 'Barcodes': 'บาร์โค้ด', 'Branches': 'สาขา' });
 PAGES.splice(PAGES.findIndex(p => p.id === 'settings'), 0,
   { id: 'barcodes', ic: '🏷', name: 'Barcodes', roles: ['owner', 'manager', 'stock'] },
@@ -1873,7 +1873,7 @@ VIEWS.barcodes = pg => {
       <div class="row" style="margin-bottom:10px"><div class="pills" id="bt">${[['all', 'ทั้งหมด'], ['promo', '🏷️ มีโปรโมชั่น'], ['nopromo', 'ราคาปกติ'], ['has', 'มีบาร์โค้ด'], ['none', 'ไม่มีบาร์โค้ด'], ['dup', 'ซ้ำ'], ['bad', 'เลขตรวจสอบผิด']].map(([k, l]) => `<button data-t="${k}" class="${tab === k ? 'on' : ''}">${l}</button>`).join('')}</div>
         <div class="sbox bc-search"><span>🔍</span><input class="in" id="bq" value="${esc(v)}" placeholder="ชื่อ / บาร์โค้ด / SKU"></div></div>
       ${bcCatSlider(cat, tab, v, list)}
-      <div class="bcg-bar"><button class="btn sm" id="ball">☑️ เลือกทั้งหมด (${rows.length})</button><button class="btn sm" id="bnone">ล้างที่เลือก</button><span class="muted" id="bsel">เลือกแล้ว ${chosen.size}</span><span class="muted" style="font-size:12px">· แตะการ์ดเพื่อเลือก (ไม่เลือก = พิมพ์ทั้งหมดที่แสดง)</span></div>
+      <div class="bcg-bar"><button class="btn sm" id="ball">☑️ เลือกทั้งหมด (${rows.length})</button><button class="btn sm" id="bnone">ล้างที่เลือก</button><span class="bcz"><button class="btn sm" id="bczm" title="รูปใหญ่ขึ้น">−</button><b id="bczv"></b><button class="btn sm" id="bczp" title="แสดงมากขึ้น">＋</button></span><span class="muted" id="bsel">เลือกแล้ว ${chosen.size}</span><span class="muted" style="font-size:12px">· แตะการ์ดเพื่อเลือก (ไม่เลือก = พิมพ์ทั้งหมดที่แสดง)</span></div>
       ${bcGrid(rows.slice(0, 600), chosen, isPromo, !cat)}
       <p class="muted">${rows.length} รายการ${rows.length > 400 ? ' (แสดง 400 แรก)' : ''}</p>`;
     $$('#bt [data-t]', pg).forEach(b => b.onclick = () => { tab = b.dataset.t; draw(); });
@@ -1882,6 +1882,7 @@ VIEWS.barcodes = pg => {
     $('#bq', pg).oninput = e => { v = e.target.value.toLowerCase(); const pos = e.target.selectionStart; draw(); const n = $('#bq', pg); n.focus(); n.setSelectionRange(pos, pos); };
     $('#ball', pg).onclick = () => { rows.forEach(p => chosen.add(p.id)); draw(); };
     $('#bnone', pg).onclick = () => { chosen.clear(); draw(); };
+    bcCols(pg, 0); $('#bczm', pg).onclick = () => bcCols(pg, -1); $('#bczp', pg).onclick = () => bcCols(pg, 1);
     $$('.bcg-card', pg).forEach(c => c.onclick = e => { if (e.target.closest('button')) return; const id = c.dataset.id; chosen.has(id) ? chosen.delete(id) : chosen.add(id);
       c.classList.toggle('on', chosen.has(id)); $('#bsel', pg).textContent = `เลือกแล้ว ${chosen.size}`; bcSelBar(chosen.size); });
     bcSelBar(chosen.size);
@@ -6092,3 +6093,12 @@ function bcSelBar(n) {
   el.innerHTML = `🖨️ พิมพ์ฉลาก <b>${n}</b> รายการที่เลือก`;
 }
 const _go540 = go; go = function (...a) { if (a[0] !== 'barcodes') $('#bcSel')?.remove(); return _go540.apply(this, a); };
+/* v5.4.1 — how many cards per row (phone default 3), remembered per device */
+function bcCols(pg, d) {
+  const phone = innerWidth < 600, key = 'pos_bc_cols_' + (phone ? 'm' : 'd'), def = phone ? 3 : Math.max(4, Math.min(7, Math.round((innerWidth - 120) / 190)));
+  let n = +localStorage.getItem(key) || def; n = Math.max(1, Math.min(phone ? 5 : 10, n + d));
+  if (d) localStorage.setItem(key, n);
+  $$('.bcg', pg).forEach(g => g.style.setProperty('--bccols', n));
+  pg.style.setProperty('--bccols', n); pg.classList.toggle('bc-small', n >= (phone ? 4 : 8));
+  const v = $('#bczv', pg); if (v) v.textContent = `${n} / แถว`;
+}
