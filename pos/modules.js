@@ -1422,7 +1422,7 @@ const _goC = go;
 go = function (page) { _goC(page); $('.top')?.classList.toggle('posmode', S.page === 'pos'); };
 /* ================= Shop POS v4 — promotions engine, data center, barcodes, personal use,
    activity log, branding, receipt image, cashier upgrades, auto-update ================= */
-const APP_VERSION = '5.3.9';
+const APP_VERSION = '5.4.0';
 Object.assign(TH, { 'Data center': 'ศูนย์ข้อมูล', 'Barcodes': 'บาร์โค้ด', 'Branches': 'สาขา' });
 PAGES.splice(PAGES.findIndex(p => p.id === 'settings'), 0,
   { id: 'barcodes', ic: '🏷', name: 'Barcodes', roles: ['owner', 'manager', 'stock'] },
@@ -1862,7 +1862,7 @@ VIEWS.barcodes = pg => {
   const chosen = new Set();
   const isPromo = p => num(p.promo_price) > 0 || itemPromosFor(p).length > 0;
   $('#tact').innerHTML = `<button class="btn p" id="bprint">🖨️ พิมพ์ / สร้างฉลาก</button><button class="btn" id="bgen">⚙️ สร้างบาร์โค้ดให้สินค้าที่ไม่มี</button><button class="btn" id="bimp">⬆ นำเข้า</button><button class="btn" id="bxl">📗 ส่งออก Excel</button><input type="file" id="bfile" accept=".xlsx,.xls,.csv" hidden>`;
-  const list = () => S.products.filter(p => p.active !== false).filter(p => !cat || p.category_id === cat).filter(p => tab === 'all' || (tab === 'promo' ? isPromo(p) : tab === 'nopromo' ? !isPromo(p) : tab === 'has' ? p.barcode : tab === 'none' ? !p.barcode : tab === 'bad' ? p.barcode && /^\d{13}$/.test(p.barcode) && !validEAN(p.barcode) : tab === 'dup' ? p.barcode && S.products.filter(x => x.barcode === p.barcode).length > 1 : true))
+  const list = () => S.products.filter(p => p.active !== false).filter(p => !cat || (cat === '_none' ? !p.category_id : p.category_id === cat)).filter(p => tab === 'all' || (tab === 'promo' ? isPromo(p) : tab === 'nopromo' ? !isPromo(p) : tab === 'has' ? p.barcode : tab === 'none' ? !p.barcode : tab === 'bad' ? p.barcode && /^\d{13}$/.test(p.barcode) && !validEAN(p.barcode) : tab === 'dup' ? p.barcode && S.products.filter(x => x.barcode === p.barcode).length > 1 : true))
     .filter(p => !v || p.name.toLowerCase().includes(v) || (p.barcode || '').includes(v) || (p.sku || '').toLowerCase().includes(v)).sort((a, b) => a.name.localeCompare(b.name, 'th'));
   const draw = () => {
     const act = S.products.filter(p => p.active !== false), has = act.filter(p => p.barcode).length;
@@ -1871,18 +1871,20 @@ VIEWS.barcodes = pg => {
     pg.innerHTML = `<div class="stats"><div class="stat"><div class="k">สินค้าทั้งหมด</div><div class="v">${act.length}</div></div><div class="stat"><div class="k">มีบาร์โค้ด</div><div class="v" style="color:var(--ok)">${has}</div></div>
       <div class="stat"><div class="k">ไม่มีบาร์โค้ด</div><div class="v" style="color:var(--warn)">${act.length - has}</div></div><div class="stat"><div class="k">บาร์โค้ดซ้ำ</div><div class="v" style="color:var(--bad)">${dup}</div></div></div>
       <div class="row" style="margin-bottom:10px"><div class="pills" id="bt">${[['all', 'ทั้งหมด'], ['promo', '🏷️ มีโปรโมชั่น'], ['nopromo', 'ราคาปกติ'], ['has', 'มีบาร์โค้ด'], ['none', 'ไม่มีบาร์โค้ด'], ['dup', 'ซ้ำ'], ['bad', 'เลขตรวจสอบผิด']].map(([k, l]) => `<button data-t="${k}" class="${tab === k ? 'on' : ''}">${l}</button>`).join('')}</div>
-        <div class="sbox" style="max-width:280px"><span>🔍</span><input class="in" id="bq" value="${esc(v)}" placeholder="ชื่อ / บาร์โค้ด / SKU"></div><select class="in" id="bcat" style="width:auto"><option value="">ทุกหมวดหมู่</option>${S.categories.map(c => `<option value="${c.id}" ${cat === c.id ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</select><span class="muted">เลือกแล้ว ${chosen.size} · ถ้าไม่เลือก จะพิมพ์ทุกรายการในแท็บนี้</span></div>
-      <div class="tblwrap"><table class="tbl"><tr><th><input type="checkbox" id="ball"></th><th>สินค้า</th><th>บาร์โค้ด</th><th>SKU</th><th class="right">ราคา</th><th class="right">คงเหลือ</th><th></th></tr>
-      ${rows.slice(0, 400).map(p => `<tr><td><input type="checkbox" data-c="${p.id}" ${chosen.has(p.id) ? 'checked' : ''}></td><td><b>${esc(p.name)}</b>${isPromo(p) ? ' <span class="chip bad">🏷️ โปร</span>' : ''}</td>
-        <td>${p.barcode ? `<code>${esc(p.barcode)}</code>${/^\d{13}$/.test(p.barcode) && !validEAN(p.barcode) ? ' <span class="chip bad">เลขตรวจผิด</span>' : ''}` : '<span class="chip warn">ไม่มี</span>'}</td><td>${esc(p.sku || '')}</td>
-        <td class="right">${money(p.price)}</td><td class="right">${p.track_stock ? qtyf(p.stock) : '—'}</td>
-        <td class="right" style="white-space:nowrap"><button class="btn sm" data-ed="${p.id}">✏️</button> <button class="btn sm" data-sc="${p.id}">📷</button> ${p.barcode ? '' : `<button class="btn sm" data-g="${p.id}">สร้าง</button>`}</td></tr>`).join('')}</table></div>
+        <div class="sbox bc-search"><span>🔍</span><input class="in" id="bq" value="${esc(v)}" placeholder="ชื่อ / บาร์โค้ด / SKU"></div></div>
+      ${bcCatSlider(cat, tab, v, list)}
+      <div class="bcg-bar"><button class="btn sm" id="ball">☑️ เลือกทั้งหมด (${rows.length})</button><button class="btn sm" id="bnone">ล้างที่เลือก</button><span class="muted" id="bsel">เลือกแล้ว ${chosen.size}</span><span class="muted" style="font-size:12px">· แตะการ์ดเพื่อเลือก (ไม่เลือก = พิมพ์ทั้งหมดที่แสดง)</span></div>
+      ${bcGrid(rows.slice(0, 600), chosen, isPromo, !cat)}
       <p class="muted">${rows.length} รายการ${rows.length > 400 ? ' (แสดง 400 แรก)' : ''}</p>`;
     $$('#bt [data-t]', pg).forEach(b => b.onclick = () => { tab = b.dataset.t; draw(); });
-    $('#bcat', pg).onchange = e => { cat = e.target.value; draw(); };
+    $$('[data-bcc]', pg).forEach(b => b.onclick = () => { cat = b.dataset.bcc; draw(); });
+    $('#bcat', pg) && ($('#bcat', pg).onchange = e => { cat = e.target.value; draw(); });
     $('#bq', pg).oninput = e => { v = e.target.value.toLowerCase(); const pos = e.target.selectionStart; draw(); const n = $('#bq', pg); n.focus(); n.setSelectionRange(pos, pos); };
-    $('#ball', pg).onchange = e => { rows.forEach(p => e.target.checked ? chosen.add(p.id) : chosen.delete(p.id)); draw(); };
-    $$('[data-c]', pg).forEach(c => c.onchange = () => { c.checked ? chosen.add(c.dataset.c) : chosen.delete(c.dataset.c); });
+    $('#ball', pg).onclick = () => { rows.forEach(p => chosen.add(p.id)); draw(); };
+    $('#bnone', pg).onclick = () => { chosen.clear(); draw(); };
+    $$('.bcg-card', pg).forEach(c => c.onclick = e => { if (e.target.closest('button')) return; const id = c.dataset.id; chosen.has(id) ? chosen.delete(id) : chosen.add(id);
+      c.classList.toggle('on', chosen.has(id)); $('#bsel', pg).textContent = `เลือกแล้ว ${chosen.size}`; bcSelBar(chosen.size); });
+    bcSelBar(chosen.size);
     const setCode = async (p, code) => {
       if (code && S.products.some(x => x.id !== p.id && x.barcode === code) && !await confirmBox(`บาร์โค้ด ${code} ถูกใช้กับสินค้าอื่นแล้ว ต้องการใช้ซ้ำหรือไม่?`)) return;
       try { Object.assign(p, await q(sb.from('products').update({ barcode: code }).eq('id', p.id).select().single())); toast('บันทึกบาร์โค้ดแล้ว', 'ok'); draw(); } catch (e) { fail(e); } };
@@ -6054,3 +6056,39 @@ lblHTML = async function (p, o) {
   }
   const out = lb.outerHTML; LBL_FIT_HOST.innerHTML = ''; return out;
 };
+/* v5.4.0 — barcode / label page: big picture cards, grouped by category, swipeable category slider, tap card to select */
+function bcCatSlider(cat, tab, v, list) {
+  const base = S.products.filter(p => p.active !== false);
+  const cnt = id => base.filter(p => (id === '_none' ? !p.category_id : p.category_id === id)).length;
+  const cats = S.categories.filter(c => cnt(c.id));
+  const none = cnt('_none');
+  const chip = (id, label, n, color) => `<button class="bcs-chip ${cat === id ? 'on' : ''}" data-bcc="${id}" style="--cc:${color || 'var(--brand)'}"><i></i><span>${esc(label)}</span><b>${n}</b></button>`;
+  return `<div class="bcs-wrap"><div class="bcs">${chip('', 'ทั้งหมด', base.length)}${cats.map(c => chip(c.id, c.name, cnt(c.id), c.color || catColor(c.id))).join('')}${none ? chip('_none', 'ไม่มีหมวด', none, '#94a3b8') : ''}</div></div>`;
+}
+function bcCard(p, on, isPromo) {
+  const bg = p.tile_color || catColor(p.category_id);
+  const img = isImg(p) ? `<div class="bcg-img" style="background-image:url('${esc(p.image_url)}')"></div>` : `<div class="bcg-img ph" style="background:${esc(bg)}"><span>${esc((p.name || '?').trim().charAt(0))}</span></div>`;
+  const badEan = p.barcode && /^\d{13}$/.test(p.barcode) && !validEAN(p.barcode);
+  return `<div class="bcg-card ${on ? 'on' : ''}" data-id="${p.id}">${img}<i class="bcg-ck">✓</i>${isPromo(p) ? '<span class="bcg-promo">🏷️ โปร</span>' : ''}
+    <div class="bcg-body"><b class="bcg-nm">${esc(p.name)}</b>
+      <div class="bcg-pr">฿${money(p.price)}${p.track_stock ? `<span>เหลือ ${qtyf(p.stock)}</span>` : ''}</div>
+      <div class="bcg-code">${p.barcode ? `<code>${esc(p.barcode)}</code>${badEan ? '<span class="chip bad">เลขตรวจผิด</span>' : ''}` : '<span class="chip warn">ไม่มีบาร์โค้ด</span>'}</div>
+      <div class="bcg-act"><button class="btn sm" data-ed="${p.id}" title="แก้บาร์โค้ด">✏️</button><button class="btn sm" data-sc="${p.id}" title="สแกนบาร์โค้ด">📷</button>${p.barcode ? '' : `<button class="btn sm p" data-g="${p.id}">สร้าง</button>`}</div></div></div>`;
+}
+function bcGrid(rows, chosen, isPromo, grouped) {
+  if (!rows.length) return '<div class="empty card">ไม่มีสินค้าในรายการนี้</div>';
+  if (!grouped) return `<div class="bcg">${rows.map(p => bcCard(p, chosen.has(p.id), isPromo)).join('')}</div>`;
+  const groups = new Map();
+  rows.forEach(p => { const k = p.category_id || '_none'; if (!groups.has(k)) groups.set(k, []); groups.get(k).push(p); });
+  const order = [...S.categories.map(c => c.id), '_none'].filter(k => groups.has(k));
+  return order.map(k => { const c = S.categories.find(x => x.id === k), list = groups.get(k);
+    return `<section class="bcg-sec"><h3 class="bcg-h"><i style="background:${esc(c?.color || (c ? catColor(c.id) : '#94a3b8'))}"></i>${esc(c?.name || 'ไม่มีหมวด')}<small>${list.length}</small></h3>
+      <div class="bcg">${list.map(p => bcCard(p, chosen.has(p.id), isPromo)).join('')}</div></section>`; }).join('');
+}
+function bcSelBar(n) {
+  let el = $('#bcSel');
+  if (!n || S.page !== 'barcodes') { el?.remove(); return; }
+  if (!el) { document.body.insertAdjacentHTML('beforeend', '<button id="bcSel" class="bc-selbar"></button>'); el = $('#bcSel'); el.onclick = () => $('#bprint')?.click(); }
+  el.innerHTML = `🖨️ พิมพ์ฉลาก <b>${n}</b> รายการที่เลือก`;
+}
+const _go540 = go; go = function (...a) { if (a[0] !== 'barcodes') $('#bcSel')?.remove(); return _go540.apply(this, a); };
