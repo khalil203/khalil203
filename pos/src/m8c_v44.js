@@ -117,7 +117,7 @@ VIEWS.receive = async pg => {
           ${ups.length ? `<div class="rcv-alert">⚠️ ราคาทุนเพิ่มขึ้น ${ups.length} รายการ: ${ups.slice(0, 4).map(l => `${esc(l.p.name)} <b>+${((baseCost(l) / num(l.p.cost) - 1) * 100).toFixed(0)}%</b>`).join(' · ')}${ups.length > 4 ? ' …' : ''}</div>` : ''}
         </div></div>
       <div id="rlines" class="rlines">${R.lines.length ? R.lines.map(lineHTML).join('') : '<div class="empty">📦<br>ถ่ายรูปบิลเพื่อให้ระบบอ่านรายการให้ หรือสแกน/ค้นหาสินค้าเพื่อเพิ่มเอง</div>'}</div>
-      ${R.lines.length ? `<div class="card rcv-foot"><div><small class="muted">${R.lines.filter(l => !l.skip).length} รายการ</small><div class="b" style="font-size:22px">${baht(tot)}</div>
+      ${R.lines.length ? `<div class="card rcv-foot"><div><small class="muted">ต้นทุนรวม · ${R.lines.filter(l => !l.skip).length} รายการ</small><div class="b" style="font-size:22px">${baht(tot)}</div>
           ${R.ocrTotal ? `<small style="color:${Math.abs(R.ocrTotal - tot) < 1 ? 'var(--ok)' : 'var(--warn)'}">ยอดในบิล ${baht(R.ocrTotal)}${Math.abs(R.ocrTotal - tot) < 1 ? ' ✓ ตรงกัน' : ' — ตรวจสอบอีกครั้ง'}</small>` : ''}</div>
         <label class="row"><input type="checkbox" id="rpaid" ${R.paid ? 'checked' : ''}> จ่ายเงินผู้จำหน่ายแล้ว</label>
         <button class="btn" id="rclear">ล้าง</button><button class="btn ok lg" id="rsave">✔ รับสินค้าเข้าสต็อก</button></div>` : ''}</div>`;
