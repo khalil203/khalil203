@@ -1485,3 +1485,9 @@ html.v5 .cart .hd.ch #cartClose[style*="none"]{display:none}
 .rl-avg .hl.dn{background:color-mix(in srgb,#16a34a 10%,var(--card));border-color:#16a34a66}.rl-avg .hl.dn b{color:#16a34a}
 .rcv-sum{display:flex;flex-direction:column;margin-right:auto}.rcv-sum small{color:var(--muted);font-size:12px;font-weight:700}.rcv-sum b{font-size:20px;color:var(--pri)}
 .qr-in{display:flex;flex-direction:column;gap:6px}.qr-in .in.lg{font-size:20px;font-weight:800;min-height:52px}
+/* v5.3.0 scanner card */
+.scan-card{margin-bottom:16px}.scan-steps{margin:0 0 12px;padding-left:20px;display:flex;flex-direction:column;gap:6px;line-height:1.5}
+.scan-live{display:flex;gap:14px;align-items:center;padding:16px;border-radius:16px;border:2px dashed color-mix(in srgb,var(--pri) 50%,transparent);background:color-mix(in srgb,var(--pri) 6%,var(--card));transition:.25s}
+.scan-live.got{background:color-mix(in srgb,#16a34a 18%,var(--card));border-color:#16a34a;transform:scale(1.01)}
+.sl-ic{font-size:34px;animation:slp 1.6s ease-in-out infinite}@keyframes slp{50%{transform:scale(1.15);opacity:.7}}
+#scanRes{margin-top:4px;line-height:1.8}#scanRes code{font-size:15px;font-weight:800;color:var(--ink)}
