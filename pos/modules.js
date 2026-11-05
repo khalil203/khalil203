@@ -1422,7 +1422,7 @@ const _goC = go;
 go = function (page) { _goC(page); $('.top')?.classList.toggle('posmode', S.page === 'pos'); };
 /* ================= Shop POS v4 — promotions engine, data center, barcodes, personal use,
    activity log, branding, receipt image, cashier upgrades, auto-update ================= */
-const APP_VERSION = '5.4.1';
+const APP_VERSION = '5.4.2';
 Object.assign(TH, { 'Data center': 'ศูนย์ข้อมูล', 'Barcodes': 'บาร์โค้ด', 'Branches': 'สาขา' });
 PAGES.splice(PAGES.findIndex(p => p.id === 'settings'), 0,
   { id: 'barcodes', ic: '🏷', name: 'Barcodes', roles: ['owner', 'manager', 'stock'] },
@@ -6022,7 +6022,8 @@ lblCSS = function (o) {
   .lb.t-shelf .row2{align-items:flex-end;min-width:0;gap:1mm}
   .lb.t-shelf .row2>div:last-child{flex:1 1 auto;min-width:0;text-align:right}
   .lb .bc .cd{max-width:100%;overflow:hidden;line-height:1.1}
-  .lb.t-qr .txt{overflow:hidden}`;
+  .lb.t-qr .txt{overflow:hidden}
+  .lb .tg{position:static!important;align-self:center;max-width:100%!important;border-radius:1.6mm!important;padding:.3mm 2mm!important;margin-bottom:.3mm;flex:0 0 auto;line-height:1.25}`;
 };
 
 /* final pass: put the label in the page at its real size and shrink whatever still sticks out (handles Thai line heights, long names, any font) */
@@ -6040,12 +6041,12 @@ lblHTML = async function (p, o) {
   const setFs = (el, v) => { el.style.fontSize = v.toFixed(2) + 'mm'; };
   const box = () => { const r = lb.getBoundingClientRect(), cs = getComputedStyle(lb); return { l: r.left + parseFloat(cs.paddingLeft) + parseFloat(cs.borderLeftWidth), r: r.right - parseFloat(cs.paddingRight) + .5, b: r.bottom + .5, t: r.top - .5 }; };
   // 1) horizontal: single-line things must fit their own column
-  for (const sel of ['.pp', '.cd', '.sh', '.od', '.un']) for (const el of lb.querySelectorAll(sel)) {
+  for (const sel of ['.tg', '.pp', '.cd', '.sh', '.od', '.un']) for (const el of lb.querySelectorAll(sel)) {
     for (let i = 0; i < 25; i++) { const B = box(), r = el.getBoundingClientRect(), par = el.closest('.bc,.row2>div:last-child,.txt') || lb, pr = par.getBoundingClientRect();
       const right = Math.min(B.r, par === lb ? B.r : pr.right + .5); const clip = el.clientWidth > 0 && el.scrollWidth > el.clientWidth + 1; if (!clip && r.right <= right && r.left >= B.l - .5) break; setFs(el, fsOf(el) * .93); } }
   // 2) vertical: shrink name → barcode → price until everything is inside
   const nameEl = $('.ln', lb), img = $('.bc img', lb), pp = $('.pp', lb), cd = $('.cd', lb);
-  const over = () => { const B = box(); return [...lb.querySelectorAll('.ln,.bc,.pp,.cd,.sh,.row2,.txt')].some(e => { const r = e.getBoundingClientRect(); return r.height && (r.bottom > B.b || r.top < B.t); }) || lb.scrollHeight > lb.clientHeight + 1 || (nameEl && nameEl.scrollHeight > nameEl.clientHeight + 2); };
+  const over = () => { const B = box(); return [...lb.querySelectorAll('.tg,.ln,.bc,.pp,.cd,.sh,.row2,.txt')].some(e => { const r = e.getBoundingClientRect(); return r.height && (r.bottom > B.b || r.top < B.t); }) || lb.scrollHeight > lb.clientHeight + 1 || (nameEl && nameEl.scrollHeight > nameEl.clientHeight + 2); };
   for (let i = 0; i < 60 && over(); i++) {
     const k = i % 3;
     if (k === 0 && nameEl && fsOf(nameEl) > H * .065) setFs(nameEl, fsOf(nameEl) * .92);
