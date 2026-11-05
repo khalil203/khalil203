@@ -1525,3 +1525,18 @@ body:has(#cart.open) #scanReady,body:has(.mbg) #scanReady{display:none!important
   html.v5 #cartfab{left:10px!important;right:10px!important;bottom:calc(var(--tabh,76px) + 8px)!important;border-radius:20px!important;min-height:54px;box-shadow:0 10px 26px color-mix(in srgb,var(--brand) 35%,transparent)!important}
 }
 .flash-ok{animation:flok .9s}@keyframes flok{0%,60%{box-shadow:0 0 0 4px #16a34a88;background:#dcfce7}}
+/* v5.3.6 tablet / desktop side rail: bigger icons and names, scroll instead of shrinking */
+@media (min-width:861px){
+  #app.flyout .side .navs{justify-content:flex-start!important;gap:6px!important;padding:6px 6px 10px!important;overflow-y:auto!important;scrollbar-width:none}
+  #app.flyout .side .navs::-webkit-scrollbar{display:none}
+  #app.flyout .side .nav{flex:0 0 auto!important;min-height:62px!important;gap:4px!important;padding:8px 2px!important;border-radius:16px!important}
+  #app.flyout .side .nav .ic svg{width:27px!important;height:27px!important;stroke-width:2}
+  #app.flyout .side .nav .sl{font-size:13px!important;font-weight:700!important;line-height:1.25!important;max-width:82px;overflow:hidden;text-overflow:ellipsis}
+  #app.flyout .side .nav.on{box-shadow:0 6px 16px rgba(0,0,0,.25)}
+}
+/* few menu items (cashier): spread them nicely down the rail */
+@media (min-width:861px){#app.flyout .side .navs:not(:has(.nav:nth-of-type(9))){justify-content:space-evenly!important}
+  #app.flyout .side .navs:not(:has(.nav:nth-of-type(9))) .nav{min-height:78px!important}
+  #app.flyout .side .navs:not(:has(.nav:nth-of-type(9))) .nav .ic svg{width:32px!important;height:32px!important}
+  #app.flyout .side .navs:not(:has(.nav:nth-of-type(9))) .nav .sl{font-size:15px!important}}
+@media (min-width:861px){#app.flyout .side .sb-brand img{width:54px!important;height:54px!important}}
