@@ -56,7 +56,7 @@ function groupGrid(g) {
     keys.forEach(k => {
       const c = S.categories.find(x => x.id === k), list = groups.get(k);
       const low = list.filter(el => { const p = prod(el.dataset.id); return p?.track_stock && p.stock <= p.low_stock; }).length;
-      const h = document.createElement('div'); h.className = 'grp-h'; h.style.setProperty('--cc', c?.color || '#94a3b8');
+      const h = document.createElement('div'); h.className = 'grp-h'; h.dataset.cat = k || '_none'; h.style.setProperty('--cc', c?.color || '#94a3b8');
       h.innerHTML = `<span class="gi">${c?.icon ? esc(c.icon) : '<i></i>'}</span><b>${esc(c?.name || 'ไม่มีหมวด')}</b><em>${list.length} รายการ</em>${low ? `<em class="w">⚠️ ใกล้หมด/หมด ${low}</em>` : ''}`;
       g.appendChild(h); list.forEach(el => g.appendChild(el));
     });
