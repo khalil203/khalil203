@@ -116,13 +116,12 @@ VIEWS.pos = pg => { _posView531(pg); const b = $('#scanBtn'); if (b) b.onclick =
   Object.assign(c, { type: 'text', autocomplete: 'off', spellcheck: false, tabIndex: -1 });
   c.setAttribute('inputmode', 'none'); c.setAttribute('data-scan', ''); c.setAttribute('aria-hidden', 'true'); c.id = 'scanCatch';
   c.style.cssText = 'position:fixed;left:0;bottom:0;width:1px;height:1px;opacity:0;border:0;padding:0;font-size:16px;z-index:-1;pointer-events:none';
-  const pill = document.createElement('div'); pill.id = 'scanReady'; pill.innerHTML = '<i></i>พร้อมสแกน';
-  document.addEventListener('DOMContentLoaded', () => { document.body.append(c, pill); });
-  if (document.body) document.body.append(c, pill);
+    document.addEventListener('DOMContentLoaded', () => { document.body.append(c); });
+  if (document.body) document.body.append(c);
   const want = () => S.shop && SCAN_PAGES.includes(S.page) && !$('.mbg') && !document.hidden && localStorage.getItem('pos_scan_catch') !== '0';
   const idleEl = el => !el || el === document.body || el === document.documentElement || el === c || !el.matches?.('input,textarea,select,[contenteditable=true]');
   const grab = () => { if (want() && idleEl(document.activeElement) && document.activeElement !== c) try { c.focus({ preventScroll: true }); } catch {} paint(); };
-  const paint = () => pill.classList.toggle('on', want() && document.activeElement === c);
+  const paint = () => {};
   // value typed while key events were "Unidentified": finish after a short pause even without Enter
   let t0; c.addEventListener('input', () => { clearTimeout(t0); t0 = setTimeout(() => { const v = c.value.trim(); if (v.length >= 4) { c.value = ''; handleScan(v, 'catch'); } }, 220); });
   ['focusin', 'focusout', 'pointerup', 'visibilitychange'].forEach(ev => addEventListener(ev, () => setTimeout(grab, 60), true));

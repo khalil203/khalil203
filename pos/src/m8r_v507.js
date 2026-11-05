@@ -168,7 +168,7 @@ VIEWS.settings = pg => {
 };
 
 /* v5.0.10 — keep floating bars above the bottom tab bar (its height differs per device) */
-const setTabH = () => { const t = $('.tabbar'); const h = t && getComputedStyle(t).display !== 'none' ? t.offsetHeight : 0; document.documentElement.style.setProperty('--tabh', h + 'px'); };
+const setTabH = () => { const t = $('.tabbar'); const h = t && getComputedStyle(t).display !== 'none' ? t.offsetHeight + (parseFloat(getComputedStyle(t).bottom) || 0) : 0; document.documentElement.style.setProperty('--tabh', h + 'px'); };
 addEventListener('resize', setTabH); addEventListener('orientationchange', () => setTimeout(setTabH, 300));
 const _renderShell510 = renderShell;
 renderShell = function () { _renderShell510(); setTabH(); setTimeout(setTabH, 400); };
