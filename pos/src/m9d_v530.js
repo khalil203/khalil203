@@ -124,7 +124,7 @@ VIEWS.pos = pg => { _posView531(pg); const b = $('#scanBtn'); if (b) b.onclick =
 (() => {
   const SCAN_PAGES = ['pos', 'receive', 'stock', 'products', 'count'];
   const c = document.createElement('input');
-  Object.assign(c, { type: 'text', autocomplete: 'off', spellcheck: false, tabIndex: -1 });
+  Object.assign(c, { type: 'text', autocomplete: 'off', spellcheck: false, tabIndex: -1, readOnly: true }); // readonly → Android attaches no keyboard at all, but hardware key presses still arrive
   c.setAttribute('inputmode', 'none'); c.setAttribute('data-scan', ''); c.setAttribute('aria-hidden', 'true'); c.id = 'scanCatch';
   c.style.cssText = 'position:fixed;left:0;bottom:0;width:1px;height:1px;opacity:0;border:0;padding:0;font-size:16px;z-index:-1;pointer-events:none';
     document.addEventListener('DOMContentLoaded', () => { document.body.append(c); });
