@@ -1543,3 +1543,4 @@ body:has(#cart.open) #scanReady,body:has(.mbg) #scanReady{display:none!important
 /* v5.3.7 centre rail icons (the icon box was narrower than the bigger icon) */
 @media (min-width:861px){#app.flyout .side .nav .ic{width:auto!important;min-width:0!important;height:auto!important;display:flex!important;justify-content:center!important;align-items:center!important;margin:0 auto!important;padding:0!important}
   #app.flyout .side .nav{align-items:center!important}#app.flyout .side .nav .sl{text-align:center!important;margin:0 auto!important}}
+.qr.cqr img{width:min(300px,72vw)!important;height:auto!important;max-height:min(360px,46vh)!important;object-fit:contain}
