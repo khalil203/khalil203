@@ -24,7 +24,7 @@ let handleScan = function (code, src) {
 };
 
 (() => {
-  const TYPING = 'input:not([type=checkbox]):not([type=radio]):not([type=button]):not([type=submit]):not([type=range]):not([type=color]):not([type=file]),textarea,select,[contenteditable=true]';
+  const TYPING = 'input:not([data-scan]):not([type=checkbox]):not([type=radio]):not([type=button]):not([type=submit]):not([type=range]):not([type=color]):not([type=file]),textarea,select,[contenteditable=true]';
   let buf = '', last = 0, fast = 0, idle = 0;
   addEventListener('keydown', e => {
     if (e.ctrlKey || e.metaKey || e.altKey) return;
@@ -32,7 +32,7 @@ let handleScan = function (code, src) {
     const now = Date.now(), gap = now - last; last = now;
     if (gap > 120) { buf = ''; fast = 0; }
     if (e.key === 'Enter' || e.key === 'Tab') {
-      clearTimeout(idle); const code = buf; const wasFast = fast >= Math.max(2, code.length - 2); buf = ''; fast = 0;
+      clearTimeout(idle); const cv = t && t.dataset?.scan !== undefined ? t.value.trim() : ''; if (cv) t.value = ''; const code = buf.length >= 3 ? buf : cv; if (cv && code === cv) fast = 99; const wasFast = fast >= Math.max(2, code.length - 2); buf = ''; fast = 0;
       if (code.length >= 3 && (!inField || wasFast)) {
         // typed by a scanner: take it over (also when a non-scan field like the search box has focus)
         if (inField && t.id !== 'scanLive') {
@@ -107,3 +107,25 @@ handleScan = function (code, src) {
 /* the camera button on the cashier uses the same flow */
 const _posView531 = VIEWS.pos;
 VIEWS.pos = pg => { _posView531(pg); const b = $('#scanBtn'); if (b) b.onclick = () => scanBarcode(code => handleScan(code, 'cam')); };
+
+/* v5.3.2 — invisible "scan catcher": a box that silently keeps focus so the Bluetooth scanner always has somewhere to type
+   (inputmode=none → the phone keyboard does NOT pop up) */
+(() => {
+  const SCAN_PAGES = ['pos', 'receive', 'stock', 'products', 'count'];
+  const c = document.createElement('input');
+  Object.assign(c, { type: 'text', autocomplete: 'off', spellcheck: false, tabIndex: -1 });
+  c.setAttribute('inputmode', 'none'); c.setAttribute('data-scan', ''); c.setAttribute('aria-hidden', 'true'); c.id = 'scanCatch';
+  c.style.cssText = 'position:fixed;left:0;bottom:0;width:1px;height:1px;opacity:0;border:0;padding:0;font-size:16px;z-index:-1;pointer-events:none';
+  const pill = document.createElement('div'); pill.id = 'scanReady'; pill.innerHTML = '<i></i>พร้อมสแกน';
+  document.addEventListener('DOMContentLoaded', () => { document.body.append(c, pill); });
+  if (document.body) document.body.append(c, pill);
+  const want = () => S.shop && SCAN_PAGES.includes(S.page) && !$('.mbg') && !document.hidden && localStorage.getItem('pos_scan_catch') !== '0';
+  const idleEl = el => !el || el === document.body || el === document.documentElement || el === c || !el.matches?.('input,textarea,select,[contenteditable=true]');
+  const grab = () => { if (want() && idleEl(document.activeElement) && document.activeElement !== c) try { c.focus({ preventScroll: true }); } catch {} paint(); };
+  const paint = () => pill.classList.toggle('on', want() && document.activeElement === c);
+  // value typed while key events were "Unidentified": finish after a short pause even without Enter
+  let t0; c.addEventListener('input', () => { clearTimeout(t0); t0 = setTimeout(() => { const v = c.value.trim(); if (v.length >= 4) { c.value = ''; handleScan(v, 'catch'); } }, 220); });
+  ['focusin', 'focusout', 'pointerup', 'visibilitychange'].forEach(ev => addEventListener(ev, () => setTimeout(grab, 60), true));
+  setInterval(grab, 1500);
+  const _go532 = go; go = function (...a) { const r = _go532.apply(this, a); setTimeout(grab, 300); return r; };
+})();

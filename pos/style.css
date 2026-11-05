@@ -1504,3 +1504,8 @@ html.v5 .cart .hd.ch #cartClose[style*="none"]{display:none}
 .ub-found{display:flex;gap:12px;align-items:center;text-align:left;padding:10px;border-radius:14px;background:color-mix(in srgb,#16a34a 10%,var(--card));margin:6px 0}
 .ub-found img{width:84px;height:84px;object-fit:contain;border-radius:12px;background:#fff;flex-shrink:0}
 .ub-found div{display:flex;flex-direction:column;gap:2px}.ub-found small{color:#16a34a;font-weight:800}.ub-found b{font-size:17px;color:var(--ink)}.ub-found span{color:var(--muted)}.ub-found em{font-style:normal;font-size:12px;color:var(--muted)}
+/* v5.3.2 scanner ready pill */
+#scanReady{position:fixed;right:12px;top:calc(env(safe-area-inset-top) + 70px);z-index:60;display:none;align-items:center;gap:6px;padding:5px 11px;border-radius:999px;background:color-mix(in srgb,#16a34a 14%,var(--card));color:#15803d;font-size:12px;font-weight:800;box-shadow:0 4px 14px rgba(0,0,0,.1);pointer-events:none}
+#scanReady.on{display:flex}#scanReady i{width:8px;height:8px;border-radius:50%;background:#16a34a;animation:slp 1.4s infinite}
+
+body:has(#cart.open) #scanReady,body:has(.mbg) #scanReady{display:none!important}

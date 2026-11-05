@@ -5,7 +5,7 @@
   let tapEl = null, tapAt = 0, keyAt = 0;
   addEventListener('pointerdown', e => { tapEl = e.target; tapAt = Date.now(); }, true);
   addEventListener('keydown', () => { keyAt = Date.now(); }, true);
-  const TYPING = 'input:not([type=checkbox]):not([type=radio]):not([type=button]):not([type=submit]):not([type=range]):not([type=color]):not([type=file]):not([type=date]):not([type=time]),textarea,[contenteditable=true]';
+  const TYPING = 'input:not([data-scan]):not([type=checkbox]):not([type=radio]):not([type=button]):not([type=submit]):not([type=range]):not([type=color]):not([type=file]):not([type=date]):not([type=time]),textarea,[contenteditable=true]';
   const of = HTMLElement.prototype.focus;
   HTMLElement.prototype.focus = function (o) {
     if (this.matches?.(TYPING)) {
