@@ -1524,3 +1524,4 @@ body:has(#cart.open) #scanReady,body:has(.mbg) #scanReady{display:none!important
   html.v5 .tabbar .tb:active .ic{transform:scale(.9)}
   html.v5 #cartfab{left:10px!important;right:10px!important;bottom:calc(var(--tabh,76px) + 8px)!important;border-radius:20px!important;min-height:54px;box-shadow:0 10px 26px color-mix(in srgb,var(--brand) 35%,transparent)!important}
 }
+.flash-ok{animation:flok .9s}@keyframes flok{0%,60%{box-shadow:0 0 0 4px #16a34a88;background:#dcfce7}}

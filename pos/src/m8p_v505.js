@@ -10,7 +10,7 @@
   HTMLElement.prototype.focus = function (o) {
     if (this.matches?.(TYPING)) {
       const tappedIt = tapEl && (tapEl === this || this.contains(tapEl) || tapEl.closest?.('label')?.control === this) && Date.now() - tapAt < 1500;
-      const typing = Date.now() - keyAt < 1500; // hardware keyboard / barcode scanner
+      const typing = Date.now() - keyAt < 1500 && Date.now() - (window.__scanAt || 0) > 2500; // hardware keyboard — but never right after a barcode scan
       if (!tappedIt && !typing) return; // the user did not ask for the keyboard
     }
     return of.call(this, o);

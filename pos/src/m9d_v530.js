@@ -10,13 +10,24 @@ let handleScan = function (code, src) {
   SCAN_LOG.unshift({ code, at: Date.now(), hit: hit?.name || '' }); SCAN_LOG.length = Math.min(SCAN_LOG.length, 5);
   document.dispatchEvent(new CustomEvent('pos-scan', { detail: { code, hit } }));
   if ($('#scanLive')) return; // settings test box shows the result itself
-  // an open dialog that already knows how to scan (stock count, picker, quick receive…) gets the code
-  const box = $('.mbg:last-of-type #scq, .mbg:last-of-type #pp, .mbg:last-of-type #puq, .mbg:last-of-type #cq0');
-  if (box) { box.value = (qty !== 1 ? qty + '*' : '') + code; box.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })); return; }
-  if ($('.mbg')) { if (!hit) { sfx('error'); toast(`บาร์โค้ด ${code} — ไม่พบสินค้า`, 'bad'); } return; }
+  window.__scanAt = Date.now();
+  const top = $$('.mbg').pop();
+  if (top) {
+    // dialogs that scan by themselves: stock count, scan-count, personal use, product picker
+    const box = $('#scq, #csq, #puq, #pp, #cq0', top);
+    if (box) { box.value = (qty !== 1 ? qty + '*' : '') + code; box.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })); box.blur(); return; }
+    // add / edit product: put the code into the barcode field
+    const bf = $('input[name=barcode], input[data-f=barcode], #pbc', top);
+    if (bf) { bf.value = code; bf.dispatchEvent(new Event('input', { bubbles: true })); bf.dispatchEvent(new Event('change', { bubbles: true })); bf.blur();
+      sfx('scan'); bf.classList.add('flash-ok'); setTimeout(() => bf.classList.remove('flash-ok'), 900);
+      if (hit && bf.defaultValue !== code) toast(`⚠️ บาร์โค้ดนี้ใช้กับ “${hit.name}” อยู่แล้ว`, 'bad'); else toast('ใส่บาร์โค้ดแล้ว ✓', 'ok'); return; }
+    // a product card / small dialog is open: close it and handle the new scan normally
+    if ($('.sq-head', top) || top.classList.contains('sold')) $('.x', top)?.click();
+    else { if (hit) { sfx('scan'); toast(`📦 ${hit.name} · เหลือ ${qtyf(hit.stock)}`, 'ok'); } else { sfx('error'); toast(`บาร์โค้ด ${code} — ไม่พบสินค้า`, 'bad'); } return; }
+  }
   const pg = S.page;
   if (pg === 'receive' && $('#radd')) { const a = $('#radd'); a.value = code; a.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })); return; }
-  if (['stock', 'products', 'count'].includes(pg)) return stockLookup(code, () => go(pg));
+  if (['stock', 'products', 'count', 'stockcount', 'inventory'].includes(pg) || /stock|count|inv/.test(pg || '')) return stockLookup(code, () => go(pg));
   // cashier (and any other page): sell it
   if (!hit) return unknownBarcode(code);
   if (pg !== 'pos') go('pos');
@@ -36,13 +47,13 @@ let handleScan = function (code, src) {
       if (code.length >= 3 && (!inField || wasFast)) {
         // typed by a scanner: take it over (also when a non-scan field like the search box has focus)
         if (inField && t.id !== 'scanLive') {
-          const isScanBox = ['ps', 'psearch', 'radd', 'scq', 'pp', 'puq', 'cq0', 'scanTest', 'gq'].includes(t.id);
+          const isScanBox = ['ps', 'psearch', 'radd', 'scq', 'csq', 'pp', 'puq', 'cq0', 'stkq', 'sfq', 'scanTest', 'gq'].includes(t.id);
           const strip = () => { t.value = t.value.slice(0, Math.max(0, t.value.length - code.length)); };
           if (!isScanBox) { // e.g. the barcode box in the product form: just make sure it holds the real code
             if (/barcode|sku|code/i.test((t.name || '') + (t.id || '') + (t.placeholder || '')) && t.value.slice(-code.length) !== code) { strip(); t.value += code; t.dispatchEvent(new Event('input', { bubbles: true })); }
             return;
           }
-          strip(); t.dispatchEvent(new Event('input', { bubbles: true }));
+          strip(); t.dispatchEvent(new Event('input', { bubbles: true })); if (!t.closest('.mbg')) t.blur();
         }
         e.preventDefault(); e.stopPropagation(); handleScan(code, 'kbd'); return;
       }
@@ -127,4 +138,13 @@ VIEWS.pos = pg => { _posView531(pg); const b = $('#scanBtn'); if (b) b.onclick =
   ['focusin', 'focusout', 'pointerup', 'visibilitychange'].forEach(ev => addEventListener(ev, () => setTimeout(grab, 60), true));
   setInterval(grab, 1500);
   const _go532 = go; go = function (...a) { const r = _go532.apply(this, a); setTimeout(grab, 300); return r; };
+})();
+
+/* v5.3.4 — scan boxes never pop the phone keyboard by themselves; tapping the box still opens it */
+(() => {
+  const IDS = ['psearch', 'radd', 'scq', 'csq', 'puq', 'pp', 'stkq', 'sfq', 'gq'];
+  const mark = () => IDS.forEach(id => document.querySelectorAll('#' + id).forEach(el => { if (!el.dataset.kbm) { el.dataset.kbm = 1; el.setAttribute('inputmode', 'none'); } }));
+  new MutationObserver(mark).observe(document.documentElement, { childList: true, subtree: true });
+  addEventListener('pointerdown', e => { const el = e.target.closest?.('input'); if (el && el.dataset.kbm) { el.setAttribute('inputmode', 'search'); } }, true);
+  addEventListener('focusout', e => { const el = e.target; if (el?.dataset?.kbm) setTimeout(() => el.setAttribute('inputmode', 'none'), 50); }, true);
 })();
