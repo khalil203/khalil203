@@ -1423,7 +1423,7 @@ const _goC = go;
 go = function (page) { _goC(page); $('.top')?.classList.toggle('posmode', S.page === 'pos'); };
 /* ================= Shop POS v4 — promotions engine, data center, barcodes, personal use,
    activity log, branding, receipt image, cashier upgrades, auto-update ================= */
-const APP_VERSION = '5.4.8';
+const APP_VERSION = '5.4.9';
 Object.assign(TH, { 'Data center': 'ศูนย์ข้อมูล', 'Barcodes': 'บาร์โค้ด', 'Branches': 'สาขา' });
 PAGES.splice(PAGES.findIndex(p => p.id === 'settings'), 0,
   { id: 'barcodes', ic: '🏷', name: 'Barcodes', roles: ['owner', 'manager', 'stock'] },
@@ -6259,4 +6259,44 @@ personalUse = function () {
     if (r) r.src = 'off';
     return r;
   };
+})();
+/* v5.4.9 — Back button in the top bar + hardware/gesture back steps through pages.
+   Layers over go(): forward moves push a history entry, so the device back
+   button (and the on-screen ‹) return to the previous screen instead of leaving. */
+(function () {
+  if (typeof go !== 'function') return;
+  const _go = go;
+  let started = false;
+  const resolveId = page => (PAGES.find(x => x.id === page && pageOK(x)) || PAGES.find(pageOK) || PAGES[1]).id;
+  const depthNow = () => (history.state && history.state.depth) || 0;
+
+  go = function (page, fromPop) {
+    const target = resolveId(page);
+    if (!fromPop) {
+      if (!started) { history.replaceState({ page: target, depth: 0 }, '', '#' + target); started = true; }
+      else if (target !== S.page) { history.pushState({ page: target, depth: depthNow() + 1 }, '', '#' + target); }
+    }
+    _go(target);
+    renderBack();
+  };
+
+  function renderBack() {
+    const top = document.querySelector('.top'); if (!top) return;
+    let b = document.getElementById('navBack');
+    if (depthNow() > 0) {
+      if (!b) {
+        b = document.createElement('button');
+        b.id = 'navBack'; b.className = 'iconbtn navback'; b.type = 'button';
+        b.title = 'ย้อนกลับ'; b.setAttribute('aria-label', 'ย้อนกลับ');
+        b.innerHTML = '<span>‹</span>';
+        top.insertBefore(b, top.firstChild);
+        b.onclick = () => history.back();
+      }
+    } else if (b) { b.remove(); }
+  }
+
+  window.addEventListener('popstate', () => {
+    if (!S.shop || !document.getElementById('pg')) return;
+    go((history.state && history.state.page) || location.hash.slice(1) || 'pos', true);
+  });
 })();

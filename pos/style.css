@@ -54,6 +54,9 @@ a{color:var(--brand)}
 .top h1{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .mob{display:none}
 .iconbtn{border:0;background:var(--bg2);width:40px;height:40px;border-radius:12px;cursor:pointer;font-size:18px}
+.navback{display:grid;place-items:center;font-size:30px;font-weight:800;color:var(--ink);flex:0 0 auto}
+.navback span{line-height:1;margin-top:-4px}
+.navback:active{transform:scale(.92)}
 .page{flex:1;overflow:auto;padding:20px 22px 40px;min-height:0;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
 .page.flush{padding:0;overflow:hidden}
 .page.enter>*{animation:pageIn .35s var(--ease)}
