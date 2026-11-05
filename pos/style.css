@@ -1540,3 +1540,6 @@ body:has(#cart.open) #scanReady,body:has(.mbg) #scanReady{display:none!important
   #app.flyout .side .navs:not(:has(.nav:nth-of-type(9))) .nav .ic svg{width:32px!important;height:32px!important}
   #app.flyout .side .navs:not(:has(.nav:nth-of-type(9))) .nav .sl{font-size:15px!important}}
 @media (min-width:861px){#app.flyout .side .sb-brand img{width:54px!important;height:54px!important}}
+/* v5.3.7 centre rail icons (the icon box was narrower than the bigger icon) */
+@media (min-width:861px){#app.flyout .side .nav .ic{width:auto!important;min-width:0!important;height:auto!important;display:flex!important;justify-content:center!important;align-items:center!important;margin:0 auto!important;padding:0!important}
+  #app.flyout .side .nav{align-items:center!important}#app.flyout .side .nav .sl{text-align:center!important;margin:0 auto!important}}
