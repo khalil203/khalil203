@@ -82,22 +82,23 @@ VIEWS.pos = pg => {
 };
 
 /* ---------- PRODUCTS: big-picture card manager (default) + table view ---------- */
-let PVIEW = { mode: localStorage.getItem('pos_pview') || 'cards', size: +(localStorage.getItem('pos_psize') || (matchMedia('(max-width:860px)').matches ? 160 : 220)) };
+let PVIEW = { mode: localStorage.getItem('pos_pview') || 'cards' };
 const _products43 = VIEWS.products;
 VIEWS.products = pg => {
   _products43(pg);
   const bar = $('#ps', pg)?.closest('.row'); if (!bar) return;
   bar.style.flexWrap = 'wrap';
-  bar.insertAdjacentHTML('beforeend', `<div class="seg" id="pvm"><button data-m="cards">🖼️ รูปใหญ่</button><button data-m="table">☰ ตาราง</button></div>
-    <div class="zctl" id="pzs" title="ขนาดรูป"><button type="button" data-z="-30">−</button><input type="range" min="140" max="420" step="10" value="${PVIEW.size}"><button type="button" data-z="30">+</button></div>`);
-  pg.insertAdjacentHTML('beforeend', '<div class="pmgrid" id="pmg"></div>');
+  bar.insertAdjacentHTML('beforeend', `<div class="seg" id="pvm"><button data-m="cards">🖼️ รูปใหญ่</button><button data-m="table">☰ ตาราง</button></div>${pmColBar('pzs')}`);
+  if ($('#pc', pg)) $('#pc', pg).style.display = 'none';
+  pg.insertAdjacentHTML('beforeend', '<div class="bcs-wrap" id="pcats"></div><div class="pmgrid" id="pmg"></div>');
   const hint = pg.querySelector('p.muted');
   const draw = () => {
     const cards = PVIEW.mode === 'cards';
     $$('#pvm button', pg).forEach(b => b.classList.toggle('on', b.dataset.m === PVIEW.mode));
-    $('#plist', pg).style.display = cards ? 'none' : ''; $('#pzs', pg).style.display = cards ? '' : 'none'; if (hint) hint.style.display = cards ? 'none' : '';
+    $('#plist', pg).style.display = cards ? 'none' : ''; $('#pzs', pg).style.display = $('#pcats', pg).style.display = cards ? '' : 'none'; if (hint) hint.style.display = cards ? 'none' : '';
     const g = $('#pmg', pg); g.style.display = cards ? '' : 'none'; if (!cards) return;
-    g.style.setProperty('--pm', PVIEW.size + 'px');
+    const cols = pmColGet('p'), px = pmPxFor(pg, cols); const cv = $('#pzs .colv', pg); if (cv) cv.textContent = cols + ' / แถว';
+    g.style.gridTemplateColumns = `repeat(${cols},minmax(0,1fr))`; g.style.setProperty('--pm', px + 'px');
     const v = $('#ps', pg).value.toLowerCase(), c = $('#pc', pg).value, f = $('#pf', pg).value;
     const list = S.products.filter(p => (!v || p.name.toLowerCase().includes(v) || (p.barcode || '').includes(v) || (p.sku || '').toLowerCase().includes(v)) && (!c || p.category_id === c) &&
       (!f || (f === 'low' ? p.track_stock && p.stock <= p.low_stock : f === 'nopic' ? !p.image_url : !p.active))).sort((a, b) => (a.active === false) - (b.active === false) || a.name.localeCompare(b.name, 'th'));
@@ -110,6 +111,9 @@ VIEWS.products = pg => {
         <div class="pm-body"><b class="pm-name">${esc(p.name)}</b>
           <div class="pm-row"><span class="pm-price">${baht(num(p.promo_price) > 0 ? p.promo_price : p.price)}</span>${num(p.promo_price) > 0 ? `<s class="muted">${money(p.price)}</s>` : ''}<span class="sp"></span>${p.track_stock ? `<span class="chip ${st}">${qtyf(p.stock)} ${esc(p.unit)}</span>` : ''}</div>
           <div class="pm-meta">${p.barcode ? `<code>${esc(p.barcode)}</code>` : '<span class="chip warn">ไม่มีบาร์โค้ด</span>'}<span>${esc(catName(p.category_id))}</span></div></div></div>`; };
+    const catList = S.products.filter(p => (!v || p.name.toLowerCase().includes(v) || (p.barcode || '').includes(v) || (p.sku || '').toLowerCase().includes(v)));
+    $('#pcats', pg).innerHTML = catSlideBar(c, catList);
+    $$('#pcats [data-cat]', pg).forEach(b => b.onclick = () => { $('#pc', pg).value = b.dataset.cat; draw(); });
     g.innerHTML = (canDo('edit_products') ? `<button class="pm pm-add" id="pmAdd"><span>＋</span><b>เพิ่มสินค้า</b><small>หรือสแกนบาร์โค้ดที่ช่องค้นหา</small></button>` : '') + list.slice(0, 600).map(card).join('')
       + (list.length ? '' : '<div class="empty" style="grid-column:1/-1">ไม่พบสินค้า</div>');
     $('#pcount', pg).textContent = `${list.length} รายการ${list.length > 600 ? ' (แสดง 600 แรก)' : ''}`;
@@ -123,9 +127,7 @@ VIEWS.products = pg => {
     productForm(p, draw);
   };
   $$('#pvm button', pg).forEach(b => b.onclick = () => { PVIEW.mode = b.dataset.m; localStorage.setItem('pos_pview', PVIEW.mode); draw(); });
-  const setSz = n => { PVIEW.size = Math.max(140, Math.min(420, n)); localStorage.setItem('pos_psize', PVIEW.size); $('#pzs input', pg).value = PVIEW.size; $('#pmg', pg).style.setProperty('--pm', PVIEW.size + 'px'); };
-  $('#pzs input', pg).oninput = e => setSz(+e.target.value);
-  $$('#pzs [data-z]', pg).forEach(b => b.onclick = () => setSz(PVIEW.size + +b.dataset.z));
+  $$('#pzs [data-z]', pg).forEach(b => b.onclick = () => { pmColStep('p', +b.dataset.z); draw(); });
   ['#ps', '#pc', '#pf'].forEach(s => $(s, pg)?.addEventListener(s === '#ps' ? 'input' : 'change', draw));
   /* scanning in the product search: open that product, or offer to add it */
   $('#ps', pg)?.addEventListener('keydown', e => { if (e.key !== 'Enter') return; const code = e.target.value.trim(); if (!looksCode(code)) return;
