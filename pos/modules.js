@@ -1423,7 +1423,7 @@ const _goC = go;
 go = function (page) { _goC(page); $('.top')?.classList.toggle('posmode', S.page === 'pos'); };
 /* ================= Shop POS v4 — promotions engine, data center, barcodes, personal use,
    activity log, branding, receipt image, cashier upgrades, auto-update ================= */
-const APP_VERSION = '5.4.6';
+const APP_VERSION = '5.4.7';
 Object.assign(TH, { 'Data center': 'ศูนย์ข้อมูล', 'Barcodes': 'บาร์โค้ด', 'Branches': 'สาขา' });
 PAGES.splice(PAGES.findIndex(p => p.id === 'settings'), 0,
   { id: 'barcodes', ic: '🏷', name: 'Barcodes', roles: ['owner', 'manager', 'stock'] },
@@ -3065,7 +3065,7 @@ function unknownBarcode(code, qty = 1) {
     if (a === 'on') { try { Object.assign(off, await q(sb.from('products').update({ active: true }).eq('id', off.id).select().single())); toast('เปิดขายแล้ว', 'ok'); sellAfter(off); } catch (e) { fail(e); } }
     if (a === 'new') {
       const before = new Set(S.products.map(p => p.id));
-      productForm({ barcode: code, name: info?.name || '', name_en: info?.name_en || '', brand: info?.brand || '', unit: 'ชิ้น', track_stock: true, active: true }, () => {
+      productForm({ barcode: code, name: info?.name || '', name_en: info?.name_en || '', brand: info?.brand || '', unit: info?.unit || 'ชิ้น', track_stock: true, active: true }, () => {
         const np = S.products.find(p => !before.has(p.id)) || findByCode(code);
         if (np && info?.image && !np.image_url) savePicFromUrl(np, info.image);
         sellAfter(np); if (S.page === 'products') go('products');
@@ -6220,4 +6220,32 @@ personalUse = function () {
   };
   new MutationObserver(ms => { for (const m of ms) for (const n of m.addedNodes) { if (n.nodeType !== 1) continue; defer(n); n.querySelectorAll?.('[style*="background-image"],img').forEach(defer); } })
     .observe(document.documentElement, { childList: true, subtree: true });
+})();
+/* v5.4.7 — scan auto-fill from our own shared catalog, then public DB.
+   Overrides offLookup (defined in m8b): first ask our shared product_catalog
+   (barcode -> name/image/unit/brand, contributed automatically by every shop),
+   then fall back to Open Food Facts. The catalog NEVER holds price/cost/stock. */
+(function () {
+  if (typeof offLookup !== 'function') return;
+  const _off = offLookup;
+  offLookup = async function (code) {
+    if (!/^\d{8,14}$/.test(code)) return null;
+    // 1) our own shared catalog (fast, Thai names, real product photos)
+    try {
+      const rows = await q(sb.rpc('catalog_lookup', { p_barcode: code }));
+      const c = Array.isArray(rows) ? rows[0] : rows;
+      if (c && c.name) return {
+        name: c.name || '',
+        name_en: c.name_en || '',
+        brand: c.brand || '',
+        unit: c.unit || '',
+        image: c.image_url || '',
+        src: 'catalog'
+      };
+    } catch (e) { /* offline / not a member: just fall through */ }
+    // 2) public database fallback
+    const r = await _off(code);
+    if (r) r.src = 'off';
+    return r;
+  };
 })();

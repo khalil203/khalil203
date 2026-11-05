@@ -43,7 +43,7 @@ function unknownBarcode(code, qty = 1) {
     if (a === 'on') { try { Object.assign(off, await q(sb.from('products').update({ active: true }).eq('id', off.id).select().single())); toast('เปิดขายแล้ว', 'ok'); sellAfter(off); } catch (e) { fail(e); } }
     if (a === 'new') {
       const before = new Set(S.products.map(p => p.id));
-      productForm({ barcode: code, name: info?.name || '', name_en: info?.name_en || '', brand: info?.brand || '', unit: 'ชิ้น', track_stock: true, active: true }, () => {
+      productForm({ barcode: code, name: info?.name || '', name_en: info?.name_en || '', brand: info?.brand || '', unit: info?.unit || 'ชิ้น', track_stock: true, active: true }, () => {
         const np = S.products.find(p => !before.has(p.id)) || findByCode(code);
         if (np && info?.image && !np.image_url) savePicFromUrl(np, info.image);
         sellAfter(np); if (S.page === 'products') go('products');
