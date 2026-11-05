@@ -1422,7 +1422,7 @@ const _goC = go;
 go = function (page) { _goC(page); $('.top')?.classList.toggle('posmode', S.page === 'pos'); };
 /* ================= Shop POS v4 — promotions engine, data center, barcodes, personal use,
    activity log, branding, receipt image, cashier upgrades, auto-update ================= */
-const APP_VERSION = '5.4.2';
+const APP_VERSION = '5.4.3';
 Object.assign(TH, { 'Data center': 'ศูนย์ข้อมูล', 'Barcodes': 'บาร์โค้ด', 'Branches': 'สาขา' });
 PAGES.splice(PAGES.findIndex(p => p.id === 'settings'), 0,
   { id: 'barcodes', ic: '🏷', name: 'Barcodes', roles: ['owner', 'manager', 'stock'] },
@@ -5960,6 +5960,12 @@ const linesFor = (txt, wt, fs, width) => Math.ceil(tw(txt, wt, fs) / width * 1.0
 lblHTML = async function (p, o) {
   await lblFonts();
   let h = await _lblHTML539(p, o);
+  // promotion tag on every template (not only มาตรฐาน / ป้ายโปร)
+  const prz = lblPrices(p, o.price);
+  if (prz.tag && o.price !== 'none' && !/class="tg"/.test(h) && ['bigprice', 'shelf', 'qr', 'dark'].includes(o.tpl)) {
+    const tg = `<div class="tg">${esc(prz.tag)}</div>`;
+    h = o.tpl === 'qr' ? h.replace('<div class="txt">', '<div class="txt">' + tg) : h.replace(/(<div class="lb[^"]*">)/, '$1' + tg);
+  }
   const z = LBL_SIZES[o.size]; if (!z) return h;
   const W = z.w, H = z.h, t = o.tpl;
   const padX = W * .04, padY = H * .05, inner = W - padX * 2 - (t === 'shelf' ? W * .03 : 0);
@@ -6000,7 +6006,7 @@ lblHTML = async function (p, o) {
   const prLine = (price || '') + (old ? ' ' + old : '') + (unit || '');
   let pfs = price ? fitFs(prLine, 800, H * baseP, inner * (t === 'burst' ? .95 : 1), H * .09) : 0;
   const cfs = code ? fitFs(code, 400, H * .075, inner * .96, 1.1, .06) : 0;
-  const nameW = t === 'burst' ? inner - Math.min(W, H * 1.6) * .3 : inner;
+  const nameW = inner;
   let nfs = H * (t === 'burst' ? .12 : .12);
   const maxBc = t === 'mini' ? H * .72 : t === 'bigprice' ? H * .28 : H * .42, minBc = H * .14;
   const avail = H - padY * 2 - shopH;
@@ -6019,11 +6025,19 @@ lblCSS = function (o) {
   return _lblCSS539(o) + `
   .lb .pp,.lb .od,.lb .un,.lb .cd{white-space:nowrap}
   .lb>div{max-width:100%}
+  .lb>*,.lb .txt>*{flex-shrink:0!important}
+  .lb .ln{min-height:0}
   .lb.t-shelf .row2{align-items:flex-end;min-width:0;gap:1mm}
   .lb.t-shelf .row2>div:last-child{flex:1 1 auto;min-width:0;text-align:right}
   .lb .bc .cd{max-width:100%;overflow:hidden;line-height:1.1}
   .lb.t-qr .txt{overflow:hidden}
-  .lb .tg{position:static!important;align-self:center;max-width:100%!important;border-radius:1.6mm!important;padding:.3mm 2mm!important;margin-bottom:.3mm;flex:0 0 auto;line-height:1.25}`;
+  .lb.t-dark .bc .cd{color:#111}
+  .lb.t-qr .txt .tg{align-self:flex-start}
+  .lb.t-shelf .tg{align-self:flex-start}
+  .lb.t-burst .pct{position:static!important;transform:rotate(-6deg)!important;flex:0 0 auto;align-self:center;width:auto!important;height:auto!important;aspect-ratio:auto!important;border-radius:999px!important;padding:.15em .7em!important;margin-bottom:.35em;line-height:1.15}
+  .lb.t-burst .ln{padding-right:0!important}
+  .lb .tg{position:static!important;align-self:center;max-width:100%!important;border-radius:1.6mm!important;padding:.3mm 2mm!important;margin-bottom:.3em;flex:0 0 auto;line-height:1.25}
+  .lb.t-qr .ln{-webkit-line-clamp:3!important}`;
 };
 
 /* final pass: put the label in the page at its real size and shrink whatever still sticks out (handles Thai line heights, long names, any font) */
@@ -6041,19 +6055,19 @@ lblHTML = async function (p, o) {
   const setFs = (el, v) => { el.style.fontSize = v.toFixed(2) + 'mm'; };
   const box = () => { const r = lb.getBoundingClientRect(), cs = getComputedStyle(lb); return { l: r.left + parseFloat(cs.paddingLeft) + parseFloat(cs.borderLeftWidth), r: r.right - parseFloat(cs.paddingRight) + .5, b: r.bottom + .5, t: r.top - .5 }; };
   // 1) horizontal: single-line things must fit their own column
-  for (const sel of ['.tg', '.pp', '.cd', '.sh', '.od', '.un']) for (const el of lb.querySelectorAll(sel)) {
+  for (const sel of ['.pct', '.tg', '.pp', '.cd', '.sh', '.od', '.un']) for (const el of lb.querySelectorAll(sel)) {
     for (let i = 0; i < 25; i++) { const B = box(), r = el.getBoundingClientRect(), par = el.closest('.bc,.row2>div:last-child,.txt') || lb, pr = par.getBoundingClientRect();
       const right = Math.min(B.r, par === lb ? B.r : pr.right + .5); const clip = el.clientWidth > 0 && el.scrollWidth > el.clientWidth + 1; if (!clip && r.right <= right && r.left >= B.l - .5) break; setFs(el, fsOf(el) * .93); } }
   // 2) vertical: shrink name → barcode → price until everything is inside
-  const nameEl = $('.ln', lb), img = $('.bc img', lb), pp = $('.pp', lb), cd = $('.cd', lb);
-  const over = () => { const B = box(); return [...lb.querySelectorAll('.tg,.ln,.bc,.pp,.cd,.sh,.row2,.txt')].some(e => { const r = e.getBoundingClientRect(); return r.height && (r.bottom > B.b || r.top < B.t); }) || lb.scrollHeight > lb.clientHeight + 1 || (nameEl && nameEl.scrollHeight > nameEl.clientHeight + 2); };
+    const nameEl = $('.ln', lb), img = $('.bc img', lb), pp = $('.pp', lb), cd = $('.cd', lb);
+  const over = () => { const B = box(); return [...lb.querySelectorAll('.pct,.tg,.ln,.bc,.pp,.cd,.sh,.row2,.txt')].some(e => { const r = e.getBoundingClientRect(); return r.height && (r.bottom > B.b || r.top < B.t); }) || lb.scrollHeight > lb.clientHeight + 1 || (nameEl && nameEl.scrollHeight > parseFloat(getComputedStyle(nameEl).fontSize) * 1.15 * 2.45); };
   for (let i = 0; i < 60 && over(); i++) {
     const k = i % 3;
-    if (k === 0 && nameEl && fsOf(nameEl) > H * .065) setFs(nameEl, fsOf(nameEl) * .92);
+    if (k === 0 && nameEl && fsOf(nameEl) > Math.min(H * .065, z.w * .035)) setFs(nameEl, fsOf(nameEl) * .92);
     else if (k === 1 && img && img.getBoundingClientRect().height / mm > H * .13) img.style.height = (img.getBoundingClientRect().height / mm * .9).toFixed(2) + 'mm';
     else if (pp && fsOf(pp) > H * .08) { setFs(pp, fsOf(pp) * .93); }
     else if (cd && fsOf(cd) > 1.1) setFs(cd, fsOf(cd) * .93);
-    else if (nameEl && fsOf(nameEl) > H * .05) setFs(nameEl, fsOf(nameEl) * .92);
+    else if (nameEl && fsOf(nameEl) > Math.min(H * .05, z.w * .03)) setFs(nameEl, fsOf(nameEl) * .92);
     else break;
   }
   const out = lb.outerHTML; LBL_FIT_HOST.innerHTML = ''; return out;
