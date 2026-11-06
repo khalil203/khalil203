@@ -13,32 +13,31 @@ function pmColGet(ns) { const mx = innerWidth < 600 ? 5 : 10; return Math.max(1,
 function pmColStep(ns, d) { const mx = innerWidth < 600 ? 5 : 10; localStorage.setItem(pmColKey(ns), Math.max(1, Math.min(mx, pmColGet(ns) + d))); }
 function pmColBar(id) { return `<div class="bcz" id="${id}" title="จำนวนรูปต่อแถว"><button class="btn" type="button" data-z="-1">−</button><b class="colv"></b><button class="btn" type="button" data-z="1">+</button></div>`; }
 function pmPxFor(pg, cols) { const w = ($('#pg') || pg)?.clientWidth || innerWidth; return Math.max(110, Math.floor((w - 28 - (cols - 1) * 14) / cols)); }
-/* Smooth-scroll the page to a category's header (or the top for ''). */
+function _catLine(pg) { const bar = pg.querySelector('.bcs-wrap'); return (bar ? bar.getBoundingClientRect().bottom : pg.getBoundingClientRect().top) + 8; }
+function _catOf(el) { return S.products.find(p => p.id === el.dataset.id)?.category_id || ''; }
+/* Smooth-scroll so the first card of a category sits just under the slide bar. */
 function catScrollTo(pg, gridSel, catId) {
-  const bar = pg.querySelector('.bcs-wrap'), barH = (bar ? bar.offsetHeight : 0) + 8;
-  if (!catId) { pg.scrollTo({ top: 0, behavior: 'smooth' }); return; }
   const g = $(gridSel, pg); if (!g) return;
-  const h = g.querySelector(`.grp-h[data-cat="${catId}"]`); if (!h) return;
-  pg.scrollTo({ top: pg.scrollTop + (h.getBoundingClientRect().top - pg.getBoundingClientRect().top) - barH, behavior: 'smooth' });
+  if (!catId) { pg.scrollTo({ top: 0, behavior: 'smooth' }); return; }
+  const el = [...g.querySelectorAll('.pm[data-id]')].find(e => _catOf(e) === catId); if (!el) return;
+  const ref = g.querySelector(`.grp-h[data-cat="${catId}"]`) || el;
+  pg.scrollBy({ top: ref.getBoundingClientRect().top - _catLine(pg) + 2, behavior: 'smooth' });
 }
-/* Highlight the category chip for whatever section the user has scrolled to,
-   and keep that chip centred in the slide bar. */
+/* Highlight the chip of whatever category is at the top of the view. */
 function catSpy(pg, catsSel, gridSel) {
   const run = () => {
     const g = $(gridSel, pg), box = $(catsSel, pg); if (!g || !box) return;
-    const bar = pg.querySelector('.bcs-wrap'), barH = (bar ? bar.offsetHeight : 0) + 14;
-    const top = pg.getBoundingClientRect().top;
-    let cur = '';
-    g.querySelectorAll('.grp-h[data-cat]').forEach(h => { if (h.getBoundingClientRect().top - top <= barH) cur = h.dataset.cat; });
+    const line = _catLine(pg), cards = [...g.querySelectorAll('.pm[data-id]')];
+    let cur = cards.length ? _catOf(cards[0]) : '';
+    for (const el of cards) { const r = el.getBoundingClientRect(); if (r.bottom > line) { cur = _catOf(el); break; } }
     const chips = [...box.querySelectorAll('.bcs-chip')];
     const on = chips.find(c => (c.dataset.cat || '') === cur) || chips.find(c => (c.dataset.cat || '') === '');
     chips.forEach(c => c.classList.toggle('on', c === on));
     if (on && on !== pg._catOn) { pg._catOn = on; const bcs = box.querySelector('.bcs'); if (bcs) bcs.scrollTo({ left: on.offsetLeft - (bcs.clientWidth - on.clientWidth) / 2, behavior: 'smooth' }); }
   };
-  if (pg._catSpy) pg.removeEventListener('scroll', pg._catSpy);
-  let raf = 0; pg._catSpy = () => { if (raf) return; raf = requestAnimationFrame(() => { raf = 0; run(); }); };
-  pg.addEventListener('scroll', pg._catSpy, { passive: true });
-  setTimeout(run, 60);
+  if (!pg._catSpy) { let raf = 0; pg._catSpy = () => { if (raf) return; raf = requestAnimationFrame(() => { raf = 0; run(); }); };
+    pg.addEventListener('scroll', pg._catSpy, { passive: true }); addEventListener('scroll', pg._catSpy, { passive: true }); }
+  pg._catOn = null; setTimeout(run, 80);
 }
 /* Render list into one grid, or grouped category sections when grouped=true. */
 function pmSections(list, cols, px, cardFn, grouped) {
