@@ -1423,7 +1423,7 @@ const _goC = go;
 go = function (page) { _goC(page); $('.top')?.classList.toggle('posmode', S.page === 'pos'); };
 /* ================= Shop POS v4 — promotions engine, data center, barcodes, personal use,
    activity log, branding, receipt image, cashier upgrades, auto-update ================= */
-const APP_VERSION = '5.5.5';
+const APP_VERSION = '5.5.6';
 Object.assign(TH, { 'Data center': 'ศูนย์ข้อมูล', 'Barcodes': 'บาร์โค้ด', 'Branches': 'สาขา' });
 PAGES.splice(PAGES.findIndex(p => p.id === 'settings'), 0,
   { id: 'barcodes', ic: '🏷', name: 'Barcodes', roles: ['owner', 'manager', 'stock'] },
@@ -6282,6 +6282,7 @@ function catScrollTo(pg, gridSel, catId) {
 function catSpy(pg, catsSel, gridSel) {
   const run = () => {
     const g = $(gridSel, pg), box = $(catsSel, pg); if (!g || !box) return;
+    const bar = pg.querySelector('.bcs-wrap'); if (bar) pg.style.setProperty('--catbar', Math.round(bar.getBoundingClientRect().height) + 'px');
     const line = _catLine(pg), cards = [...g.querySelectorAll('.pm[data-id]')];
     let cur = cards.length ? _catOf(cards[0]) : '';
     for (const el of cards) { const r = el.getBoundingClientRect(); if (r.bottom > line) { cur = _catOf(el); break; } }
@@ -6290,9 +6291,10 @@ function catSpy(pg, catsSel, gridSel) {
     chips.forEach(c => c.classList.toggle('on', c === on));
     if (on && on !== pg._catOn) { pg._catOn = on; const bcs = box.querySelector('.bcs'); if (bcs) bcs.scrollTo({ left: on.offsetLeft - (bcs.clientWidth - on.clientWidth) / 2, behavior: 'smooth' }); }
   };
-  if (!pg._catSpy) { let raf = 0; pg._catSpy = () => { if (raf) return; raf = requestAnimationFrame(() => { raf = 0; run(); }); };
-    pg.addEventListener('scroll', pg._catSpy, { passive: true }); addEventListener('scroll', pg._catSpy, { passive: true }); }
-  pg._catOn = null; setTimeout(run, 80);
+  if (pg._catSpy) { pg.removeEventListener('scroll', pg._catSpy); removeEventListener('scroll', pg._catSpy); }
+  let raf = 0; pg._catSpy = () => { if (raf) return; raf = requestAnimationFrame(() => { raf = 0; run(); }); };
+  pg.addEventListener('scroll', pg._catSpy, { passive: true }); addEventListener('scroll', pg._catSpy, { passive: true });
+  pg._catOn = null; setTimeout(run, 80); setTimeout(run, 300);
 }
 /* Render list into one grid, or grouped category sections when grouped=true. */
 function pmSections(list, cols, px, cardFn, grouped) {
