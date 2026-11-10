@@ -113,7 +113,7 @@ VIEWS.products = pg => {
           <div class="pm-meta">${p.barcode ? `<code>${esc(p.barcode)}</code>` : '<span class="chip warn">ไม่มีบาร์โค้ด</span>'}<span>${esc(catName(p.category_id))}</span></div></div></div>`; };
     const catList = S.products.filter(p => (!v || p.name.toLowerCase().includes(v) || (p.barcode || '').includes(v) || (p.sku || '').toLowerCase().includes(v)));
     $('#pcats', pg).innerHTML = catSlideBar(c, catList);
-    $$('#pcats [data-cat]', pg).forEach(b => b.onclick = () => catScrollTo(pg, '#pmg', b.dataset.cat));
+    $$('#pcats [data-cat]', pg).forEach(b => b.onclick = () => { $('#pc', pg).value = b.dataset.cat; draw(); pg.scrollTo({ top: 0, behavior: 'smooth' }); });
     catSpy(pg, '#pcats', '#pmg');
     g.innerHTML = (canDo('edit_products') ? `<button class="pm pm-add" id="pmAdd"><span>＋</span><b>เพิ่มสินค้า</b><small>หรือสแกนบาร์โค้ดที่ช่องค้นหา</small></button>` : '') + list.slice(0, 600).map(card).join('')
       + (list.length ? '' : '<div class="empty" style="grid-column:1/-1">ไม่พบสินค้า</div>');

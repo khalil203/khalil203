@@ -1423,7 +1423,7 @@ const _goC = go;
 go = function (page) { _goC(page); $('.top')?.classList.toggle('posmode', S.page === 'pos'); };
 /* ================= Shop POS v4 — promotions engine, data center, barcodes, personal use,
    activity log, branding, receipt image, cashier upgrades, auto-update ================= */
-const APP_VERSION = '5.5.9';
+const APP_VERSION = '5.6.0';
 Object.assign(TH, { 'Data center': 'ศูนย์ข้อมูล', 'Barcodes': 'บาร์โค้ด', 'Branches': 'สาขา' });
 PAGES.splice(PAGES.findIndex(p => p.id === 'settings'), 0,
   { id: 'barcodes', ic: '🏷', name: 'Barcodes', roles: ['owner', 'manager', 'stock'] },
@@ -3135,7 +3135,7 @@ VIEWS.products = pg => {
           <div class="pm-meta">${p.barcode ? `<code>${esc(p.barcode)}</code>` : '<span class="chip warn">ไม่มีบาร์โค้ด</span>'}<span>${esc(catName(p.category_id))}</span></div></div></div>`; };
     const catList = S.products.filter(p => (!v || p.name.toLowerCase().includes(v) || (p.barcode || '').includes(v) || (p.sku || '').toLowerCase().includes(v)));
     $('#pcats', pg).innerHTML = catSlideBar(c, catList);
-    $$('#pcats [data-cat]', pg).forEach(b => b.onclick = () => catScrollTo(pg, '#pmg', b.dataset.cat));
+    $$('#pcats [data-cat]', pg).forEach(b => b.onclick = () => { $('#pc', pg).value = b.dataset.cat; draw(); pg.scrollTo({ top: 0, behavior: 'smooth' }); });
     catSpy(pg, '#pcats', '#pmg');
     g.innerHTML = (canDo('edit_products') ? `<button class="pm pm-add" id="pmAdd"><span>＋</span><b>เพิ่มสินค้า</b><small>หรือสแกนบาร์โค้ดที่ช่องค้นหา</small></button>` : '') + list.slice(0, 600).map(card).join('')
       + (list.length ? '' : '<div class="empty" style="grid-column:1/-1">ไม่พบสินค้า</div>');
@@ -3756,8 +3756,8 @@ VIEWS.stock = pg => {
     pg.classList.toggle('stkcards', cards);
     $$('#svm button', pg).forEach(b => b.classList.toggle('on', b.dataset.m === SVIEW.mode));
     $('#szc', pg).style.display = $('#scats', pg).style.display = cards ? '' : 'none';
-    $('#scats', pg).innerHTML = catSlideBar('', searched());
-    $$('#scats [data-cat]', pg).forEach(b => b.onclick = () => catScrollTo(pg, '#stkg', b.dataset.cat));
+    $('#scats', pg).innerHTML = catSlideBar(SVIEW.cat, searched());
+    $$('#scats [data-cat]', pg).forEach(b => b.onclick = () => { SVIEW.cat = b.dataset.cat; draw(); pg.scrollTo({ top: 0, behavior: 'smooth' }); });
     catSpy(pg, '#scats', '#stkg');
     const b0 = base();
     $('#sff', pg).innerHTML = Object.entries(F).map(([k, [l, fn]]) => { const n = b0.filter(p => (k === 'all' ? (p.track_stock && p.active !== false) : k === 'off' ? p.active === false : p.active !== false && fn(p))).length;

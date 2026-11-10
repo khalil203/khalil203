@@ -33,8 +33,8 @@ VIEWS.stock = pg => {
     pg.classList.toggle('stkcards', cards);
     $$('#svm button', pg).forEach(b => b.classList.toggle('on', b.dataset.m === SVIEW.mode));
     $('#szc', pg).style.display = $('#scats', pg).style.display = cards ? '' : 'none';
-    $('#scats', pg).innerHTML = catSlideBar('', searched());
-    $$('#scats [data-cat]', pg).forEach(b => b.onclick = () => catScrollTo(pg, '#stkg', b.dataset.cat));
+    $('#scats', pg).innerHTML = catSlideBar(SVIEW.cat, searched());
+    $$('#scats [data-cat]', pg).forEach(b => b.onclick = () => { SVIEW.cat = b.dataset.cat; draw(); pg.scrollTo({ top: 0, behavior: 'smooth' }); });
     catSpy(pg, '#scats', '#stkg');
     const b0 = base();
     $('#sff', pg).innerHTML = Object.entries(F).map(([k, [l, fn]]) => { const n = b0.filter(p => (k === 'all' ? (p.track_stock && p.active !== false) : k === 'off' ? p.active === false : p.active !== false && fn(p))).length;
