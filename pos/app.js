@@ -1,6 +1,6 @@
 /* Shop POS — free, open POS + stock web app.  Data: Supabase.  Hosting: GitHub Pages. */
 'use strict';
-const VERSION = '5.5.7';
+const VERSION = '5.5.8';
 const sb = supabase.createClient(window.POS_CONFIG.url, window.POS_CONFIG.key, { auth: { flowType: 'pkce', detectSessionInUrl: true, persistSession: true } });
 
 /* ================= i18n ================= */
@@ -326,8 +326,12 @@ function renderShell() {
         <div class="tt"><h1 id="ttl"></h1><small class="mob">${esc(S.shop.name)}</small></div><div id="tact" class="row"></div></header>
       <div class="page" id="pg"></div>
     </div>
-    <nav class="tabbar">${tabs.map(p => `<button class="tb" data-p="${p.id}"><span class="ic">${p.ic}</span><span>${t(p.name)}</span></button>`).join('')}
-      <button class="tb" id="moreBtn"><span class="ic">☰</span><span>${LANG === 'th' ? 'เพิ่มเติม' : 'More'}</span></button></nav>
+    <nav class="tabbar">${(() => {
+      const items = [...tabs.map(p => `<button class="tb" data-p="${p.id}"><span class="ic">${p.ic}</span><span>${t(p.name)}</span></button>`),
+        `<button class="tb" id="moreBtn"><span class="ic">☰</span><span>${LANG === 'th' ? 'เพิ่มเติม' : 'More'}</span></button>`];
+      const half = Math.ceil(items.length / 2);
+      return items.slice(0, half).join('') + `<button class="fab" id="quickFab" title="${LANG === 'th' ? 'ทางลัด' : 'Quick'}" aria-label="quick"><span>＋</span></button>` + items.slice(half).join('');
+    })()}</nav>
   </div>`;
   $$('[data-p]').forEach(b => b.onclick = () => go(b.dataset.p));
   $('#miniBtn').onclick = () => { $('#app').classList.toggle('mini'); localStorage.setItem('pos_side', $('#app').classList.contains('mini') ? 'mini' : ''); };
@@ -342,7 +346,18 @@ function renderShell() {
     updateInstallUI();
   };
   $$('[data-install]').forEach(b => b.onclick = installApp);
+  $('#quickFab') && ($('#quickFab').onclick = quickActions);
   updateInstallUI();
+}
+
+function quickActions() {
+  const acts = [];
+  if (pageOK(PAGES.find(p => p.id === 'pos'))) acts.push(['🛒', LANG === 'th' ? 'ขายสินค้า' : 'Sell', () => go('pos')]);
+  acts.push(['📷', LANG === 'th' ? 'สแกนหาสินค้า' : 'Scan product', () => scanBarcode(code => { go('products'); setTimeout(() => { const i = $('#ps'); if (i) { i.value = code; i.dispatchEvent(new Event('input', { bubbles: true })); i.focus(); } }, 250); })]);
+  if (canDo('manage_inventory')) acts.push(['📥', LANG === 'th' ? 'รับสินค้าเข้า' : 'Receive', () => go('stock')]);
+  if (canDo('edit_products')) acts.push(['➕', LANG === 'th' ? 'เพิ่มสินค้า' : 'Add product', () => productForm({ unit: 'ชิ้น', track_stock: true, active: true }, () => go('products'))]);
+  const m = modal(LANG === 'th' ? 'ทางลัด' : 'Quick actions', `<div class="qacts">${acts.map((a, i) => `<button data-q="${i}" style="--i:${i}"><span>${a[0]}</span>${a[1]}</button>`).join('')}</div>`, { sheet: true });
+  $$('[data-q]', m).forEach(b => b.onclick = () => { m.close(); acts[+b.dataset.q][2](); });
 }
 
 function go(page) {

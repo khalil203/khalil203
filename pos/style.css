@@ -309,6 +309,15 @@ kbd{font-family:inherit;font-size:11px;background:#ffffff2e;border-radius:6px;pa
   .tb.on{color:var(--brand)}
   .tb.on .ic{transform:translateY(-2px) scale(1.15)}
   .tb.on::before{content:"";position:absolute;top:0;left:30%;right:30%;height:3px;border-radius:0 0 4px 4px;background:var(--grad)}
+  .tb:active{transform:scale(.9)}
+  .tabbar .fab{flex:0 0 auto;width:56px;height:56px;margin:-22px 6px 0;border:0;border-radius:50%;background:var(--grad);color:#fff;box-shadow:0 10px 24px color-mix(in srgb,var(--brand) 55%,transparent);cursor:pointer;display:grid;place-items:center;align-self:center;transition:transform .2s var(--spring)}
+  .tabbar .fab span{font-size:30px;font-weight:300;line-height:1;margin-top:-2px}
+  .tabbar .fab:active{transform:scale(.88) rotate(90deg)}
+  .qacts{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+  .qacts button{display:flex;flex-direction:column;align-items:center;gap:8px;padding:18px 10px;border:1px solid var(--line);border-radius:18px;background:var(--card2);font-size:14px;font-weight:700;cursor:pointer;animation:rise .3s var(--ease) both;animation-delay:calc(var(--i) * .05s);transition:transform .15s,border-color .15s}
+  .qacts button span{font-size:30px}
+  .qacts button:active{transform:scale(.94)}
+  .qacts button:hover{border-color:var(--brand)}
   .pos .left{padding:10px 12px 0;gap:10px}
   .posstats .ps{min-width:118px;padding:7px 10px}.posstats .ps span{width:30px;height:30px;font-size:16px}
   .posstats .ps.clock{display:none}
