@@ -310,7 +310,8 @@ kbd{font-family:inherit;font-size:11px;background:#ffffff2e;border-radius:6px;pa
   .tb.on .ic{transform:translateY(-2px) scale(1.15)}
   .tb.on::before{content:"";position:absolute;top:0;left:30%;right:30%;height:3px;border-radius:0 0 4px 4px;background:var(--grad)}
   .tb:active{transform:scale(.9)}
-  .tabbar .fab{flex:0 0 auto;width:56px;height:56px;margin:-22px 6px 0;border:0;border-radius:50%;background:var(--grad);color:#fff;box-shadow:0 10px 24px color-mix(in srgb,var(--brand) 55%,transparent);cursor:pointer;display:grid;place-items:center;align-self:center;transition:transform .2s var(--spring)}
+  .tabbar .tabgrp{flex:1;display:flex;align-items:stretch;justify-content:space-around;min-width:0}
+  .tabbar .fab{flex:0 0 auto;width:56px;height:56px;margin:-22px 4px 0;border:0;border-radius:50%;background:var(--grad);color:#fff;box-shadow:0 10px 24px color-mix(in srgb,var(--brand) 55%,transparent);cursor:pointer;display:grid;place-items:center;align-self:center;transition:transform .2s var(--spring)}
   .tabbar .fab span{font-size:30px;font-weight:300;line-height:1;margin-top:-2px}
   .tabbar .fab:active{transform:scale(.88) rotate(90deg)}
   .qacts{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}

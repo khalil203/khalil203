@@ -19,8 +19,8 @@ VIEWS.stock = pg => {
         <div class="sbox" style="flex:1;min-width:160px"><span>🔍</span><input class="in" id="sfq" placeholder="กรองชื่อ / บาร์โค้ด" value="${esc(SVIEW.q)}"></div>
         <select class="in" id="sfs" style="width:auto">${Object.entries(SORT).map(([k, [l]]) => `<option value="${k}" ${SVIEW.sort === k ? 'selected' : ''}>เรียง: ${l}</option>`).join('')}</select>
         ${pmColBar('szc')}</div>
-      <div class="bcs-wrap" id="scats" style="margin-top:8px"></div>
       <div class="pills" id="sff" style="margin-top:8px"></div></div>
+    <div class="bcs-wrap" id="scats"></div>
     <div class="pmgrid" id="stkg"></div>`);
   const placeStats = () => { const stk = $('#stk', pg); if (stk && stk.previousElementSibling !== scan) scan.after(stk); };
   placeStats(); new MutationObserver(placeStats).observe(pg, { childList: true });

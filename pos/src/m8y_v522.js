@@ -87,5 +87,7 @@ const _stock524 = VIEWS.stock;
 VIEWS.stock = pg => { const r = _stock524(pg);
   const fix = () => { const scan = $('.stk-scan', pg), f = $('#stkf', pg), stk = $('#stk', pg); if (!scan || !f) return;
     if (scan.nextElementSibling !== f && !(stk && scan.nextElementSibling === stk && stk.nextElementSibling === f)) { (stk || scan).after(f); }
-    const g = $('#stkg', pg); if (g && f.nextElementSibling !== g) f.after(g); };
+    const sc = $('#scats', pg); let a = f;
+    if (sc) { if (a.nextElementSibling !== sc) a.after(sc); a = sc; }
+    const g = $('#stkg', pg); if (g && a.nextElementSibling !== g) a.after(g); };
   fix(); new MutationObserver(fix).observe(pg, { childList: true }); return r; };
