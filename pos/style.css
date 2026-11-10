@@ -1552,6 +1552,23 @@ body:has(#cart.open) #scanReady,body:has(.mbg) #scanReady{display:none!important
 .qr.cqr img{width:min(300px,72vw)!important;height:auto!important;max-height:min(360px,46vh)!important;object-fit:contain}
 /* v5.4.0 barcode page cards */
 .bcs-wrap{position:sticky;top:0;z-index:5;margin:0 -4px 10px;padding:6px 4px;background:linear-gradient(var(--bg) 70%,transparent)}
+/* live product lookup in the search bar */
+.livebox{position:relative}
+.livebox .livescan{position:absolute;right:6px;top:50%;transform:translateY(-50%);width:38px;height:38px;border:0;border-radius:12px;background:var(--brandsoft);color:var(--brand);font-size:18px;cursor:pointer;display:grid;place-items:center;transition:transform .15s,background .15s;z-index:2}
+.livebox .livescan:active{transform:translateY(-50%) scale(.9)}
+.livebox input{padding-right:48px!important}
+.livedrop{position:absolute;left:0;right:0;top:calc(100% + 6px);z-index:60;background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow2);max-height:min(60vh,420px);overflow:auto;padding:6px;animation:rise .18s var(--ease)}
+.liverow{width:100%;display:flex;align-items:center;gap:10px;padding:8px;border:0;background:none;border-radius:12px;cursor:pointer;text-align:left;transition:background .12s}
+.liverow:hover,.liverow:active{background:var(--brandsoft)}
+.liveimg{width:44px;height:44px;flex:0 0 auto;border-radius:10px;background-size:cover;background-position:center;display:grid;place-items:center;font-weight:800;color:#fff;font-size:16px;box-shadow:inset 0 0 0 1px #0001}
+.livename{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
+.livename b{font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.livename small{font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.liveend{flex:0 0 auto;display:flex;flex-direction:column;align-items:flex-end;gap:2px}
+.liveend b{font-size:14px;color:var(--brand)}
+.liveend .lv{font-size:11px;font-weight:700;padding:1px 7px;border-radius:999px;background:#0000000d;color:var(--muted)}
+.liveend .lv.ok{background:#dcfce7;color:#15803d}.liveend .lv.warn{background:#fef3c7;color:#b45309}.liveend .lv.bad{background:#fee2e2;color:#dc2626}
+.livempty{padding:14px;text-align:center;color:var(--muted);font-size:13px}
 .bcs{display:flex;gap:8px;overflow-x:auto;scroll-snap-type:x proximity;scrollbar-width:none;padding-bottom:2px}.bcs::-webkit-scrollbar{display:none}
 .bcs-chip{scroll-snap-align:start;flex:0 0 auto;display:flex;align-items:center;gap:7px;padding:9px 14px;border-radius:999px;border:1.5px solid var(--line);background:var(--card);font:inherit;font-weight:700;font-size:14px;color:var(--ink);cursor:pointer;white-space:nowrap}
 .bcs-chip i{width:10px;height:10px;border-radius:50%;background:var(--cc)}.bcs-chip b{font-size:12px;background:var(--card2,#f1f5f9);padding:1px 8px;border-radius:999px;color:var(--muted)}
