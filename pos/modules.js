@@ -1423,7 +1423,7 @@ const _goC = go;
 go = function (page) { _goC(page); $('.top')?.classList.toggle('posmode', S.page === 'pos'); };
 /* ================= Shop POS v4 — promotions engine, data center, barcodes, personal use,
    activity log, branding, receipt image, cashier upgrades, auto-update ================= */
-const APP_VERSION = '5.5.8';
+const APP_VERSION = '5.5.9';
 Object.assign(TH, { 'Data center': 'ศูนย์ข้อมูล', 'Barcodes': 'บาร์โค้ด', 'Branches': 'สาขา' });
 PAGES.splice(PAGES.findIndex(p => p.id === 'settings'), 0,
   { id: 'barcodes', ic: '🏷', name: 'Barcodes', roles: ['owner', 'manager', 'stock'] },

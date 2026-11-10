@@ -1581,7 +1581,17 @@ body:has(#cart.open) #scanReady,body:has(.mbg) #scanReady{display:none!important
 .bcs{display:flex;gap:8px;overflow-x:auto;scroll-snap-type:x proximity;scrollbar-width:none;padding-bottom:2px}.bcs::-webkit-scrollbar{display:none}
 .bcs-chip{scroll-snap-align:start;flex:0 0 auto;display:flex;align-items:center;gap:7px;padding:9px 14px;border-radius:999px;border:1.5px solid var(--line);background:var(--card);font:inherit;font-weight:700;font-size:14px;color:var(--ink);cursor:pointer;white-space:nowrap}
 .bcs-chip i{width:10px;height:10px;border-radius:50%;background:var(--cc)}.bcs-chip b{font-size:12px;background:var(--card2,#f1f5f9);padding:1px 8px;border-radius:999px;color:var(--muted)}
-.bcs-chip.on{background:var(--cc);border-color:var(--cc);color:#fff}.bcs-chip.on i{background:#fff}.bcs-chip.on b{background:rgba(255,255,255,.25);color:#fff}
+.bcs-chip.on{background:var(--cc);border-color:var(--cc);color:#fff;box-shadow:0 6px 16px color-mix(in srgb,var(--cc) 40%,transparent)}.bcs-chip.on i{background:#fff}.bcs-chip.on b{background:rgba(255,255,255,.25);color:#fff}
+/* make everything feel tactile & pressable */
+.bcs-chip{transition:transform .15s var(--spring),background .15s,border-color .15s,box-shadow .15s}
+.bcs-chip:active{transform:scale(.93)}
+.bcs-chip.on{transform:translateY(-1px)}
+.pills button,.seg button,.moregrid button,.qacts button,.tb,.bcz .btn{transition:transform .15s,background .15s,border-color .15s,color .15s}
+.pills button:active,.seg button:active,.moregrid button:active,.bcz .btn:active{transform:scale(.93)}
+.seg button.on{box-shadow:0 4px 12px color-mix(in srgb,var(--brand) 35%,transparent)}
+.pills button.on{box-shadow:0 4px 12px color-mix(in srgb,var(--brand) 22%,transparent)}
+.pm{transition:transform .15s,box-shadow .2s}.pm:active{transform:scale(.97)}
+.liverow:active{transform:scale(.98)}
 .bcg-bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px}
 .bcg-sec{margin-bottom:18px}.bcg-h{display:flex;align-items:center;gap:8px;margin:6px 2px 10px;font-size:17px}.bcg-h i{width:12px;height:12px;border-radius:4px}.bcg-h small{color:var(--muted);font-weight:600;font-size:13px}
 .bcg-sec .pmgrid{padding-bottom:0}
