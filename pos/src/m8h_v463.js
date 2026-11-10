@@ -47,14 +47,15 @@ VIEWS.stock = pg => {
     const prof = canDo('view_profit');
     const card = p => { const st = !p.track_stock ? '' : p.stock <= 0 ? 'bad' : p.stock <= p.low_stock ? 'warn' : 'ok';
       const exp = p.expiry_date ? Math.ceil((new Date(p.expiry_date) - now) / dayMs) : null;
-      return `<div class="pm sk" data-id="${p.id}"><div class="pm-img" style="${p.image_url ? `background-image:url('${esc(p.image_url)}')` : `background:linear-gradient(135deg,${esc(p.tile_color || catColor(p.category_id))},${esc(p.tile_color || catColor(p.category_id))}aa)`}">
+      return `<div class="pm sk" data-id="${p.id}">
+        <div class="pm-img" style="${p.image_url ? `background-image:url('${esc(p.image_url)}')` : `background:linear-gradient(135deg,${esc(p.tile_color || catColor(p.category_id))},${esc(p.tile_color || catColor(p.category_id))}aa)`}">
           ${p.image_url ? '' : `<span>${esc([...p.name].slice(0, 2).join(''))}</span>`}
-          <i class="sk-stock ${st}">${p.track_stock ? `${qtyf(p.stock)} <small>${esc(p.unit)}</small>` : 'ไม่ตัดสต็อก'}</i>
-          ${exp != null && exp <= 30 ? `<i class="pm-promo" style="background:${exp < 0 ? '#e5384f' : '#e38a06'}">⌛ ${exp < 0 ? 'หมดอายุแล้ว' : 'อีก ' + exp + ' วัน'}</i>` : ''}
+          ${p.favorite ? '<i class="pm-fav">★</i>' : ''}
+          ${exp != null && exp <= 30 ? `<i class="pm-promo" style="background:${exp < 0 ? '#e5384f' : '#e38a06'}">⌛ ${exp < 0 ? 'หมดอายุ' : 'อีก ' + exp + ' วัน'}</i>` : ''}
           ${canDo('manage_inventory') ? `<div class="pm-acts"><button data-k="in" title="รับเข้า">➕</button><button data-k="out" title="เบิกออก">➖</button><button data-k="adjust" title="ตรวจนับ">⚖️</button></div>` : ''}</div>
         <div class="pm-body"><b class="pm-name">${esc(p.name)}</b>
-          <div class="pm-meta">${p.barcode ? `<code>${esc(p.barcode)}</code>` : '<span class="chip warn">ไม่มีบาร์โค้ด</span>'}<span>${esc(catName(p.category_id))}</span></div>
-          <div class="pm-meta">${p.track_stock ? `แจ้งเตือน ≤ ${qtyf(p.low_stock)}` : ''}${prof && p.track_stock ? ` · มูลค่า ${money(Math.max(0, p.stock) * p.cost)}` : ''}</div></div></div>`; };
+          <div class="pm-row"><span class="pm-price">${baht(p.price)}</span><span class="sp"></span>${p.track_stock ? `<span class="chip ${st}">${qtyf(p.stock)} ${esc(p.unit)}</span>` : '<span class="chip">ไม่ตัดสต็อก</span>'}</div>
+          <div class="pm-meta">${p.barcode ? `<code>${esc(p.barcode)}</code>` : '<span class="chip warn">ไม่มีบาร์โค้ด</span>'}<span>${esc(catName(p.category_id))}</span></div></div></div>`; };
     g.innerHTML = list.length ? list.slice(0, 600).map(card).join('') : '<div class="empty" style="grid-column:1/-1">ไม่มีสินค้าตามตัวกรองนี้</div>';
   };
   $('#stkg', pg).onclick = e => { const el = e.target.closest('.pm[data-id]'); if (!el) return; const p = S.products.find(x => x.id === el.dataset.id); if (!p) return;
