@@ -6,9 +6,8 @@ Tunisian living in Thailand 🇹🇳🇹🇭. I build free tools for my own busi
 
 | Project | What it is | Open |
 |---|---|---|
-| 🧠 [Second Brain](https://github.com/khalil203/second-brain) | Notes, tasks, journal, 3D brain map, on-device AI and a file converter. Works offline and syncs to the cloud. | [Web app](https://khalil203.github.io/second-brain/) · [Android APK](https://github.com/khalil203/second-brain/raw/main/dist/second-brain.apk) |
-| 🔄 [Second Brain Convert](https://github.com/khalil203/second-brain-convert) | Drag-and-drop file converter for Windows. Handles 200+ formats on your own PC. | [Download](https://github.com/khalil203/second-brain-convert/releases) |
-| 🤖 [K.LINKO Jarvis](voice-call/) | Free AI voice assistant (Thai, English, French, Arabic) that can run Make.com automations. | [Open](https://khalil203.github.io/khalil203/voice-call/) |
+| 🧠 [Second Brain](https://github.com/khalil203/second-brain) | My all-in-one app: notes, tasks, journal and 3D brain map, plus 🤖 **Jarvis** voice assistant, 🎙️ **My Voice** voice cloner, 🎨 **Imagine** AI images and 🔄 **Convert** file converter. Works offline and syncs to the cloud. | [Web app](https://khalil203.github.io/second-brain/) · [Android APK](https://github.com/khalil203/second-brain/raw/main/dist/second-brain.apk) |
+| 🔄 [Second Brain Convert](https://github.com/khalil203/second-brain-convert) | Desktop version of Convert for Windows: drag and drop, 200+ formats, runs on your own PC. | [Download](https://github.com/khalil203/second-brain-convert/releases) |
 
 ## 📣 Marketing tools
 
@@ -29,5 +28,5 @@ HTML · JavaScript · TypeScript · React · C# / .NET · Supabase · Cloudflare
 
 <!---
 khalil203/khalil203 is a special repository: this README appears on the GitHub profile.
-The /pos and /voice-call folders are live apps served by GitHub Pages; keep their paths unchanged.
+The /pos folder (Yanisa Shop) and the older /voice-call Jarvis are live apps served by GitHub Pages; keep their paths unchanged.
 --->
