@@ -11,6 +11,9 @@
   const tidy = () => { tick = 0;
     document.querySelectorAll('#sbody table.tbl').forEach(tb => { if (tb._lbl) return; tb._lbl = 1; const heads = [...tb.querySelectorAll('tr:first-child th')].map(h => h.textContent.trim());
       tb.querySelectorAll('tr').forEach(tr => [...tr.children].forEach((td, i) => { if (td.tagName === 'TD' && i > 0 && heads[i] && !td.querySelector('button')) td.dataset.l = heads[i]; })); });
+    /* a category row that was just redrawn starts at the far left — bring the selected category back into view */
+    document.querySelectorAll('.cs-cats,.bcs').forEach(row => { if (row.scrollLeft > 0) return; const on = row.querySelector('.on'); if (!on) return;
+      const rr = row.getBoundingClientRect(), r = on.getBoundingClientRect(); if (rr.width && r.right > rr.right - 4) row.scrollLeft += r.left - rr.left - (rr.width - r.width) / 2; });
     const tabs = document.querySelector('#stk .tabs'), sw = document.querySelector('#svm [data-m="cards"]');
     if (tabs && sw && !sw.classList.contains('on') && !tabs.querySelector('.tocards')) { const b = document.createElement('button'); b.type = 'button'; b.className = 'tocards'; b.textContent = '🖼️ รูปใหญ่'; b.onclick = () => { sw.click(); (document.querySelector('#pg') || document.body).scrollTo({ top: 0 }); }; tabs.prepend(b); } };
   new MutationObserver(() => { if (!tick) tick = setTimeout(tidy, 120); }).observe(document.body, { childList: true, subtree: true });

@@ -14,13 +14,19 @@ VIEWS.receive = async pg => {
   };
   const browser = () => {
     const list = S.products.filter(p => p.active !== false && (!cat || (cat === '_none' ? !p.category_id : p.category_id === cat)))
-      .sort((a, b) => (b.track_stock && b.stock <= b.low_stock) - (a.track_stock && a.stock <= a.low_stock) || a.name.localeCompare(b.name, 'th')).slice(0, 120);
+      .sort((a, b) => (b.track_stock && b.stock <= b.low_stock) - (a.track_stock && a.stock <= a.low_stock) || a.name.localeCompare(b.name, 'th')).slice(0, 600);
     const inRcv = id => $$('.rl', pg).length ? null : null;
     return `<div class="card rb-box"><div class="rb-h"><b>👆 แตะสินค้าเพื่อเพิ่มเข้ารายการรับ</b><small class="muted">สินค้าใกล้หมดขึ้นก่อน</small></div>
       <div class="cs-cats" id="rbcat"><button type="button" data-rc="" class="${!cat ? 'on' : ''}">🗂️ ทั้งหมด</button>${[...S.categories].sort((a, b) => num(a.sort) - num(b.sort)).filter(c => S.products.some(p => p.active !== false && p.category_id === c.id)).map(c => `<button type="button" data-rc="${c.id}" class="${cat === c.id ? 'on' : ''}">${c.icon ? esc(c.icon) + ' ' : '<i style="--cc:' + esc(c.color || '#6366f1') + '"></i>'}${esc(c.name)}</button>`).join('')}${S.products.some(p => p.active !== false && !p.category_id) ? `<button type="button" data-rc="_none" class="${cat === '_none' ? 'on' : ''}">ไม่มีหมวด</button>` : ''}</div>
-      <div class="rb-grid">${list.map(p => { const low = p.track_stock && p.stock <= p.low_stock;
+      <div class="rb-grid">${(() => { const tile = p => { const low = p.track_stock && p.stock <= p.low_stock;
         return `<button type="button" class="rb-tile ${low ? 'low' : ''}" data-id="${p.id}"><span class="rb-img" style="${p.image_url ? `background-image:url('${esc(p.image_url)}')` : `background:${esc(p.tile_color || catColor(p.category_id))}`}">${p.image_url ? '' : esc([...p.name].slice(0, 1).join(''))}</span>
-          <span class="rb-n">${esc(p.name)}</span><small>${p.track_stock ? `เหลือ ${qtyf(p.stock)} ${esc(p.unit || '')}` : 'ไม่ตัดสต็อก'}</small></button>`; }).join('') || '<div class="muted" style="padding:12px">ไม่มีสินค้าในหมวดนี้</div>'}</div></div>`;
+          <span class="rb-n">${esc(p.name)}</span><small>${p.track_stock ? `เหลือ ${qtyf(p.stock)} ${esc(p.unit || '')}` : 'ไม่ตัดสต็อก'}</small></button>`; };
+        /* grouped under a category name banner, categories in their set order */
+        const groups = new Map(); list.forEach(p => { const k = p.category_id || '_none'; (groups.get(k) || groups.set(k, []).get(k)).push(p); });
+        const order = [...[...S.categories].sort((a, b) => num(a.sort) - num(b.sort)).map(c => c.id), '_none'].filter(k => groups.has(k));
+        return order.map(k => { const c = S.categories.find(x => x.id === k);
+          return `<div class="rb-gh"><i style="background:${esc(c ? (c.color || catColor(c.id)) : '#94a3b8')}"></i>${c && c.icon ? esc(c.icon) + ' ' : ''}${esc(c ? c.name : 'ไม่มีหมวด')}<small>${groups.get(k).length}</small></div>` + groups.get(k).map(tile).join(''); }).join('')
+          || '<div class="muted" style="padding:12px">ไม่มีสินค้าในหมวดนี้</div>'; })()}</div></div>`;
   };
   const deco = () => {
     const rcv = $('.rcv', pg); if (!rcv || rcv.dataset.d) return; rcv.dataset.d = 1;
