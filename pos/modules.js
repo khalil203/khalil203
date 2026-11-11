@@ -1423,7 +1423,7 @@ const _goC = go;
 go = function (page) { _goC(page); $('.top')?.classList.toggle('posmode', S.page === 'pos'); };
 /* ================= Shop POS v4 — promotions engine, data center, barcodes, personal use,
    activity log, branding, receipt image, cashier upgrades, auto-update ================= */
-const APP_VERSION = '5.7.3';
+const APP_VERSION = '5.7.4';
 Object.assign(TH, { 'Data center': 'ศูนย์ข้อมูล', 'Barcodes': 'บาร์โค้ด', 'Branches': 'สาขา' });
 PAGES.splice(PAGES.findIndex(p => p.id === 'settings'), 0,
   { id: 'barcodes', ic: '🏷', name: 'Barcodes', roles: ['owner', 'manager', 'stock'] },
@@ -3130,6 +3130,7 @@ VIEWS.products = pg => {
     g.style.gridTemplateColumns = `repeat(${cols},minmax(0,1fr))`; g.style.setProperty('--pm', px + 'px');
     const v = sv, c = PSF.cat, f = PSF.f;
     const list = S.products.filter(p => (!v || p.name.toLowerCase().includes(v) || (p.barcode || '').includes(v) || (p.sku || '').toLowerCase().includes(v)) && psCatOK(p, c) && psStatusOK(p, f) && (f === 'off' || p.active !== false || !f)).sort((a, b) => (a.active === false) - (b.active === false) || a.name.localeCompare(b.name, 'th'));
+    { const ord = catOrder(), k = p => { const c = psCid(p); return c ? ord[c] : 1e6; }; list.sort((a, b) => k(a) - k(b)); }   // stable: keeps the name order inside each category
     const card = p => { const st = !p.track_stock ? '' : p.stock <= 0 ? 'bad' : p.stock <= p.low_stock ? 'warn' : 'ok'; const pr = itemPromosFor(p)[0];
       return `<div class="pm ${p.active === false ? 'off' : ''}" data-id="${p.id}">
         <div class="pm-img" style="${p.image_url ? `background-image:url('${esc(p.image_url)}')` : `background:linear-gradient(135deg,${esc(p.tile_color || catColor(p.category_id))},${esc(p.tile_color || catColor(p.category_id))}aa)`}">
@@ -5568,7 +5569,7 @@ function groupGrid(g) {
     if (!GROUP_ON) return;
     const ord = catOrder(), prod = id => S.products.find(p => p.id === id);
     const groups = new Map();
-    cards.forEach(c => { const cid = prod(c.dataset.id)?.category_id || ''; if (!groups.has(cid)) groups.set(cid, []); groups.get(cid).push(c); });
+    cards.forEach(c => { const cid = psCid(prod(c.dataset.id)); if (!groups.has(cid)) groups.set(cid, []); groups.get(cid).push(c); });
     const keys = [...groups.keys()].sort((a, b) => (a === '' ? 1e6 : ord[a] ?? 1e5) - (b === '' ? 1e6 : ord[b] ?? 1e5));
     if (keys.length < 2 && keys[0] !== '') { /* single category view: no header needed */ return; }
     keys.forEach(k => {
@@ -6272,8 +6273,9 @@ personalUse = function () {
    category, and an adjustable images-per-row count. Used by the Products
    page and the Stock page so both look and behave the same. */
 function catSlideBar(activeId, list, opt) {
-  const cnt = id => list.filter(p => id === '_none' ? !p.category_id : p.category_id === id).length;
-  const cats = S.categories.filter(c => cnt(c.id)), none = opt && opt.none ? cnt('_none') : 0;
+  const cnt = id => list.filter(p => id === '_none' ? !psCid(p) : p.category_id === id).length;
+  /* chips in exactly the order the category sections appear in the list, so the highlight walks left-to-right as you scroll down */
+  const ord = catOrder(), cats = S.categories.filter(c => cnt(c.id)).sort((a, b) => ord[a.id] - ord[b.id]), none = opt && opt.none ? cnt('_none') : 0;
   const chip = (id, label, n, color) => `<button class="bcs-chip ${activeId === id ? 'on' : ''}" data-cat="${id}" style="--cc:${color || 'var(--brand)'}"><i></i><span>${esc(label)}</span><b>${n}</b></button>`;
   return `<div class="bcs">${chip('', 'ทั้งหมด', list.length)}${cats.map(c => chip(c.id, (c.icon ? c.icon + ' ' : '') + c.name, cnt(c.id), c.color || catColor(c.id))).join('')}${none ? chip('_none', 'ไม่มีหมวด', none, '#94a3b8') : ''}${opt && opt.manage ? '<button class="bcs-chip bcs-manage" data-catmanage="1" style="--cc:var(--brand)"><span>🗂 จัดการหมวดหมู่</span></button>' : ''}</div>`;
 }
@@ -6284,7 +6286,7 @@ function pmColStep(ns, d) { const mx = innerWidth < 600 ? 5 : 10; localStorage.s
 function pmColBar(id) { return `<div class="bcz" id="${id}" title="จำนวนรูปต่อแถว"><button class="btn" type="button" data-z="-1">−</button><b class="colv"></b><button class="btn" type="button" data-z="1">+</button></div>`; }
 function pmPxFor(pg, cols) { const w = ($('#pg') || pg)?.clientWidth || innerWidth; return Math.max(110, Math.floor((w - 28 - (cols - 1) * 14) / cols)); }
 function _catLine(pg) { const bar = pg.querySelector('.bcs-wrap'); return (bar ? bar.getBoundingClientRect().bottom : pg.getBoundingClientRect().top) + 8; }
-function _catOf(el) { return S.products.find(p => p.id === el.dataset.id)?.category_id || '_none'; }
+function _catOf(el) { return psCid(S.products.find(p => p.id === el.dataset.id)) || '_none'; }
 /* Smooth-scroll so the first card of a category sits just under the slide bar. */
 function catScrollTo(pg, gridSel, catId) {
   const g = $(gridSel, pg); if (!g) return;
@@ -6446,3 +6448,6 @@ function psShell(pg) {
   const _stockOld = VIEWS.stock;
   VIEWS.stock = pg => pgOK('products') ? VIEWS.products(pg) : _stockOld(pg);
 })();
+
+/* categories are always organised into sections on the merged page (the old on/off switch could leave the list unsorted) */
+GROUP_ON = true; try { localStorage.setItem('pos_grid_group', '1'); } catch (e) {}

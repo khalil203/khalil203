@@ -50,7 +50,7 @@ function groupGrid(g) {
     if (!GROUP_ON) return;
     const ord = catOrder(), prod = id => S.products.find(p => p.id === id);
     const groups = new Map();
-    cards.forEach(c => { const cid = prod(c.dataset.id)?.category_id || ''; if (!groups.has(cid)) groups.set(cid, []); groups.get(cid).push(c); });
+    cards.forEach(c => { const cid = psCid(prod(c.dataset.id)); if (!groups.has(cid)) groups.set(cid, []); groups.get(cid).push(c); });
     const keys = [...groups.keys()].sort((a, b) => (a === '' ? 1e6 : ord[a] ?? 1e5) - (b === '' ? 1e6 : ord[b] ?? 1e5));
     if (keys.length < 2 && keys[0] !== '') { /* single category view: no header needed */ return; }
     keys.forEach(k => {

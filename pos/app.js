@@ -1,6 +1,6 @@
 /* Shop POS — free, open POS + stock web app.  Data: Supabase.  Hosting: GitHub Pages. */
 'use strict';
-const VERSION = '5.7.3';
+const VERSION = '5.7.4';
 const sb = supabase.createClient(window.POS_CONFIG.url, window.POS_CONFIG.key, { auth: { flowType: 'pkce', detectSessionInUrl: true, persistSession: true } });
 
 /* ================= i18n ================= */
@@ -1140,7 +1140,9 @@ async function billDetail(sale, reload) {
 /* ================= PRODUCTS ================= */
 /* one filter state for the merged Products & Stock page (cards and list both read it) */
 const PSF = { cat: '', f: '' };
-function psCatOK(p, c) { return !c || (c === '_none' ? !p.category_id : p.category_id === c); }
+/* a product's category, or '' when it has none (or points at a category that was deleted) */
+function psCid(p) { return p && p.category_id && S.categories.some(c => c.id === p.category_id) ? p.category_id : ''; }
+function psCatOK(p, c) { return !c || (c === '_none' ? !psCid(p) : p.category_id === c); }
 function psStatusOK(p, f) { const t = p.track_stock;
   return !f ? true : f === 'low' ? t && p.stock > 0 && p.stock <= p.low_stock : f === 'out' ? t && p.stock <= 0 : f === 'exp' ? !!p.expiry_date && new Date(p.expiry_date) - Date.now() < 30 * 864e5
     : f === 'nopic' ? !p.image_url : f === 'nobc' ? !p.barcode : f === 'off' ? p.active === false : true; }

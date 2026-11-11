@@ -37,3 +37,6 @@ function psShell(pg) {
   const _stockOld = VIEWS.stock;
   VIEWS.stock = pg => pgOK('products') ? VIEWS.products(pg) : _stockOld(pg);
 })();
+
+/* categories are always organised into sections on the merged page (the old on/off switch could leave the list unsorted) */
+GROUP_ON = true; try { localStorage.setItem('pos_grid_group', '1'); } catch (e) {}

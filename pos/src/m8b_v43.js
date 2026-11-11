@@ -108,6 +108,7 @@ VIEWS.products = pg => {
     g.style.gridTemplateColumns = `repeat(${cols},minmax(0,1fr))`; g.style.setProperty('--pm', px + 'px');
     const v = sv, c = PSF.cat, f = PSF.f;
     const list = S.products.filter(p => (!v || p.name.toLowerCase().includes(v) || (p.barcode || '').includes(v) || (p.sku || '').toLowerCase().includes(v)) && psCatOK(p, c) && psStatusOK(p, f) && (f === 'off' || p.active !== false || !f)).sort((a, b) => (a.active === false) - (b.active === false) || a.name.localeCompare(b.name, 'th'));
+    { const ord = catOrder(), k = p => { const c = psCid(p); return c ? ord[c] : 1e6; }; list.sort((a, b) => k(a) - k(b)); }   // stable: keeps the name order inside each category
     const card = p => { const st = !p.track_stock ? '' : p.stock <= 0 ? 'bad' : p.stock <= p.low_stock ? 'warn' : 'ok'; const pr = itemPromosFor(p)[0];
       return `<div class="pm ${p.active === false ? 'off' : ''}" data-id="${p.id}">
         <div class="pm-img" style="${p.image_url ? `background-image:url('${esc(p.image_url)}')` : `background:linear-gradient(135deg,${esc(p.tile_color || catColor(p.category_id))},${esc(p.tile_color || catColor(p.category_id))}aa)`}">

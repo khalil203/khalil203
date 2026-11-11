@@ -2,8 +2,9 @@
    category, and an adjustable images-per-row count. Used by the Products
    page and the Stock page so both look and behave the same. */
 function catSlideBar(activeId, list, opt) {
-  const cnt = id => list.filter(p => id === '_none' ? !p.category_id : p.category_id === id).length;
-  const cats = S.categories.filter(c => cnt(c.id)), none = opt && opt.none ? cnt('_none') : 0;
+  const cnt = id => list.filter(p => id === '_none' ? !psCid(p) : p.category_id === id).length;
+  /* chips in exactly the order the category sections appear in the list, so the highlight walks left-to-right as you scroll down */
+  const ord = catOrder(), cats = S.categories.filter(c => cnt(c.id)).sort((a, b) => ord[a.id] - ord[b.id]), none = opt && opt.none ? cnt('_none') : 0;
   const chip = (id, label, n, color) => `<button class="bcs-chip ${activeId === id ? 'on' : ''}" data-cat="${id}" style="--cc:${color || 'var(--brand)'}"><i></i><span>${esc(label)}</span><b>${n}</b></button>`;
   return `<div class="bcs">${chip('', 'ทั้งหมด', list.length)}${cats.map(c => chip(c.id, (c.icon ? c.icon + ' ' : '') + c.name, cnt(c.id), c.color || catColor(c.id))).join('')}${none ? chip('_none', 'ไม่มีหมวด', none, '#94a3b8') : ''}${opt && opt.manage ? '<button class="bcs-chip bcs-manage" data-catmanage="1" style="--cc:var(--brand)"><span>🗂 จัดการหมวดหมู่</span></button>' : ''}</div>`;
 }
@@ -14,7 +15,7 @@ function pmColStep(ns, d) { const mx = innerWidth < 600 ? 5 : 10; localStorage.s
 function pmColBar(id) { return `<div class="bcz" id="${id}" title="จำนวนรูปต่อแถว"><button class="btn" type="button" data-z="-1">−</button><b class="colv"></b><button class="btn" type="button" data-z="1">+</button></div>`; }
 function pmPxFor(pg, cols) { const w = ($('#pg') || pg)?.clientWidth || innerWidth; return Math.max(110, Math.floor((w - 28 - (cols - 1) * 14) / cols)); }
 function _catLine(pg) { const bar = pg.querySelector('.bcs-wrap'); return (bar ? bar.getBoundingClientRect().bottom : pg.getBoundingClientRect().top) + 8; }
-function _catOf(el) { return S.products.find(p => p.id === el.dataset.id)?.category_id || '_none'; }
+function _catOf(el) { return psCid(S.products.find(p => p.id === el.dataset.id)) || '_none'; }
 /* Smooth-scroll so the first card of a category sits just under the slide bar. */
 function catScrollTo(pg, gridSel, catId) {
   const g = $(gridSel, pg); if (!g) return;
