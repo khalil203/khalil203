@@ -1,6 +1,6 @@
 /* Shop POS — free, open POS + stock web app.  Data: Supabase.  Hosting: GitHub Pages. */
 'use strict';
-const VERSION = '5.6.4';
+const VERSION = '5.7.0';
 const sb = supabase.createClient(window.POS_CONFIG.url, window.POS_CONFIG.key, { auth: { flowType: 'pkce', detectSessionInUrl: true, persistSession: true } });
 
 /* ================= i18n ================= */
@@ -1138,6 +1138,12 @@ async function billDetail(sale, reload) {
 }
 
 /* ================= PRODUCTS ================= */
+/* one filter state for the merged Products & Stock page (cards and list both read it) */
+const PSF = { cat: '', f: '' };
+function psCatOK(p, c) { return !c || (c === '_none' ? !p.category_id : p.category_id === c); }
+function psStatusOK(p, f) { const t = p.track_stock;
+  return !f ? true : f === 'low' ? t && p.stock > 0 && p.stock <= p.low_stock : f === 'out' ? t && p.stock <= 0 : f === 'exp' ? !!p.expiry_date && new Date(p.expiry_date) - Date.now() < 30 * 864e5
+    : f === 'nopic' ? !p.image_url : f === 'nobc' ? !p.barcode : f === 'off' ? p.active === false : true; }
 VIEWS.products = pg => {
   const th = LANG === 'th';
   $('#tact').innerHTML = `<button class="btn p" id="addBtn">+ ${t('Add product')}</button><button class="btn" id="autoPic">🪄 ${th ? 'ใส่รูปอัตโนมัติ' : 'Auto pictures'}</button><button class="btn" id="catBtn">🗂 ${t('Categories')}</button><button class="btn" id="impBtn">⬆ ${t('Import CSV')}</button><button class="btn" id="expBtn">⬇ ${t('Export CSV')}</button>`;
@@ -1165,9 +1171,8 @@ VIEWS.products = pg => {
     if (sen) { io = new IntersectionObserver(es => { if (es.some(e => e.isIntersecting)) more(); }, {root: $('#pg'), rootMargin: '500px'}); io.observe(sen); }
   };
   const draw = () => {
-    const v = $('#ps').value.toLowerCase(), c = $('#pc').value, f = $('#pf').value;
-    list = S.products.filter(p => (!v || p.name.toLowerCase().includes(v) || (p.barcode || '').includes(v) || (p.sku || '').toLowerCase().includes(v)) && (!c || p.category_id === c) &&
-      (!f || (f === 'low' ? p.track_stock && p.stock <= p.low_stock : f === 'nopic' ? !p.image_url : !p.active)));
+    const v = $('#ps').value.toLowerCase();
+    list = S.products.filter(p => (!v || p.name.toLowerCase().includes(v) || (p.barcode || '').includes(v) || (p.sku || '').toLowerCase().includes(v)) && psCatOK(p, PSF.cat) && psStatusOK(p, PSF.f));
     shown = 0; $('#plist').innerHTML = list.length ? `<div class="erow head"><span></span><span>${t('Name')}</span><span>${t('Price')}</span><span>${t('Cost')}</span><span>${t('Stock')}</span><span>${t('Margin')}</span><span></span></div>` : `<div class="empty">—</div>`;
     more();
     const nopic = S.products.filter(p => !p.image_url).length;

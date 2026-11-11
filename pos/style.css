@@ -1669,3 +1669,14 @@ body:has(#cart.open) #scanReady,body:has(.mbg) #scanReady{display:none!important
 #stk .tabs .tocards{border:0;border-radius:999px;padding:8px 14px;font:inherit;font-weight:700;background:var(--brandsoft);color:var(--brand);cursor:pointer;white-space:nowrap}
 .pm-promo{left:auto;right:6px;top:6px;bottom:auto;max-width:calc(100% - 46px);font-size:clamp(10px,calc(var(--pm) * .08),12px)}
 .pm.off .pm-promo{display:none}
+/* ---- v5.7.0 merged Products & Stock page ---- */
+.ustats{display:grid;grid-template-columns:repeat(auto-fit,minmax(104px,1fr));gap:8px;margin-bottom:12px}
+.ustat{display:grid;grid-template-columns:auto 1fr;column-gap:6px;align-items:center;text-align:left;padding:9px 11px;border:1.5px solid var(--line);border-radius:14px;background:var(--card);font:inherit;cursor:pointer;min-width:0;transition:transform .15s,border-color .15s,box-shadow .15s}
+.ustat span{grid-row:1/3;font-size:20px}.ustat small{font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ustat b{font-size:clamp(14px,3.6vw,18px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--ink)}
+.ustat.warn b{color:#b45309}.ustat.bad b{color:#dc2626}
+.ustat:not(:disabled):active{transform:scale(.95)}.ustat:disabled{cursor:default;opacity:1}
+.ustat.on{border-color:var(--brand);box-shadow:0 4px 14px color-mix(in srgb,var(--brand) 25%,transparent);background:var(--brandsoft)}
+#upills{margin:0 0 10px;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;padding-bottom:2px}#upills::-webkit-scrollbar{display:none}#upills button{flex:0 0 auto;white-space:nowrap}
+.bcs-chip.bcs-manage{border-style:dashed;color:var(--brand);background:transparent}
+.ustat:disabled{grid-column:span 2}

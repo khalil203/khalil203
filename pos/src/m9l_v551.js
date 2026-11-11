@@ -15,7 +15,10 @@
       const v = input.value.trim().toLowerCase();
       if (!v) { dd.hidden = true; dd.innerHTML = ''; return; }
       const list = S.products.filter(p => p.active !== false && (p.name.toLowerCase().includes(v) || (p.barcode || '').includes(v) || (p.sku || '').toLowerCase().includes(v))).slice(0, 8);
-      if (!list.length) { dd.innerHTML = `<div class="livempty">ไม่พบสินค้า · กด 📷 เพื่อสแกน</div>`; dd.hidden = false; return; }
+      if (!list.length) { const raw = input.value.trim(), can = canDo('edit_products');
+        dd.innerHTML = `<div class="livempty">ไม่พบสินค้า “${esc(raw)}”</div>${can ? `<button type="button" class="liverow livenew"><i class="liveimg" style="background:var(--brand)">＋</i><span class="livename"><b>เพิ่มเป็นสินค้าใหม่</b><small>${/^\d{6,}$/.test(raw) ? 'บาร์โค้ด ' + esc(raw) : 'ชื่อ ' + esc(raw)}</small></span></button>` : ''}`; dd.hidden = false;
+        const nb = $('.livenew', dd); if (nb) nb.onmousedown = e => { e.preventDefault(); dd.hidden = true; productForm(/^\d{6,}$/.test(raw) ? { barcode: raw, unit: 'ชิ้น', track_stock: true, active: true } : { name: raw, unit: 'ชิ้น', track_stock: true, active: true }, () => go('products')); };
+        return; }
       dd.innerHTML = list.map(p => {
         const img = p.image_url ? `style="background-image:url('${esc(p.image_url)}')"` : `style="background:${esc(p.tile_color || catColor(p.category_id))}"`;
         const st = p.track_stock ? `${qtyf(p.stock)} ${esc(p.unit)}` : 'ไม่ตัดสต็อก';

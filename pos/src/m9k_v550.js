@@ -1,11 +1,11 @@
 /* v5.5.1 — shared "organized well" grid: category slide bar, grouping by
    category, and an adjustable images-per-row count. Used by the Products
    page and the Stock page so both look and behave the same. */
-function catSlideBar(activeId, list) {
-  const cnt = id => list.filter(p => p.category_id === id).length;
-  const cats = S.categories.filter(c => cnt(c.id));
+function catSlideBar(activeId, list, opt) {
+  const cnt = id => list.filter(p => id === '_none' ? !p.category_id : p.category_id === id).length;
+  const cats = S.categories.filter(c => cnt(c.id)), none = opt && opt.none ? cnt('_none') : 0;
   const chip = (id, label, n, color) => `<button class="bcs-chip ${activeId === id ? 'on' : ''}" data-cat="${id}" style="--cc:${color || 'var(--brand)'}"><i></i><span>${esc(label)}</span><b>${n}</b></button>`;
-  return `<div class="bcs">${chip('', 'ทั้งหมด', list.length)}${cats.map(c => chip(c.id, c.name, cnt(c.id), c.color || catColor(c.id))).join('')}</div>`;
+  return `<div class="bcs">${chip('', 'ทั้งหมด', list.length)}${cats.map(c => chip(c.id, (c.icon ? c.icon + ' ' : '') + c.name, cnt(c.id), c.color || catColor(c.id))).join('')}${none ? chip('_none', 'ไม่มีหมวด', none, '#94a3b8') : ''}${opt && opt.manage ? '<button class="bcs-chip bcs-manage" data-catmanage="1" style="--cc:var(--brand)"><span>🗂 จัดการหมวดหมู่</span></button>' : ''}</div>`;
 }
 function pmColKey(ns) { return 'pos_' + ns + 'cols_' + (innerWidth < 600 ? 'm' : 'd'); }
 function pmColDef() { return innerWidth < 600 ? 3 : Math.max(4, Math.min(7, Math.round((innerWidth - 120) / 210))); }
@@ -14,7 +14,7 @@ function pmColStep(ns, d) { const mx = innerWidth < 600 ? 5 : 10; localStorage.s
 function pmColBar(id) { return `<div class="bcz" id="${id}" title="จำนวนรูปต่อแถว"><button class="btn" type="button" data-z="-1">−</button><b class="colv"></b><button class="btn" type="button" data-z="1">+</button></div>`; }
 function pmPxFor(pg, cols) { const w = ($('#pg') || pg)?.clientWidth || innerWidth; return Math.max(110, Math.floor((w - 28 - (cols - 1) * 14) / cols)); }
 function _catLine(pg) { const bar = pg.querySelector('.bcs-wrap'); return (bar ? bar.getBoundingClientRect().bottom : pg.getBoundingClientRect().top) + 8; }
-function _catOf(el) { return S.products.find(p => p.id === el.dataset.id)?.category_id || ''; }
+function _catOf(el) { return S.products.find(p => p.id === el.dataset.id)?.category_id || '_none'; }
 /* Smooth-scroll so the first card of a category sits just under the slide bar. */
 function catScrollTo(pg, gridSel, catId) {
   const g = $(gridSel, pg); if (!g) return;
@@ -25,13 +25,14 @@ function catScrollTo(pg, gridSel, catId) {
   scr.scrollBy({ top: ref.getBoundingClientRect().top - _catLine(pg) + 2, behavior: 'smooth' });
 }
 /* Highlight the chip of whatever category is at the top of the view. */
-function catSpy(pg, catsSel, gridSel) {
+function catSpy(pg, catsSel, gridSel, fixed) {
   const run = () => {
     const g = $(gridSel, pg), box = $(catsSel, pg); if (!g || !box) return;
     const bar = pg.querySelector('.bcs-wrap'); if (bar) pg.style.setProperty('--catbar', Math.round(bar.getBoundingClientRect().height) + 'px');
     const line = _catLine(pg), cards = [...g.querySelectorAll('.pm[data-id]')];
-    let cur = cards.length ? _catOf(cards[0]) : '';
-    for (const el of cards) { const r = el.getBoundingClientRect(); if (r.bottom > line) { cur = _catOf(el); break; } }
+    let cur = fixed || '';
+    /* showing everything: at the very top 'all' is lit, further down the category in view */
+    if (!fixed && (document.querySelector('#pg') || pg).scrollTop > 40) for (const el of cards) { const r = el.getBoundingClientRect(); if (r.bottom > line) { cur = _catOf(el); break; } }
     const chips = [...box.querySelectorAll('.bcs-chip')];
     const on = chips.find(c => (c.dataset.cat || '') === cur) || chips.find(c => (c.dataset.cat || '') === '');
     chips.forEach(c => c.classList.toggle('on', c === on));

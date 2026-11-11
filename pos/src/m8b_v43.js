@@ -89,32 +89,39 @@ VIEWS.products = pg => {
   const bar = $('#ps', pg)?.closest('.row'); if (!bar) return;
   bar.style.flexWrap = 'wrap';
   bar.insertAdjacentHTML('beforeend', `<div class="seg" id="pvm"><button data-m="cards">🖼️ รูปใหญ่</button><button data-m="table">☰ ตาราง</button></div>${pmColBar('pzs')}`);
-  if ($('#pc', pg)) $('#pc', pg).style.display = 'none';
+  ['#pc', '#pf'].forEach(s => { if ($(s, pg)) $(s, pg).style.display = 'none'; });
+  bar.insertAdjacentHTML('afterend', '<div class="pills" id="upills"></div>');
   pg.insertAdjacentHTML('beforeend', '<div class="bcs-wrap" id="pcats"></div><div class="pmgrid" id="pmg"></div>');
+  const redraw = () => $('#pf', pg).dispatchEvent(new Event('change'));   // list mode and card mode both listen
+  const FL = [['', 'ทั้งหมด'], ['low', '⚠️ ใกล้หมด'], ['out', '⛔ หมด'], ['exp', '⌛ ใกล้หมดอายุ'], ['nopic', '🖼️ ไม่มีรูป'], ['nobc', '🏷️ ไม่มีบาร์โค้ด'], ['off', '🚫 ปิดขาย']];
   const hint = pg.querySelector('p.muted');
   const draw = () => {
     const cards = PVIEW.mode === 'cards';
     $$('#pvm button', pg).forEach(b => b.classList.toggle('on', b.dataset.m === PVIEW.mode));
+    const sv = $('#ps', pg).value.toLowerCase(), inS = S.products.filter(p => (!sv || p.name.toLowerCase().includes(sv) || (p.barcode || '').includes(sv) || (p.sku || '').toLowerCase().includes(sv)) && psCatOK(p, PSF.cat));
+    $('#upills', pg).innerHTML = FL.map(([k, l]) => { const n = inS.filter(p => psStatusOK(p, k) && (k === 'off' || k === '' || p.active !== false)).length; return n || !k || PSF.f === k ? `<button data-uf="${k}" class="${PSF.f === k ? 'on' : ''}">${l} <small>${n}</small></button>` : ''; }).join('');
+    $$('#upills [data-uf]', pg).forEach(b => b.onclick = () => { PSF.f = b.dataset.uf; redraw(); });
+    $$('.ustat[data-us]').forEach(x => x.classList.toggle('on', !!PSF.f && x.dataset.us === PSF.f));
     $('#plist', pg).style.display = cards ? 'none' : ''; $('#pzs', pg).style.display = $('#pcats', pg).style.display = cards ? '' : 'none'; if (hint) hint.style.display = cards ? 'none' : '';
     const g = $('#pmg', pg); g.style.display = cards ? '' : 'none'; if (!cards) return;
     const cols = pmColGet('p'), px = pmPxFor(pg, cols); const cv = $('#pzs .colv', pg); if (cv) cv.textContent = cols + ' / แถว';
     g.style.gridTemplateColumns = `repeat(${cols},minmax(0,1fr))`; g.style.setProperty('--pm', px + 'px');
-    const v = $('#ps', pg).value.toLowerCase(), c = $('#pc', pg).value, f = $('#pf', pg).value;
-    const list = S.products.filter(p => (!v || p.name.toLowerCase().includes(v) || (p.barcode || '').includes(v) || (p.sku || '').toLowerCase().includes(v)) && (!c || p.category_id === c) &&
-      (!f || (f === 'low' ? p.track_stock && p.stock <= p.low_stock : f === 'nopic' ? !p.image_url : !p.active))).sort((a, b) => (a.active === false) - (b.active === false) || a.name.localeCompare(b.name, 'th'));
+    const v = sv, c = PSF.cat, f = PSF.f;
+    const list = S.products.filter(p => (!v || p.name.toLowerCase().includes(v) || (p.barcode || '').includes(v) || (p.sku || '').toLowerCase().includes(v)) && psCatOK(p, c) && psStatusOK(p, f) && (f === 'off' || p.active !== false || !f)).sort((a, b) => (a.active === false) - (b.active === false) || a.name.localeCompare(b.name, 'th'));
     const card = p => { const st = !p.track_stock ? '' : p.stock <= 0 ? 'bad' : p.stock <= p.low_stock ? 'warn' : 'ok'; const pr = itemPromosFor(p)[0];
       return `<div class="pm ${p.active === false ? 'off' : ''}" data-id="${p.id}">
         <div class="pm-img" style="${p.image_url ? `background-image:url('${esc(p.image_url)}')` : `background:linear-gradient(135deg,${esc(p.tile_color || catColor(p.category_id))},${esc(p.tile_color || catColor(p.category_id))}aa)`}">
           ${p.image_url ? '' : `<span>${esc([...p.name].slice(0, 2).join(''))}</span>`}
           ${p.favorite ? '<i class="pm-fav">★</i>' : ''}${pr || num(p.promo_price) > 0 ? `<i class="pm-promo">🏷️ ${esc(pr ? promoLabel(pr) : 'โปร ฿' + money(p.promo_price))}</i>` : ''}${p.active === false ? '<i class="pm-off">ปิดขาย</i>' : ''}
-          <div class="pm-acts"><button data-act="pic" title="เปลี่ยนรูป">📷</button><button data-act="stock" title="ปรับสต็อก">📦</button><button data-act="edit" title="แก้ไข">✏️</button></div></div>
+          <div class="pm-acts">${canDo('manage_inventory') && p.track_stock ? '<button data-act="in" title="รับเข้า">➕</button><button data-act="out" title="เบิกออก">➖</button>' : ''}<button data-act="edit" title="แก้ไขสินค้า">✏️</button></div></div>
         <div class="pm-body"><b class="pm-name">${esc(p.name)}</b>
           <div class="pm-row"><span class="pm-price">${baht(num(p.promo_price) > 0 ? p.promo_price : p.price)}</span>${num(p.promo_price) > 0 ? `<s class="muted">${money(p.price)}</s>` : ''}<span class="sp"></span>${p.track_stock ? `<span class="chip ${st}">${qtyf(p.stock)} ${esc(p.unit)}</span>` : ''}</div>
           <div class="pm-meta">${p.barcode ? `<code>${esc(p.barcode)}</code>` : '<span class="chip warn">ไม่มีบาร์โค้ด</span>'}<span>${esc(catName(p.category_id))}</span></div></div></div>`; };
     const catList = S.products.filter(p => (!v || p.name.toLowerCase().includes(v) || (p.barcode || '').includes(v) || (p.sku || '').toLowerCase().includes(v)));
-    $('#pcats', pg).innerHTML = catSlideBar(c, catList);
-    $$('#pcats [data-cat]', pg).forEach(b => b.onclick = () => { $('#pc', pg).value = b.dataset.cat; draw(); ($('#pg') || pg).scrollTo({ top: 0, behavior: 'smooth' }); });
-    catSpy(pg, '#pcats', '#pmg');
+    $('#pcats', pg).innerHTML = catSlideBar(c, catList.filter(p => psStatusOK(p, f) && (f === 'off' || p.active !== false || !f)), { none: true, manage: canDo('edit_products') });
+    $$('#pcats [data-cat]', pg).forEach(b => b.onclick = () => { PSF.cat = b.dataset.cat; redraw(); ($('#pg') || pg).scrollTo({ top: 0, behavior: 'smooth' }); });
+    const cm = $('#pcats [data-catmanage]', pg); if (cm) cm.onclick = () => $('#catBtn')?.click();
+    catSpy(pg, '#pcats', '#pmg', c);
     g.innerHTML = list.slice(0, 600).map(card).join('')
       + (list.length ? '' : '<div class="empty" style="grid-column:1/-1">ไม่พบสินค้า</div>');
     $('#pcount', pg).textContent = `${list.length} รายการ${list.length > 600 ? ' (แสดง 600 แรก)' : ''}`;
@@ -123,9 +130,10 @@ VIEWS.products = pg => {
     if (e.target.closest('#pmAdd')) return productForm({ unit: 'ชิ้น', track_stock: true, active: true }, draw);
     const el = e.target.closest('.pm[data-id]'); if (!el) return; const p = S.products.find(x => x.id === el.dataset.id); if (!p) return;
     const act = e.target.closest('[data-act]')?.dataset.act;
-    if (act === 'pic') return pictureMenu(p, draw);
-    if (act === 'stock') { if (!canDo('manage_inventory')) return toast('ไม่มีสิทธิ์ปรับสต็อก', 'bad'); return stockForm(p, 'adjust', draw); }
-    productForm(p, draw);
+    const again = () => go('products');
+    if (act === 'in' || act === 'out') return stockForm(p, act, again);
+    if (act === 'edit' || !canDo('manage_inventory')) return productForm(p, again);
+    stockQuick(p, again);   // one card for everything: receive, remove, count, damaged, expired, edit, picture, label, history
   };
   $$('#pvm button', pg).forEach(b => b.onclick = () => { PVIEW.mode = b.dataset.m; localStorage.setItem('pos_pview', PVIEW.mode); draw(); });
   $$('#pzs [data-z]', pg).forEach(b => b.onclick = () => { pmColStep('p', +b.dataset.z); draw(); });

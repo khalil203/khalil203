@@ -1423,7 +1423,7 @@ const _goC = go;
 go = function (page) { _goC(page); $('.top')?.classList.toggle('posmode', S.page === 'pos'); };
 /* ================= Shop POS v4 — promotions engine, data center, barcodes, personal use,
    activity log, branding, receipt image, cashier upgrades, auto-update ================= */
-const APP_VERSION = '5.6.4';
+const APP_VERSION = '5.7.0';
 Object.assign(TH, { 'Data center': 'ศูนย์ข้อมูล', 'Barcodes': 'บาร์โค้ด', 'Branches': 'สาขา' });
 PAGES.splice(PAGES.findIndex(p => p.id === 'settings'), 0,
   { id: 'barcodes', ic: '🏷', name: 'Barcodes', roles: ['owner', 'manager', 'stock'] },
@@ -3111,32 +3111,39 @@ VIEWS.products = pg => {
   const bar = $('#ps', pg)?.closest('.row'); if (!bar) return;
   bar.style.flexWrap = 'wrap';
   bar.insertAdjacentHTML('beforeend', `<div class="seg" id="pvm"><button data-m="cards">🖼️ รูปใหญ่</button><button data-m="table">☰ ตาราง</button></div>${pmColBar('pzs')}`);
-  if ($('#pc', pg)) $('#pc', pg).style.display = 'none';
+  ['#pc', '#pf'].forEach(s => { if ($(s, pg)) $(s, pg).style.display = 'none'; });
+  bar.insertAdjacentHTML('afterend', '<div class="pills" id="upills"></div>');
   pg.insertAdjacentHTML('beforeend', '<div class="bcs-wrap" id="pcats"></div><div class="pmgrid" id="pmg"></div>');
+  const redraw = () => $('#pf', pg).dispatchEvent(new Event('change'));   // list mode and card mode both listen
+  const FL = [['', 'ทั้งหมด'], ['low', '⚠️ ใกล้หมด'], ['out', '⛔ หมด'], ['exp', '⌛ ใกล้หมดอายุ'], ['nopic', '🖼️ ไม่มีรูป'], ['nobc', '🏷️ ไม่มีบาร์โค้ด'], ['off', '🚫 ปิดขาย']];
   const hint = pg.querySelector('p.muted');
   const draw = () => {
     const cards = PVIEW.mode === 'cards';
     $$('#pvm button', pg).forEach(b => b.classList.toggle('on', b.dataset.m === PVIEW.mode));
+    const sv = $('#ps', pg).value.toLowerCase(), inS = S.products.filter(p => (!sv || p.name.toLowerCase().includes(sv) || (p.barcode || '').includes(sv) || (p.sku || '').toLowerCase().includes(sv)) && psCatOK(p, PSF.cat));
+    $('#upills', pg).innerHTML = FL.map(([k, l]) => { const n = inS.filter(p => psStatusOK(p, k) && (k === 'off' || k === '' || p.active !== false)).length; return n || !k || PSF.f === k ? `<button data-uf="${k}" class="${PSF.f === k ? 'on' : ''}">${l} <small>${n}</small></button>` : ''; }).join('');
+    $$('#upills [data-uf]', pg).forEach(b => b.onclick = () => { PSF.f = b.dataset.uf; redraw(); });
+    $$('.ustat[data-us]').forEach(x => x.classList.toggle('on', !!PSF.f && x.dataset.us === PSF.f));
     $('#plist', pg).style.display = cards ? 'none' : ''; $('#pzs', pg).style.display = $('#pcats', pg).style.display = cards ? '' : 'none'; if (hint) hint.style.display = cards ? 'none' : '';
     const g = $('#pmg', pg); g.style.display = cards ? '' : 'none'; if (!cards) return;
     const cols = pmColGet('p'), px = pmPxFor(pg, cols); const cv = $('#pzs .colv', pg); if (cv) cv.textContent = cols + ' / แถว';
     g.style.gridTemplateColumns = `repeat(${cols},minmax(0,1fr))`; g.style.setProperty('--pm', px + 'px');
-    const v = $('#ps', pg).value.toLowerCase(), c = $('#pc', pg).value, f = $('#pf', pg).value;
-    const list = S.products.filter(p => (!v || p.name.toLowerCase().includes(v) || (p.barcode || '').includes(v) || (p.sku || '').toLowerCase().includes(v)) && (!c || p.category_id === c) &&
-      (!f || (f === 'low' ? p.track_stock && p.stock <= p.low_stock : f === 'nopic' ? !p.image_url : !p.active))).sort((a, b) => (a.active === false) - (b.active === false) || a.name.localeCompare(b.name, 'th'));
+    const v = sv, c = PSF.cat, f = PSF.f;
+    const list = S.products.filter(p => (!v || p.name.toLowerCase().includes(v) || (p.barcode || '').includes(v) || (p.sku || '').toLowerCase().includes(v)) && psCatOK(p, c) && psStatusOK(p, f) && (f === 'off' || p.active !== false || !f)).sort((a, b) => (a.active === false) - (b.active === false) || a.name.localeCompare(b.name, 'th'));
     const card = p => { const st = !p.track_stock ? '' : p.stock <= 0 ? 'bad' : p.stock <= p.low_stock ? 'warn' : 'ok'; const pr = itemPromosFor(p)[0];
       return `<div class="pm ${p.active === false ? 'off' : ''}" data-id="${p.id}">
         <div class="pm-img" style="${p.image_url ? `background-image:url('${esc(p.image_url)}')` : `background:linear-gradient(135deg,${esc(p.tile_color || catColor(p.category_id))},${esc(p.tile_color || catColor(p.category_id))}aa)`}">
           ${p.image_url ? '' : `<span>${esc([...p.name].slice(0, 2).join(''))}</span>`}
           ${p.favorite ? '<i class="pm-fav">★</i>' : ''}${pr || num(p.promo_price) > 0 ? `<i class="pm-promo">🏷️ ${esc(pr ? promoLabel(pr) : 'โปร ฿' + money(p.promo_price))}</i>` : ''}${p.active === false ? '<i class="pm-off">ปิดขาย</i>' : ''}
-          <div class="pm-acts"><button data-act="pic" title="เปลี่ยนรูป">📷</button><button data-act="stock" title="ปรับสต็อก">📦</button><button data-act="edit" title="แก้ไข">✏️</button></div></div>
+          <div class="pm-acts">${canDo('manage_inventory') && p.track_stock ? '<button data-act="in" title="รับเข้า">➕</button><button data-act="out" title="เบิกออก">➖</button>' : ''}<button data-act="edit" title="แก้ไขสินค้า">✏️</button></div></div>
         <div class="pm-body"><b class="pm-name">${esc(p.name)}</b>
           <div class="pm-row"><span class="pm-price">${baht(num(p.promo_price) > 0 ? p.promo_price : p.price)}</span>${num(p.promo_price) > 0 ? `<s class="muted">${money(p.price)}</s>` : ''}<span class="sp"></span>${p.track_stock ? `<span class="chip ${st}">${qtyf(p.stock)} ${esc(p.unit)}</span>` : ''}</div>
           <div class="pm-meta">${p.barcode ? `<code>${esc(p.barcode)}</code>` : '<span class="chip warn">ไม่มีบาร์โค้ด</span>'}<span>${esc(catName(p.category_id))}</span></div></div></div>`; };
     const catList = S.products.filter(p => (!v || p.name.toLowerCase().includes(v) || (p.barcode || '').includes(v) || (p.sku || '').toLowerCase().includes(v)));
-    $('#pcats', pg).innerHTML = catSlideBar(c, catList);
-    $$('#pcats [data-cat]', pg).forEach(b => b.onclick = () => { $('#pc', pg).value = b.dataset.cat; draw(); ($('#pg') || pg).scrollTo({ top: 0, behavior: 'smooth' }); });
-    catSpy(pg, '#pcats', '#pmg');
+    $('#pcats', pg).innerHTML = catSlideBar(c, catList.filter(p => psStatusOK(p, f) && (f === 'off' || p.active !== false || !f)), { none: true, manage: canDo('edit_products') });
+    $$('#pcats [data-cat]', pg).forEach(b => b.onclick = () => { PSF.cat = b.dataset.cat; redraw(); ($('#pg') || pg).scrollTo({ top: 0, behavior: 'smooth' }); });
+    const cm = $('#pcats [data-catmanage]', pg); if (cm) cm.onclick = () => $('#catBtn')?.click();
+    catSpy(pg, '#pcats', '#pmg', c);
     g.innerHTML = list.slice(0, 600).map(card).join('')
       + (list.length ? '' : '<div class="empty" style="grid-column:1/-1">ไม่พบสินค้า</div>');
     $('#pcount', pg).textContent = `${list.length} รายการ${list.length > 600 ? ' (แสดง 600 แรก)' : ''}`;
@@ -3145,9 +3152,10 @@ VIEWS.products = pg => {
     if (e.target.closest('#pmAdd')) return productForm({ unit: 'ชิ้น', track_stock: true, active: true }, draw);
     const el = e.target.closest('.pm[data-id]'); if (!el) return; const p = S.products.find(x => x.id === el.dataset.id); if (!p) return;
     const act = e.target.closest('[data-act]')?.dataset.act;
-    if (act === 'pic') return pictureMenu(p, draw);
-    if (act === 'stock') { if (!canDo('manage_inventory')) return toast('ไม่มีสิทธิ์ปรับสต็อก', 'bad'); return stockForm(p, 'adjust', draw); }
-    productForm(p, draw);
+    const again = () => go('products');
+    if (act === 'in' || act === 'out') return stockForm(p, act, again);
+    if (act === 'edit' || !canDo('manage_inventory')) return productForm(p, again);
+    stockQuick(p, again);   // one card for everything: receive, remove, count, damaged, expired, edit, picture, label, history
   };
   $$('#pvm button', pg).forEach(b => b.onclick = () => { PVIEW.mode = b.dataset.m; localStorage.setItem('pos_pview', PVIEW.mode); draw(); });
   $$('#pzs [data-z]', pg).forEach(b => b.onclick = () => { pmColStep('p', +b.dataset.z); draw(); });
@@ -6257,11 +6265,11 @@ personalUse = function () {
 /* v5.5.1 — shared "organized well" grid: category slide bar, grouping by
    category, and an adjustable images-per-row count. Used by the Products
    page and the Stock page so both look and behave the same. */
-function catSlideBar(activeId, list) {
-  const cnt = id => list.filter(p => p.category_id === id).length;
-  const cats = S.categories.filter(c => cnt(c.id));
+function catSlideBar(activeId, list, opt) {
+  const cnt = id => list.filter(p => id === '_none' ? !p.category_id : p.category_id === id).length;
+  const cats = S.categories.filter(c => cnt(c.id)), none = opt && opt.none ? cnt('_none') : 0;
   const chip = (id, label, n, color) => `<button class="bcs-chip ${activeId === id ? 'on' : ''}" data-cat="${id}" style="--cc:${color || 'var(--brand)'}"><i></i><span>${esc(label)}</span><b>${n}</b></button>`;
-  return `<div class="bcs">${chip('', 'ทั้งหมด', list.length)}${cats.map(c => chip(c.id, c.name, cnt(c.id), c.color || catColor(c.id))).join('')}</div>`;
+  return `<div class="bcs">${chip('', 'ทั้งหมด', list.length)}${cats.map(c => chip(c.id, (c.icon ? c.icon + ' ' : '') + c.name, cnt(c.id), c.color || catColor(c.id))).join('')}${none ? chip('_none', 'ไม่มีหมวด', none, '#94a3b8') : ''}${opt && opt.manage ? '<button class="bcs-chip bcs-manage" data-catmanage="1" style="--cc:var(--brand)"><span>🗂 จัดการหมวดหมู่</span></button>' : ''}</div>`;
 }
 function pmColKey(ns) { return 'pos_' + ns + 'cols_' + (innerWidth < 600 ? 'm' : 'd'); }
 function pmColDef() { return innerWidth < 600 ? 3 : Math.max(4, Math.min(7, Math.round((innerWidth - 120) / 210))); }
@@ -6270,7 +6278,7 @@ function pmColStep(ns, d) { const mx = innerWidth < 600 ? 5 : 10; localStorage.s
 function pmColBar(id) { return `<div class="bcz" id="${id}" title="จำนวนรูปต่อแถว"><button class="btn" type="button" data-z="-1">−</button><b class="colv"></b><button class="btn" type="button" data-z="1">+</button></div>`; }
 function pmPxFor(pg, cols) { const w = ($('#pg') || pg)?.clientWidth || innerWidth; return Math.max(110, Math.floor((w - 28 - (cols - 1) * 14) / cols)); }
 function _catLine(pg) { const bar = pg.querySelector('.bcs-wrap'); return (bar ? bar.getBoundingClientRect().bottom : pg.getBoundingClientRect().top) + 8; }
-function _catOf(el) { return S.products.find(p => p.id === el.dataset.id)?.category_id || ''; }
+function _catOf(el) { return S.products.find(p => p.id === el.dataset.id)?.category_id || '_none'; }
 /* Smooth-scroll so the first card of a category sits just under the slide bar. */
 function catScrollTo(pg, gridSel, catId) {
   const g = $(gridSel, pg); if (!g) return;
@@ -6281,13 +6289,14 @@ function catScrollTo(pg, gridSel, catId) {
   scr.scrollBy({ top: ref.getBoundingClientRect().top - _catLine(pg) + 2, behavior: 'smooth' });
 }
 /* Highlight the chip of whatever category is at the top of the view. */
-function catSpy(pg, catsSel, gridSel) {
+function catSpy(pg, catsSel, gridSel, fixed) {
   const run = () => {
     const g = $(gridSel, pg), box = $(catsSel, pg); if (!g || !box) return;
     const bar = pg.querySelector('.bcs-wrap'); if (bar) pg.style.setProperty('--catbar', Math.round(bar.getBoundingClientRect().height) + 'px');
     const line = _catLine(pg), cards = [...g.querySelectorAll('.pm[data-id]')];
-    let cur = cards.length ? _catOf(cards[0]) : '';
-    for (const el of cards) { const r = el.getBoundingClientRect(); if (r.bottom > line) { cur = _catOf(el); break; } }
+    let cur = fixed || '';
+    /* showing everything: at the very top 'all' is lit, further down the category in view */
+    if (!fixed && (document.querySelector('#pg') || pg).scrollTop > 40) for (const el of cards) { const r = el.getBoundingClientRect(); if (r.bottom > line) { cur = _catOf(el); break; } }
     const chips = [...box.querySelectorAll('.bcs-chip')];
     const on = chips.find(c => (c.dataset.cat || '') === cur) || chips.find(c => (c.dataset.cat || '') === '');
     chips.forEach(c => c.classList.toggle('on', c === on));
@@ -6328,7 +6337,10 @@ function pmSections(list, cols, px, cardFn, grouped) {
       const v = input.value.trim().toLowerCase();
       if (!v) { dd.hidden = true; dd.innerHTML = ''; return; }
       const list = S.products.filter(p => p.active !== false && (p.name.toLowerCase().includes(v) || (p.barcode || '').includes(v) || (p.sku || '').toLowerCase().includes(v))).slice(0, 8);
-      if (!list.length) { dd.innerHTML = `<div class="livempty">ไม่พบสินค้า · กด 📷 เพื่อสแกน</div>`; dd.hidden = false; return; }
+      if (!list.length) { const raw = input.value.trim(), can = canDo('edit_products');
+        dd.innerHTML = `<div class="livempty">ไม่พบสินค้า “${esc(raw)}”</div>${can ? `<button type="button" class="liverow livenew"><i class="liveimg" style="background:var(--brand)">＋</i><span class="livename"><b>เพิ่มเป็นสินค้าใหม่</b><small>${/^\d{6,}$/.test(raw) ? 'บาร์โค้ด ' + esc(raw) : 'ชื่อ ' + esc(raw)}</small></span></button>` : ''}`; dd.hidden = false;
+        const nb = $('.livenew', dd); if (nb) nb.onmousedown = e => { e.preventDefault(); dd.hidden = true; productForm(/^\d{6,}$/.test(raw) ? { barcode: raw, unit: 'ชิ้น', track_stock: true, active: true } : { name: raw, unit: 'ชิ้น', track_stock: true, active: true }, () => go('products')); };
+        return; }
       dd.innerHTML = list.map(p => {
         const img = p.image_url ? `style="background-image:url('${esc(p.image_url)}')"` : `style="background:${esc(p.tile_color || catColor(p.category_id))}"`;
         const st = p.track_stock ? `${qtyf(p.stock)} ${esc(p.unit)}` : 'ไม่ตัดสต็อก';
@@ -6369,4 +6381,43 @@ function pmSections(list, cols, px, cardFn, grouped) {
     e.preventDefault(); if (Date.now() - last < 4000) return; last = Date.now();
     toast(LANG === 'th' ? 'โหลดไม่สำเร็จ — ตรวจสอบอินเทอร์เน็ตแล้วกดอีกครั้ง' : 'Could not load — check the internet and tap again', 'bad');
   });
+})();
+/* v5.7.0 — Products and Stock are ONE page: one grid, one category bar, and every
+   card does both jobs (➕ receive, ➖ remove, ✏️ edit; tap = full card with count,
+   damaged, expired, picture, label, history). Replaces the two-tab shell. */
+async function stockHistory() {
+  const m = modal('📜 ประวัติสต็อก (เข้า / ออก / ปรับ)', '<div id="shb" class="muted">กำลังโหลด…</div>', { wide: true });
+  try {
+    const mv = await q(sb.from('stock_moves').select('*').eq('shop_id', S.shop.id).order('created_at', { ascending: false }).limit(300));
+    const box = $('#shb', m); if (!box) return;
+    box.classList.remove('muted');
+    box.innerHTML = mv.length ? `<div class="sbox" style="margin-bottom:10px"><span>🔍</span><input class="in" id="shq" placeholder="ค้นหาชื่อสินค้า"></div><div class="tblwrap"><table class="tbl" id="sht"><tr><th>วันเวลา</th><th>สินค้า</th><th>ประเภท</th><th class="right">จำนวน</th><th>หมายเหตุ</th></tr>
+      ${mv.map(r => `<tr data-n="${esc((r.product_name || '').toLowerCase())}"><td>${dt(r.created_at)}</td><td><b>${esc(r.product_name || '')}</b></td><td>${(MOVE[r.kind] || ['', r.kind]).join(' ')}</td>
+        <td class="right b" style="color:${r.qty < 0 ? 'var(--bad)' : 'var(--ok)'}">${r.qty > 0 ? '+' : ''}${qtyf(r.qty)}</td><td><small>${esc([r.ref, r.note].filter(Boolean).join(' · '))}</small></td></tr>`).join('')}</table></div>` : '<div class="empty">ยังไม่มีความเคลื่อนไหว</div>';
+    const qi = $('#shq', m); if (qi) qi.oninput = () => { const v = qi.value.toLowerCase(); $$('#sht tr[data-n]', m).forEach(tr => tr.style.display = !v || tr.dataset.n.includes(v) ? '' : 'none'); };
+  } catch (e) { const box = $('#shb', m); if (box) box.textContent = 'โหลดประวัติไม่สำเร็จ — ลองอีกครั้ง'; }
+}
+function psShell(pg) {
+  if (!pgOK('products')) return _vStock5(pg);          // stock-only staff keep the stock screen
+  const ttl = $('#ttl'); if (ttl) ttl.textContent = 'สินค้า & สต็อก';
+  $$('[data-p="products"]').forEach(b => b.classList.add('on')); $$('[data-p="stock"]').forEach(b => b.classList.remove('on'));
+  const inv = canDo('manage_inventory'), act = S.products.filter(p => p.active !== false), tr = act.filter(p => p.track_stock);
+  const n = f => act.filter(p => psStatusOK(p, f)).length;
+  const st = [['', '📦', 'สินค้าทั้งหมด', act.length, '']];
+  if (inv) st.push(['low', '⚠️', 'ใกล้หมด', n('low'), 'warn'], ['out', '⛔', 'หมดสต็อก', n('out'), 'bad'], ['exp', '⌛', 'ใกล้หมดอายุ', n('exp'), 'warn']);
+  if (inv && canDo('view_profit')) st.push([null, '💰', 'มูลค่าสต็อก (ทุน)', baht(tr.reduce((a, p) => a + Math.max(0, num(p.stock)) * num(p.cost), 0)), '']);
+  pg.innerHTML = `<div class="ustats">${st.map(([k, ic, l, v, c]) => `<button type="button" class="ustat ${c} ${k !== null && PSF.f === k ? 'on' : ''}" ${k === null ? 'disabled' : `data-us="${k}"`}><span>${ic}</span><small>${l}</small><b>${v}</b></button>`).join('')}</div><div id="psub"></div>`;
+  const r = _vProducts5($('#psub', pg));
+  $$('[data-us]', pg).forEach(b => b.onclick = () => { PSF.f = b.dataset.us; $$('[data-us]', pg).forEach(x => x.classList.toggle('on', x === b)); $('#pf', pg)?.dispatchEvent(new Event('change')); });
+  const ta = $('#tact'), add = $('#addBtn');
+  if (ta && inv && !$('#uRcv')) {
+    (add || ta).insertAdjacentHTML(add ? 'afterend' : 'afterbegin', `<button class="btn ok" id="uRcv">📥 รับสินค้าเข้า</button><button class="btn" id="uCnt">📋 ตรวจนับสต็อก</button><button class="btn" id="uHist">📜 ประวัติสต็อก</button>${S.shops.length > 1 ? '<button class="btn" id="uTrf">🔁 โอนระหว่างสาขา</button>' : ''}`);
+    $('#uRcv').onclick = () => go('receive'); $('#uCnt').onclick = () => stockCountSheet(() => go('products')); $('#uHist').onclick = stockHistory;
+    if ($('#uTrf')) $('#uTrf').onclick = () => transferDialog(() => go('products'));
+  }
+  return r;
+}
+(function () {
+  const _stockOld = VIEWS.stock;
+  VIEWS.stock = pg => pgOK('products') ? VIEWS.products(pg) : _stockOld(pg);
 })();
