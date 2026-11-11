@@ -1423,7 +1423,7 @@ const _goC = go;
 go = function (page) { _goC(page); $('.top')?.classList.toggle('posmode', S.page === 'pos'); };
 /* ================= Shop POS v4 — promotions engine, data center, barcodes, personal use,
    activity log, branding, receipt image, cashier upgrades, auto-update ================= */
-const APP_VERSION = '5.6.2';
+const APP_VERSION = '5.6.3';
 Object.assign(TH, { 'Data center': 'ศูนย์ข้อมูล', 'Barcodes': 'บาร์โค้ด', 'Branches': 'สาขา' });
 PAGES.splice(PAGES.findIndex(p => p.id === 'settings'), 0,
   { id: 'barcodes', ic: '🏷', name: 'Barcodes', roles: ['owner', 'manager', 'stock'] },
@@ -3742,8 +3742,8 @@ VIEWS.stock = pg => {
         <div class="sbox" style="flex:1;min-width:160px"><span>🔍</span><input class="in" id="sfq" placeholder="กรองชื่อ / บาร์โค้ด" value="${esc(SVIEW.q)}"></div>
         <select class="in" id="sfs" style="width:auto">${Object.entries(SORT).map(([k, [l]]) => `<option value="${k}" ${SVIEW.sort === k ? 'selected' : ''}>เรียง: ${l}</option>`).join('')}</select>
         ${pmColBar('szc')}</div>
+      <div class="bcs-wrap" id="scats" style="margin-top:8px"></div>
       <div class="pills" id="sff" style="margin-top:8px"></div></div>
-    <div class="bcs-wrap" id="scats"></div>
     <div class="pmgrid" id="stkg"></div>`);
   const placeStats = () => { const stk = $('#stk', pg); if (stk && stk.previousElementSibling !== scan) scan.after(stk); };
   placeStats(); new MutationObserver(placeStats).observe(pg, { childList: true });
@@ -5592,9 +5592,7 @@ const _stock524 = VIEWS.stock;
 VIEWS.stock = pg => { const r = _stock524(pg);
   const fix = () => { const scan = $('.stk-scan', pg), f = $('#stkf', pg), stk = $('#stk', pg); if (!scan || !f) return;
     if (scan.nextElementSibling !== f && !(stk && scan.nextElementSibling === stk && stk.nextElementSibling === f)) { (stk || scan).after(f); }
-    const sc = $('#scats', pg); let a = f;
-    if (sc) { if (a.nextElementSibling !== sc) a.after(sc); a = sc; }
-    const g = $('#stkg', pg); if (g && a.nextElementSibling !== g) a.after(g); };
+    const g = $('#stkg', pg); if (g && f.nextElementSibling !== g) f.after(g); };
   fix(); new MutationObserver(fix).observe(pg, { childList: true }); return r; };
 /* ================= v5.2.5 — every device sees every bill, live sync between devices ================= */
 let SYNC_LAST = null;

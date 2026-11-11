@@ -1,6 +1,6 @@
 /* Shop POS — free, open POS + stock web app.  Data: Supabase.  Hosting: GitHub Pages. */
 'use strict';
-const VERSION = '5.6.2';
+const VERSION = '5.6.3';
 const sb = supabase.createClient(window.POS_CONFIG.url, window.POS_CONFIG.key, { auth: { flowType: 'pkce', detectSessionInUrl: true, persistSession: true } });
 
 /* ================= i18n ================= */
@@ -329,8 +329,8 @@ function renderShell() {
     <nav class="tabbar">${(() => {
       const items = [...tabs.map(p => `<button class="tb" data-p="${p.id}"><span class="ic">${p.ic}</span><span>${t(p.name)}</span></button>`),
         `<button class="tb" id="moreBtn"><span class="ic">☰</span><span>${LANG === 'th' ? 'เพิ่มเติม' : 'More'}</span></button>`];
-      const half = Math.ceil(items.length / 2);
-      return `<div class="tabgrp">${items.slice(0, half).join('')}</div><button class="fab" id="quickFab" title="${LANG === 'th' ? 'ทางลัด' : 'Quick'}" aria-label="quick"><span>＋</span></button><div class="tabgrp">${items.slice(half).join('')}</div>`;
+      const mid = Math.floor(items.length / 2);
+      return items.slice(0, mid).join('') + '<span class="fabgap" aria-hidden="true"></span>' + items.slice(mid).join('') + `<button class="fab" id="quickFab" title="${LANG === 'th' ? 'ทางลัด' : 'Quick'}" aria-label="quick"><span>＋</span></button>`;
     })()}</nav>
   </div>`;
   $$('[data-p]').forEach(b => b.onclick = () => go(b.dataset.p));
