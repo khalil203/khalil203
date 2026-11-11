@@ -28,5 +28,5 @@ HTML · JavaScript · TypeScript · React · C# / .NET · Supabase · Cloudflare
 
 <!---
 khalil203/khalil203 is a special repository: this README appears on the GitHub profile.
-The /pos folder (Yanisa Shop) and the older /voice-call Jarvis are live apps served by GitHub Pages; keep their paths unchanged.
+The /pos folder (Yanisa Shop) is a live app served by GitHub Pages; keep its path unchanged.
 --->
