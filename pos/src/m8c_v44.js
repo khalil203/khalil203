@@ -28,8 +28,7 @@ function matchProducts(name, code) {
 /* ---------- bill OCR (free, runs on the device with Tesseract: Thai + English) ---------- */
 let TESS_P = null, TESS_W = null;
 async function ocrImage(file, onProg) {
-  TESS_P ||= loadScript('https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js');
-  await TESS_P;
+  await loadScript('https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js');
   if (!TESS_W) TESS_W = await Tesseract.createWorker(['tha', 'eng'], 1, { logger: m => { if (m.status === 'recognizing text') onProg?.('กำลังอ่านบิล', m.progress); else if (/load|init/.test(m.status)) onProg?.('กำลังเตรียมตัวอ่านภาษาไทย (ครั้งแรกจะช้าสักครู่)', m.progress || 0); } });
   const img = await prepImage(file);
   const { data } = await TESS_W.recognize(img);

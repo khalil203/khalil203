@@ -219,7 +219,7 @@ printLabels = async function (items) {
   /* PDF: each different label is rendered once to an image, then placed as many times as needed */
   const makePDF = async () => {
     const items = await plan(); if (!items) return null;
-    await Promise.all([loadH2C(), JSPDF_P ||= loadScript('https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js')]);
+    await Promise.all([loadH2C(), loadScript('https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js')]);
     const z = LBL_SIZES[o.size], { jsPDF } = window.jspdf;
     const imgs = await renderLabelImages(items.filter(it => it.k), o, (a, b) => progress(`กำลังสร้าง PDF ${a}/${b}`, .3 + a / b * .6));
     const pdf = z.a4 ? new jsPDF({ unit: 'mm', format: 'a4' }) : new jsPDF({ unit: 'mm', format: [z.w, z.h], orientation: z.w > z.h ? 'l' : 'p' });

@@ -1,6 +1,6 @@
 /* ---------------- helpers ---------------- */
 let CHART_P = null;
-const loadChart = () => (CHART_P ||= loadScript('https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js'));
+const loadChart = () => loadScript('https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js');
 const CHARTS = {};
 function chart(id, cfg) { CHARTS[id]?.destroy?.(); const el = document.getElementById(id); if (!el || !window.Chart) return; CHARTS[id] = new Chart(el, cfg); }
 const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();

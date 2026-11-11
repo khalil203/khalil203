@@ -310,7 +310,6 @@ kbd{font-family:inherit;font-size:11px;background:#ffffff2e;border-radius:6px;pa
   .tb.on .ic{transform:translateY(-2px) scale(1.15)}
   .tb.on::before{content:"";position:absolute;top:0;left:30%;right:30%;height:3px;border-radius:0 0 4px 4px;background:var(--grad)}
   .tb:active{transform:scale(.9)}
-  .tabbar{position:relative}
   .tabbar .fabgap{flex:0 0 58px}
   .tabbar .fab{position:absolute;left:50%;top:-16px;transform:translateX(-50%);width:56px;height:56px;border:0;border-radius:50%;background:var(--grad);color:#fff;box-shadow:0 10px 24px color-mix(in srgb,var(--brand) 55%,transparent);cursor:pointer;display:grid;place-items:center;transition:transform .2s var(--spring);z-index:3}
   .tabbar .fab span{font-size:30px;font-weight:300;line-height:1;margin-top:-2px}
@@ -645,7 +644,7 @@ code{font-family:ui-monospace,monospace;font-size:13px;background:var(--bg);padd
 .pm-add span{font-size:46px;color:var(--brand);line-height:1}.pm-add small{color:var(--muted)}
 .pm-add:hover{border-color:var(--brand)}
 @media (max-width:860px){.pmgrid{--pm:160px;gap:10px}}
-@media (max-width:860px){.sbox:has(#ps){flex:1 1 100%!important;max-width:none!important}#pzs{flex:1 1 100%}}
+@media (max-width:860px){.sbox:has(#ps){flex:1 1 100%!important;max-width:none!important}#pzs{flex:0 0 auto;margin-left:0}}
 .lprog{position:sticky;top:0;z-index:3;background:var(--card);border-radius:12px;padding:10px 12px;margin-bottom:8px;box-shadow:0 4px 14px #0001;font-size:13px;font-weight:600}
 /* ================= v4.4 receive goods / personal use ================= */
 .rcv-head{display:grid;grid-template-columns:260px 1fr;gap:18px;margin-bottom:14px}
@@ -1652,3 +1651,21 @@ body:has(#cart.open) #scanReady,body:has(.mbg) #scanReady{display:none!important
 .pu-chip{flex:0 0 auto;padding:7px 13px;border-radius:999px;border:1.5px solid var(--line);background:var(--card);font:inherit;font-size:13.5px;font-weight:700;color:var(--ink);cursor:pointer;white-space:nowrap}
 .pu-chip.on{background:var(--brand);border-color:var(--brand);color:#fff}
 .pu-save{width:100%;min-height:52px;font-size:17px}
+
+/* ---- v5.6.4 UI test fixes ---- */
+#pg .row>.sbox{min-width:min(100%,170px)}
+@media (max-width:860px){#pg .row>.sbox:has(#aq){flex:1 1 100%;max-width:none!important}}
+@media (max-width:560px){.modal .mf .btn{white-space:normal;line-height:1.25;min-height:44px;overflow:visible;height:auto}}
+.btn.sm{flex-shrink:0}
+@media (pointer:coarse){.btn.sm{min-height:34px;min-width:34px}.ttsw.mob{min-height:28px;padding:4px 12px}#discBtn,#noteBtn{min-height:34px;display:inline-flex;align-items:center}}
+.pm-acts{flex-wrap:wrap-reverse}
+@media (max-width:480px){.tabbar .tb{padding-inline:2px}.tabbar .tb>span:last-child{font-size:10.5px;letter-spacing:-.01em}}
+.sbox .in,.sbox .in:focus{border:0!important;box-shadow:none!important;outline:0;background:none}
+@media (pointer:coarse){.cpe{min-height:32px!important;min-width:34px}}
+.bcg-act{flex-wrap:wrap}.bcg-act .btn{flex:1 0 auto;min-width:0;padding-inline:6px}
+.pm-acts{flex-wrap:nowrap;gap:3px;left:4px;right:4px}
+.pm-acts button{flex:1 1 0;min-width:0;max-width:38px;width:auto;height:auto;aspect-ratio:1}
+@media (max-width:860px){#sbody td[data-l]::before{content:attr(data-l) " ";color:var(--muted);font-size:11px;font-weight:500;margin-right:6px}}
+#stk .tabs .tocards{border:0;border-radius:999px;padding:8px 14px;font:inherit;font-weight:700;background:var(--brandsoft);color:var(--brand);cursor:pointer;white-space:nowrap}
+.pm-promo{left:auto;right:6px;top:6px;bottom:auto;max-width:calc(100% - 46px);font-size:clamp(10px,calc(var(--pm) * .08),12px)}
+.pm.off .pm-promo{display:none}

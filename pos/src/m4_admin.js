@@ -1,6 +1,6 @@
 /* ================= REPORTS ================= */
 let XLSX_P = null;
-const loadXLSX = () => (XLSX_P ||= loadScript('https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js'));
+const loadXLSX = () => loadScript('https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js');
 const REPORTS = [
   ['sales', 'ยอดขายรายวัน'], ['profit', 'กำไร'], ['product', 'ผลงานสินค้า'], ['category', 'หมวดหมู่'], ['inventory', 'สินค้าคงคลัง'], ['moves', 'ความเคลื่อนไหวสต็อก'],
   ['purchase', 'การสั่งซื้อ'], ['expense', 'ค่าใช้จ่าย'], ['customer', 'ลูกค้า'], ['staff', 'ผลงานพนักงาน'], ['payment', 'ช่องทางชำระเงิน'], ['vat', 'ภาษีขาย (VAT)'],

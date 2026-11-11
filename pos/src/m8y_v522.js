@@ -87,5 +87,6 @@ const _stock524 = VIEWS.stock;
 VIEWS.stock = pg => { const r = _stock524(pg);
   const fix = () => { const scan = $('.stk-scan', pg), f = $('#stkf', pg), stk = $('#stk', pg); if (!scan || !f) return;
     if (scan.nextElementSibling !== f && !(stk && scan.nextElementSibling === stk && stk.nextElementSibling === f)) { (stk || scan).after(f); }
-    const g = $('#stkg', pg); if (g && f.nextElementSibling !== g) f.after(g); };
+    const g = $('#stkg', pg), sc = $('#scats', pg); /* the category bar may sit between the filter card and the grid */
+    if (g && f.nextElementSibling !== g && !(sc && f.nextElementSibling === sc && sc.nextElementSibling === g)) (sc && f.nextElementSibling === sc ? sc : f).after(g); };
   fix(); new MutationObserver(fix).observe(pg, { childList: true }); return r; };

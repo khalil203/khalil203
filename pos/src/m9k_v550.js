@@ -18,10 +18,11 @@ function _catOf(el) { return S.products.find(p => p.id === el.dataset.id)?.categ
 /* Smooth-scroll so the first card of a category sits just under the slide bar. */
 function catScrollTo(pg, gridSel, catId) {
   const g = $(gridSel, pg); if (!g) return;
-  if (!catId) { pg.scrollTo({ top: 0, behavior: 'smooth' }); return; }
+  const scr = document.querySelector('#pg') || pg;
+  if (!catId) { scr.scrollTo({ top: 0, behavior: 'smooth' }); return; }
   const el = [...g.querySelectorAll('.pm[data-id]')].find(e => _catOf(e) === catId); if (!el) return;
   const ref = g.querySelector(`.grp-h[data-cat="${catId}"]`) || el;
-  pg.scrollBy({ top: ref.getBoundingClientRect().top - _catLine(pg) + 2, behavior: 'smooth' });
+  scr.scrollBy({ top: ref.getBoundingClientRect().top - _catLine(pg) + 2, behavior: 'smooth' });
 }
 /* Highlight the chip of whatever category is at the top of the view. */
 function catSpy(pg, catsSel, gridSel) {
@@ -36,9 +37,11 @@ function catSpy(pg, catsSel, gridSel) {
     chips.forEach(c => c.classList.toggle('on', c === on));
     if (on && on !== pg._catOn) { pg._catOn = on; const bcs = box.querySelector('.bcs'); if (bcs) bcs.scrollTo({ left: on.offsetLeft - (bcs.clientWidth - on.clientWidth) / 2, behavior: 'smooth' }); }
   };
-  if (pg._catSpy) { pg.removeEventListener('scroll', pg._catSpy); removeEventListener('scroll', pg._catSpy); }
-  let raf = 0; pg._catSpy = () => { if (raf) return; raf = requestAnimationFrame(() => { raf = 0; run(); }); };
-  pg.addEventListener('scroll', pg._catSpy, { passive: true }); addEventListener('scroll', pg._catSpy, { passive: true });
+  /* the list scrolls inside #pg (the view itself is drawn in a sub-container), so listen there */
+  const scr = document.querySelector('#pg') || pg;
+  if (scr._catSpy) scr.removeEventListener('scroll', scr._catSpy);
+  let raf = 0; scr._catSpy = () => { if (raf) return; raf = requestAnimationFrame(() => { raf = 0; run(); }); };
+  scr.addEventListener('scroll', scr._catSpy, { passive: true });
   pg._catOn = null; setTimeout(run, 80); setTimeout(run, 300);
 }
 /* Render list into one grid, or grouped category sections when grouped=true. */

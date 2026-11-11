@@ -262,7 +262,7 @@ payDialog = function () {
 };
 /* ---------------- helpers ---------------- */
 let CHART_P = null;
-const loadChart = () => (CHART_P ||= loadScript('https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js'));
+const loadChart = () => loadScript('https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js');
 const CHARTS = {};
 function chart(id, cfg) { CHARTS[id]?.destroy?.(); const el = document.getElementById(id); if (!el || !window.Chart) return; CHARTS[id] = new Chart(el, cfg); }
 const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
@@ -886,7 +886,7 @@ VIEWS.shifts = async pg => {
 };
 /* ================= REPORTS ================= */
 let XLSX_P = null;
-const loadXLSX = () => (XLSX_P ||= loadScript('https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js'));
+const loadXLSX = () => loadScript('https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js');
 const REPORTS = [
   ['sales', 'ยอดขายรายวัน'], ['profit', 'กำไร'], ['product', 'ผลงานสินค้า'], ['category', 'หมวดหมู่'], ['inventory', 'สินค้าคงคลัง'], ['moves', 'ความเคลื่อนไหวสต็อก'],
   ['purchase', 'การสั่งซื้อ'], ['expense', 'ค่าใช้จ่าย'], ['customer', 'ลูกค้า'], ['staff', 'ผลงานพนักงาน'], ['payment', 'ช่องทางชำระเงิน'], ['vat', 'ภาษีขาย (VAT)'],
@@ -1423,7 +1423,7 @@ const _goC = go;
 go = function (page) { _goC(page); $('.top')?.classList.toggle('posmode', S.page === 'pos'); };
 /* ================= Shop POS v4 — promotions engine, data center, barcodes, personal use,
    activity log, branding, receipt image, cashier upgrades, auto-update ================= */
-const APP_VERSION = '5.6.3';
+const APP_VERSION = '5.6.4';
 Object.assign(TH, { 'Data center': 'ศูนย์ข้อมูล', 'Barcodes': 'บาร์โค้ด', 'Branches': 'สาขา' });
 PAGES.splice(PAGES.findIndex(p => p.id === 'settings'), 0,
   { id: 'barcodes', ic: '🏷', name: 'Barcodes', roles: ['owner', 'manager', 'stock'] },
@@ -1452,8 +1452,8 @@ const actGroup = a => a === 'delete_history' ? 'delete' : /^log(in|out)$/.test(a
   : /sale|refund|payment|tax_invoice|shift|cash_/.test(a) ? 'sale' : /^staff|permissions/.test(a) ? 'staff' : /import|restore|backup|settings|barcode/.test(a) ? 'data' : 'other';
 const logAct = (action, entity, id, detail) => sb.rpc('log_action', { p_shop: S.shop.id, p_action: action, p_entity: entity || '', p_id: id || '', p_detail: detail || {} }).then(() => {}, () => {});
 let H2C_P = null, JSB_P = null;
-const loadH2C = () => (H2C_P ||= loadScript('https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js'));
-const loadJsBarcode = () => (JSB_P ||= loadScript('https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js'));
+const loadH2C = () => loadScript('https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js');
+const loadJsBarcode = () => loadScript('https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js');
 function saveBlob(name, blob) {
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click();
   setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 2000);
@@ -2706,7 +2706,7 @@ printLabels = async function (items) {
   /* PDF: each different label is rendered once to an image, then placed as many times as needed */
   const makePDF = async () => {
     const items = await plan(); if (!items) return null;
-    await Promise.all([loadH2C(), JSPDF_P ||= loadScript('https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js')]);
+    await Promise.all([loadH2C(), loadScript('https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js')]);
     const z = LBL_SIZES[o.size], { jsPDF } = window.jspdf;
     const imgs = await renderLabelImages(items.filter(it => it.k), o, (a, b) => progress(`กำลังสร้าง PDF ${a}/${b}`, .3 + a / b * .6));
     const pdf = z.a4 ? new jsPDF({ unit: 'mm', format: 'a4' }) : new jsPDF({ unit: 'mm', format: [z.w, z.h], orientation: z.w > z.h ? 'l' : 'p' });
@@ -3135,9 +3135,9 @@ VIEWS.products = pg => {
           <div class="pm-meta">${p.barcode ? `<code>${esc(p.barcode)}</code>` : '<span class="chip warn">ไม่มีบาร์โค้ด</span>'}<span>${esc(catName(p.category_id))}</span></div></div></div>`; };
     const catList = S.products.filter(p => (!v || p.name.toLowerCase().includes(v) || (p.barcode || '').includes(v) || (p.sku || '').toLowerCase().includes(v)));
     $('#pcats', pg).innerHTML = catSlideBar(c, catList);
-    $$('#pcats [data-cat]', pg).forEach(b => b.onclick = () => { $('#pc', pg).value = b.dataset.cat; draw(); pg.scrollTo({ top: 0, behavior: 'smooth' }); });
+    $$('#pcats [data-cat]', pg).forEach(b => b.onclick = () => { $('#pc', pg).value = b.dataset.cat; draw(); ($('#pg') || pg).scrollTo({ top: 0, behavior: 'smooth' }); });
     catSpy(pg, '#pcats', '#pmg');
-    g.innerHTML = (canDo('edit_products') ? `<button class="pm pm-add" id="pmAdd"><span>＋</span><b>เพิ่มสินค้า</b><small>หรือสแกนบาร์โค้ดที่ช่องค้นหา</small></button>` : '') + list.slice(0, 600).map(card).join('')
+    g.innerHTML = list.slice(0, 600).map(card).join('')
       + (list.length ? '' : '<div class="empty" style="grid-column:1/-1">ไม่พบสินค้า</div>');
     $('#pcount', pg).textContent = `${list.length} รายการ${list.length > 600 ? ' (แสดง 600 แรก)' : ''}`;
   };
@@ -3188,8 +3188,7 @@ function matchProducts(name, code) {
 /* ---------- bill OCR (free, runs on the device with Tesseract: Thai + English) ---------- */
 let TESS_P = null, TESS_W = null;
 async function ocrImage(file, onProg) {
-  TESS_P ||= loadScript('https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js');
-  await TESS_P;
+  await loadScript('https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js');
   if (!TESS_W) TESS_W = await Tesseract.createWorker(['tha', 'eng'], 1, { logger: m => { if (m.status === 'recognizing text') onProg?.('กำลังอ่านบิล', m.progress); else if (/load|init/.test(m.status)) onProg?.('กำลังเตรียมตัวอ่านภาษาไทย (ครั้งแรกจะช้าสักครู่)', m.progress || 0); } });
   const img = await prepImage(file);
   const { data } = await TESS_W.recognize(img);
@@ -3742,8 +3741,8 @@ VIEWS.stock = pg => {
         <div class="sbox" style="flex:1;min-width:160px"><span>🔍</span><input class="in" id="sfq" placeholder="กรองชื่อ / บาร์โค้ด" value="${esc(SVIEW.q)}"></div>
         <select class="in" id="sfs" style="width:auto">${Object.entries(SORT).map(([k, [l]]) => `<option value="${k}" ${SVIEW.sort === k ? 'selected' : ''}>เรียง: ${l}</option>`).join('')}</select>
         ${pmColBar('szc')}</div>
-      <div class="bcs-wrap" id="scats" style="margin-top:8px"></div>
       <div class="pills" id="sff" style="margin-top:8px"></div></div>
+    <div class="bcs-wrap" id="scats"></div>
     <div class="pmgrid" id="stkg"></div>`);
   const placeStats = () => { const stk = $('#stk', pg); if (stk && stk.previousElementSibling !== scan) scan.after(stk); };
   placeStats(); new MutationObserver(placeStats).observe(pg, { childList: true });
@@ -3757,7 +3756,7 @@ VIEWS.stock = pg => {
     $$('#svm button', pg).forEach(b => b.classList.toggle('on', b.dataset.m === SVIEW.mode));
     $('#szc', pg).style.display = $('#scats', pg).style.display = cards ? '' : 'none';
     $('#scats', pg).innerHTML = catSlideBar(SVIEW.cat, searched());
-    $$('#scats [data-cat]', pg).forEach(b => b.onclick = () => { SVIEW.cat = b.dataset.cat; draw(); pg.scrollTo({ top: 0, behavior: 'smooth' }); });
+    $$('#scats [data-cat]', pg).forEach(b => b.onclick = () => { SVIEW.cat = b.dataset.cat; draw(); ($('#pg') || pg).scrollTo({ top: 0, behavior: 'smooth' }); });
     catSpy(pg, '#scats', '#stkg');
     const b0 = base();
     $('#sff', pg).innerHTML = Object.entries(F).map(([k, [l, fn]]) => { const n = b0.filter(p => (k === 'all' ? (p.track_stock && p.active !== false) : k === 'off' ? p.active === false : p.active !== false && fn(p))).length;
@@ -5592,7 +5591,8 @@ const _stock524 = VIEWS.stock;
 VIEWS.stock = pg => { const r = _stock524(pg);
   const fix = () => { const scan = $('.stk-scan', pg), f = $('#stkf', pg), stk = $('#stk', pg); if (!scan || !f) return;
     if (scan.nextElementSibling !== f && !(stk && scan.nextElementSibling === stk && stk.nextElementSibling === f)) { (stk || scan).after(f); }
-    const g = $('#stkg', pg); if (g && f.nextElementSibling !== g) f.after(g); };
+    const g = $('#stkg', pg), sc = $('#scats', pg); /* the category bar may sit between the filter card and the grid */
+    if (g && f.nextElementSibling !== g && !(sc && f.nextElementSibling === sc && sc.nextElementSibling === g)) (sc && f.nextElementSibling === sc ? sc : f).after(g); };
   fix(); new MutationObserver(fix).observe(pg, { childList: true }); return r; };
 /* ================= v5.2.5 — every device sees every bill, live sync between devices ================= */
 let SYNC_LAST = null;
@@ -6274,10 +6274,11 @@ function _catOf(el) { return S.products.find(p => p.id === el.dataset.id)?.categ
 /* Smooth-scroll so the first card of a category sits just under the slide bar. */
 function catScrollTo(pg, gridSel, catId) {
   const g = $(gridSel, pg); if (!g) return;
-  if (!catId) { pg.scrollTo({ top: 0, behavior: 'smooth' }); return; }
+  const scr = document.querySelector('#pg') || pg;
+  if (!catId) { scr.scrollTo({ top: 0, behavior: 'smooth' }); return; }
   const el = [...g.querySelectorAll('.pm[data-id]')].find(e => _catOf(e) === catId); if (!el) return;
   const ref = g.querySelector(`.grp-h[data-cat="${catId}"]`) || el;
-  pg.scrollBy({ top: ref.getBoundingClientRect().top - _catLine(pg) + 2, behavior: 'smooth' });
+  scr.scrollBy({ top: ref.getBoundingClientRect().top - _catLine(pg) + 2, behavior: 'smooth' });
 }
 /* Highlight the chip of whatever category is at the top of the view. */
 function catSpy(pg, catsSel, gridSel) {
@@ -6292,9 +6293,11 @@ function catSpy(pg, catsSel, gridSel) {
     chips.forEach(c => c.classList.toggle('on', c === on));
     if (on && on !== pg._catOn) { pg._catOn = on; const bcs = box.querySelector('.bcs'); if (bcs) bcs.scrollTo({ left: on.offsetLeft - (bcs.clientWidth - on.clientWidth) / 2, behavior: 'smooth' }); }
   };
-  if (pg._catSpy) { pg.removeEventListener('scroll', pg._catSpy); removeEventListener('scroll', pg._catSpy); }
-  let raf = 0; pg._catSpy = () => { if (raf) return; raf = requestAnimationFrame(() => { raf = 0; run(); }); };
-  pg.addEventListener('scroll', pg._catSpy, { passive: true }); addEventListener('scroll', pg._catSpy, { passive: true });
+  /* the list scrolls inside #pg (the view itself is drawn in a sub-container), so listen there */
+  const scr = document.querySelector('#pg') || pg;
+  if (scr._catSpy) scr.removeEventListener('scroll', scr._catSpy);
+  let raf = 0; scr._catSpy = () => { if (raf) return; raf = requestAnimationFrame(() => { raf = 0; run(); }); };
+  scr.addEventListener('scroll', scr._catSpy, { passive: true });
   pg._catOn = null; setTimeout(run, 80); setTimeout(run, 300);
 }
 /* Render list into one grid, or grouped category sections when grouped=true. */
@@ -6343,4 +6346,27 @@ function pmSections(list, cols, px, cardFn, grouped) {
   }
   const _p = VIEWS.products; VIEWS.products = pg => { const r = _p(pg); try { liveSearch(pg, '#ps', p => productForm(p, () => go('products'))); } catch (e) {} return r; };
   const _s = VIEWS.stock; VIEWS.stock = pg => { const r = _s(pg); try { liveSearch(pg, '#sfq', p => stockQuick(p, () => go('stock'))); } catch (e) {} return r; };
+})();
+/* v5.6.4 — UI test fixes: close floating popovers when the page changes, and
+   tell the user (instead of doing nothing) when a helper library can't load. */
+(function () {
+  const _go = go;
+  go = function (page) { document.querySelectorAll('.pop5,.livedrop').forEach(p => p.classList.contains('pop5') ? p.remove() : (p.hidden = true)); const r = _go.apply(this, arguments);
+    try { if (document.querySelector('.tabbar .tb[data-p].on')) document.getElementById('moreBtn')?.classList.remove('on');
+      [['#prof', 'บัญชีผู้ใช้'], ['#bell', 'การแจ้งเตือน'], ['#shopBtn', 'เลือกร้าน'], ['#quickFab', 'ทางลัด']].forEach(([s, l]) => { const b = document.querySelector(s); if (b && !b.getAttribute('aria-label')) b.setAttribute('aria-label', l); }); } catch (e) {}
+    return r; };
+  /* stock list (table) mode: label the stacked numbers on small screens, and keep a one-tap way back to the picture view */
+  let tick = 0;
+  const tidy = () => { tick = 0;
+    document.querySelectorAll('#sbody table.tbl').forEach(tb => { if (tb._lbl) return; tb._lbl = 1; const heads = [...tb.querySelectorAll('tr:first-child th')].map(h => h.textContent.trim());
+      tb.querySelectorAll('tr').forEach(tr => [...tr.children].forEach((td, i) => { if (td.tagName === 'TD' && i > 0 && heads[i] && !td.querySelector('button')) td.dataset.l = heads[i]; })); });
+    const tabs = document.querySelector('#stk .tabs'), sw = document.querySelector('#svm [data-m="cards"]');
+    if (tabs && sw && !sw.classList.contains('on') && !tabs.querySelector('.tocards')) { const b = document.createElement('button'); b.type = 'button'; b.className = 'tocards'; b.textContent = '🖼️ รูปใหญ่'; b.onclick = () => { sw.click(); (document.querySelector('#pg') || document.body).scrollTo({ top: 0 }); }; tabs.prepend(b); } };
+  new MutationObserver(() => { if (!tick) tick = setTimeout(tidy, 120); }).observe(document.body, { childList: true, subtree: true });
+  let last = 0;
+  addEventListener('unhandledrejection', e => {
+    if (!e.reason || e.reason.message !== 'LIB_LOAD') return;
+    e.preventDefault(); if (Date.now() - last < 4000) return; last = Date.now();
+    toast(LANG === 'th' ? 'โหลดไม่สำเร็จ — ตรวจสอบอินเทอร์เน็ตแล้วกดอีกครั้ง' : 'Could not load — check the internet and tap again', 'bad');
+  });
 })();

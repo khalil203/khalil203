@@ -1,6 +1,6 @@
 /* Shop POS — free, open POS + stock web app.  Data: Supabase.  Hosting: GitHub Pages. */
 'use strict';
-const VERSION = '5.6.3';
+const VERSION = '5.6.4';
 const sb = supabase.createClient(window.POS_CONFIG.url, window.POS_CONFIG.key, { auth: { flowType: 'pkce', detectSessionInUrl: true, persistSession: true } });
 
 /* ================= i18n ================= */
@@ -1077,12 +1077,16 @@ function showReceipt(sale, items, cust, autoPrint) {
 
 /* ---------- barcode camera ---------- */
 let h5Loaded = null;
-function loadScript(src) { return new Promise((res, rej) => { const s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = rej; document.head.appendChild(s); }); }
+const _scriptP = {};
+/* load a helper library once; a failed load is forgotten so the next tap tries again (and one automatic retry) */
+function loadScript(src) {
+  const once = () => new Promise((res, rej) => { const s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = () => { s.remove(); rej(new Error('LIB_LOAD')); }; document.head.appendChild(s); });
+  return _scriptP[src] ||= once().catch(() => new Promise(r => setTimeout(r, 700)).then(once)).catch(e => { delete _scriptP[src]; throw e; });
+}
 async function scanBarcode(onCode) {
   const m = modal(t('Scan'), `<div id="reader" style="width:100%;min-height:260px"></div><p class="muted" style="text-align:center">📷 ${t('Barcode')} / QR</p>`);
   try {
-    h5Loaded ||= loadScript('https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js');
-    await h5Loaded;
+    await loadScript('https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js');
     const sc = new Html5Qrcode('reader');
     let done = false;
     const stop = () => sc.stop().catch(() => {});
