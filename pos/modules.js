@@ -1423,7 +1423,7 @@ const _goC = go;
 go = function (page) { _goC(page); $('.top')?.classList.toggle('posmode', S.page === 'pos'); };
 /* ================= Shop POS v4 — promotions engine, data center, barcodes, personal use,
    activity log, branding, receipt image, cashier upgrades, auto-update ================= */
-const APP_VERSION = '5.7.2';
+const APP_VERSION = '5.7.3';
 Object.assign(TH, { 'Data center': 'ศูนย์ข้อมูล', 'Barcodes': 'บาร์โค้ด', 'Branches': 'สาขา' });
 PAGES.splice(PAGES.findIndex(p => p.id === 'settings'), 0,
   { id: 'barcodes', ic: '🏷', name: 'Barcodes', roles: ['owner', 'manager', 'stock'] },
@@ -6373,7 +6373,19 @@ function pmSections(list, cols, px, cardFn, grouped) {
    tell the user (instead of doing nothing) when a helper library can't load. */
 (function () {
   const _go = go;
-  go = function (page) { document.querySelectorAll('.pop5,.livedrop').forEach(p => p.classList.contains('pop5') ? p.remove() : (p.hidden = true)); const r = _go.apply(this, arguments);
+  const PS = ['products', 'stock'];
+  go = function (page) { document.querySelectorAll('.pop5,.livedrop').forEach(p => p.classList.contains('pop5') ? p.remove() : (p.hidden = true));
+    /* redrawing the page you are already on (after a save, or the background data refresh) must not throw you back to the top or clear your search */
+    const sc0 = document.querySelector('#pg'), same = sc0 && (S.page === page || (PS.includes(S.page) && PS.includes(page))) && sc0.children.length;
+    const keep = same ? { y: sc0.scrollTop, q: document.querySelector('#ps')?.value || '' } : null; if (keep && keep.q) document.querySelector('#ps').value = '';
+    const r = _go.apply(this, arguments);
+    if (keep && (keep.y > 0 || keep.q)) { try {
+      const old = document.querySelector('#ps');
+      const set = () => { const p = document.querySelector('#pg'); if (!p || S.page !== page) return;
+        const i = document.querySelector('#ps'); if (i && keep.q && !i.value && i !== old) { i.value = keep.q; i.dispatchEvent(new Event('input', { bubbles: true })); document.querySelectorAll('.livedrop').forEach(d => d.hidden = true); }
+        p.scrollTop = keep.y; };
+      set(); requestAnimationFrame(set); setTimeout(set, 180);
+    } catch (e) {} }
     try { if (document.querySelector('.tabbar .tb[data-p].on')) document.getElementById('moreBtn')?.classList.remove('on');
       [['#prof', 'บัญชีผู้ใช้'], ['#bell', 'การแจ้งเตือน'], ['#shopBtn', 'เลือกร้าน'], ['#quickFab', 'ทางลัด']].forEach(([s, l]) => { const b = document.querySelector(s); if (b && !b.getAttribute('aria-label')) b.setAttribute('aria-label', l); }); } catch (e) {}
     return r; };

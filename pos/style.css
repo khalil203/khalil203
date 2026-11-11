@@ -1682,3 +1682,4 @@ body:has(#cart.open) #scanReady,body:has(.mbg) #scanReady{display:none!important
 .ustat:disabled{grid-column:span 2}
 .rb-gh{grid-column:1/-1;position:sticky;top:-2px;z-index:2;display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:10px;background:var(--card);box-shadow:var(--shadow);font-weight:800;font-size:14px}
 .rb-gh i{width:10px;height:10px;border-radius:50%;flex:0 0 auto}.rb-gh small{margin-left:auto;font-weight:600;color:var(--muted);background:var(--bg2);border-radius:999px;padding:1px 8px}
+.pm:active{transform:none}
