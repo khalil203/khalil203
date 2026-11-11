@@ -31,8 +31,12 @@ function catSpy(pg, catsSel, gridSel, fixed) {
     const bar = pg.querySelector('.bcs-wrap'); if (bar) pg.style.setProperty('--catbar', Math.round(bar.getBoundingClientRect().height) + 'px');
     const line = _catLine(pg), cards = [...g.querySelectorAll('.pm[data-id]')];
     let cur = fixed || '';
-    /* showing everything: at the very top 'all' is lit, further down the category in view */
-    if (!fixed && (document.querySelector('#pg') || pg).scrollTop > 40) for (const el of cards) { const r = el.getBoundingClientRect(); if (r.bottom > line) { cur = _catOf(el); break; } }
+    if (!fixed) {
+      /* follow the category banner that is pinned under the bar, so the lit chip always names the same category as the banner */
+      const heads = [...g.querySelectorAll('.grp-h[data-cat]')];
+      if (heads.length) { for (const h of heads) { if (h.getBoundingClientRect().top <= line + 6) cur = h.dataset.cat; } }
+      else if ((document.querySelector('#pg') || pg).scrollTop > 40) for (const el of cards) { const r = el.getBoundingClientRect(); if (r.bottom > line + 4) { cur = _catOf(el); break; } }
+    }
     const chips = [...box.querySelectorAll('.bcs-chip')];
     const on = chips.find(c => (c.dataset.cat || '') === cur) || chips.find(c => (c.dataset.cat || '') === '');
     chips.forEach(c => c.classList.toggle('on', c === on));
