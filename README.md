@@ -6,14 +6,8 @@ Tunisian living in Thailand 🇹🇳🇹🇭. I build free tools for my own busi
 
 | Project | What it is | Open |
 |---|---|---|
-| 🧠 [Second Brain](https://github.com/khalil203/second-brain) | My all-in-one app: notes, tasks, journal and 3D brain map, plus 🤖 **Jarvis** voice assistant, 🎙️ **My Voice** voice cloner, 🎨 **Imagine** AI images and 🔄 **Convert** file converter. Works offline and syncs to the cloud. | [Web app](https://khalil203.github.io/second-brain/) · [Android APK](https://github.com/khalil203/second-brain/raw/main/dist/second-brain.apk) |
+| 🧠 [Second Brain](https://github.com/khalil203/second-brain) | My all-in-one app: notes, tasks, journal and 3D brain map, plus 🤖 **Jarvis** voice assistant, 🎙️ **My Voice** voice cloner, 🎨 **Imagine** AI images, 🎬 **AD Studio** Thai ad videos and 🔄 **Convert** file converter. Works offline and syncs to the cloud. | [Web app](https://khalil203.github.io/second-brain/) · [Android APK](https://github.com/khalil203/second-brain/raw/main/dist/second-brain.apk) |
 | 🔄 [Second Brain Convert](https://github.com/khalil203/second-brain-convert) | Desktop version of Convert for Windows: drag and drop, 200+ formats, runs on your own PC. | [Download](https://github.com/khalil203/second-brain-convert/releases) |
-
-## 📣 Marketing tools
-
-| Project | What it is | Open |
-|---|---|---|
-| 🎬 [AI AD STUDIO](https://github.com/khalil203/ai-ad-studio) | Mobile app that turns product photos into Thai ad videos, from strategy and storyboard to MP4. | [Open](https://khalil203.github.io/ai-ad-studio/) |
 
 ## 🏪 Business systems
 
